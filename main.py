@@ -12,6 +12,12 @@ from PyQt5.QtCore import Qt
 from ui.main_window import MainWindow
 from constants import THEME_DARK
 
+# Enable Retina / High-DPI rendering on macOS before QApplication is created
+if hasattr(Qt, 'AA_EnableHighDpiScaling'):
+    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
+if hasattr(Qt, 'AA_UseHighDpiPixmaps'):
+    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+
 
 def apply_dark_theme(app: QApplication):
     """
