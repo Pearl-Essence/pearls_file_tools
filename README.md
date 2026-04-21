@@ -9,190 +9,98 @@ Built with Python 3.7+ and PyQt5. Runs on macOS and Windows.
 ## Table of Contents
 
 1. [Requirements](#requirements)
-2. [macOS Setup](#macos-setup)
-3. [Windows Setup](#windows-setup)
-4. [Running the Application](#running-the-application)
-5. [Features](#features)
-6. [Keyboard Shortcuts](#keyboard-shortcuts)
-7. [Configuration](#configuration)
-8. [Optional Dependencies](#optional-dependencies)
-9. [Troubleshooting](#troubleshooting)
+2. [Setup](#setup)
+3. [Running the Application](#running-the-application)
+4. [Features](#features)
+5. [Keyboard Shortcuts](#keyboard-shortcuts)
+6. [Configuration](#configuration)
+7. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Requirements
 
-| Dependency | Version | Required |
+The only thing you need to install manually is **Python 3.7 or later**. Everything else is handled by the setup script.
+
+| Dependency | Required | Installed by setup script |
 |---|---|---|
-| Python | 3.7 or later | Yes |
-| PyQt5 | 5.15.0 or later | Yes |
-| rarfile | 4.0 or later | No — RAR support only |
-| py7zr | 0.20.0 or later | No — 7Z support only |
-| pymediainfo | 6.0.0 or later | No — media metadata only |
-| watchdog | 3.0.0 or later | No — watch folders only |
-| ffprobe / ffmpeg | any | No — video thumbnails & metadata only |
+| Python 3.7+ | Yes | No — install once manually (see below) |
+| PyQt5 | Yes | Yes — automatically |
+| rarfile | No — RAR support | Yes — prompted |
+| py7zr | No — 7Z support | Yes — prompted |
+| pymediainfo | No — media metadata | Yes — prompted |
+| watchdog | No — watch folders | Yes — prompted |
+| ffprobe / ffmpeg | No — video thumbnails | No — see note below |
 
 ---
 
-## macOS Setup
+## Setup
 
-### Step 1 — Install Python 3
+### macOS
 
-Check if Python 3 is already installed:
-
-```bash
-python3 --version
-```
-
-If the command is not found, install Python via Homebrew (recommended) or the official installer.
-
-**Option A — Homebrew (recommended):**
+**Step 1 — Install Python 3** (one time only)
 
 ```bash
-# Install Homebrew if you don't have it
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-
-# Install Python
+# If you have Homebrew (recommended):
 brew install python
+
+# Or download the installer from https://www.python.org/downloads/
 ```
 
-**Option B — Official installer:**
-
-Download and run the macOS installer from https://www.python.org/downloads/
-
-### Step 2 — Create a virtual environment (recommended)
-
-A virtual environment keeps Pearl's File Tools dependencies isolated from your system Python.
+**Step 2 — Run the setup script**
 
 ```bash
-# Navigate to the project directory
 cd /path/to/pearls_file_tools
-
-# Create the virtual environment
-python3 -m venv .venv
-
-# Activate it
-source .venv/bin/activate
+./run.sh --setup
 ```
 
-You will see `(.venv)` at the start of your terminal prompt when the environment is active. You must activate it each time you open a new terminal session before running the app.
+That's it. The script will:
+- Create an isolated virtual environment in `.venv/`
+- Install PyQt5 automatically
+- Ask yes/no for each optional dependency (RAR, 7Z, media metadata, watch folders)
+- Check whether `ffprobe` is available and tell you how to install it if not
+- Launch the app immediately when done
 
-### Step 3 — Install required dependencies
+On subsequent launches, just run `./run.sh` — no setup needed again.
 
-With the virtual environment active:
-
-```bash
-pip install PyQt5>=5.15.0
-```
-
-### Step 4 — (Optional) Install optional dependencies
-
-Install only the ones you need:
-
-```bash
-# RAR archive support
-pip install rarfile
-
-# 7Z archive support
-pip install py7zr
-
-# Media metadata reading
-pip install pymediainfo
-
-# Watch folder automation
-pip install watchdog
-
-# ffprobe/ffmpeg for video thumbnails (via Homebrew)
-brew install ffmpeg
-```
-
-### Step 5 — Verify the installation
-
-```bash
-python3 -c "import PyQt5; print('PyQt5 OK')"
-```
-
-You should see `PyQt5 OK` with no errors.
-
-### Step 6 — Launch the application
-
-```bash
-# Using the launch script (handles environment checks automatically)
-./run.sh
-
-# Or directly
-python3 main.py
-```
-
-> **Retina displays:** High-DPI scaling is enabled automatically. The app renders sharply on all Retina/Pro Display XDR screens.
+> **ffprobe (optional):** The setup script cannot install this because it is not a Python package. To enable video thumbnail and metadata features: `brew install ffmpeg`
 
 ---
 
-## Windows Setup
+### Windows
 
-### Step 1 — Install Python 3
+**Step 1 — Install Python 3** (one time only)
 
 Download and run the installer from https://www.python.org/downloads/
 
 During installation, check **"Add Python to PATH"** before clicking Install.
 
-Verify in Command Prompt or PowerShell:
+**Step 2 — Run the setup script**
+
+Open Command Prompt or PowerShell in the `pearls_file_tools` folder and run:
 
 ```cmd
-python --version
+run.bat --setup
 ```
 
-### Step 2 — Create a virtual environment (recommended)
+The script does the same thing as the macOS version — creates a venv, installs PyQt5, prompts for optional deps, and launches the app.
 
-```cmd
-cd C:\path\to\pearls_file_tools
-python -m venv .venv
-.venv\Scripts\activate
-```
+On subsequent launches, just run `run.bat`.
 
-You will see `(.venv)` in your prompt when the environment is active.
-
-### Step 3 — Install required dependencies
-
-```cmd
-pip install PyQt5>=5.15.0
-```
-
-### Step 4 — (Optional) Install optional dependencies
-
-```cmd
-pip install rarfile
-pip install py7zr
-pip install pymediainfo
-pip install watchdog
-```
-
-For ffprobe, download a Windows build from https://ffmpeg.org/download.html and add the `bin` folder to your system PATH.
-
-### Step 5 — Launch the application
-
-```cmd
-run.bat
-```
-
-Or directly:
-
-```cmd
-python main.py
-```
+> **ffprobe (optional):** Download ffmpeg from https://ffmpeg.org/download.html and add its `bin\` folder to your system PATH.
 
 ---
 
 ## Running the Application
 
-| Platform | Command |
-|---|---|
-| macOS / Linux | `./run.sh` |
-| Windows | `run.bat` or `python main.py` |
+| Platform | First time | Subsequent launches |
+|---|---|---|
+| macOS | `./run.sh --setup` | `./run.sh` |
+| Windows | `run.bat --setup` | `run.bat` |
 
-Both launch scripts automatically check that Python 3 and PyQt5 are available and print a clear error message if they are not.
-
-Settings and configuration are saved automatically on exit. On macOS they are stored in `~/.config/pearls_file_tools/`. On Windows they are stored in `%APPDATA%\pearls_file_tools\`.
+Settings are saved automatically on exit to:
+- **macOS:** `~/.config/pearls_file_tools/`
+- **Windows:** `%APPDATA%\pearls_file_tools\`
 
 ---
 
@@ -325,63 +233,45 @@ To reset all settings to defaults, delete the configuration file and relaunch th
 
 ---
 
-## Optional Dependencies
-
-Install any of these to unlock additional functionality:
-
-```bash
-# RAR archive extraction
-pip install rarfile
-
-# 7Z archive extraction
-pip install py7zr
-
-# Media metadata (codec, resolution, fps, duration)
-pip install pymediainfo
-
-# Watch folder automation (future feature)
-pip install watchdog
-
-# Video thumbnails and metadata via ffprobe (external tool)
-# macOS:
-brew install ffmpeg
-# Windows: download from https://ffmpeg.org/download.html and add to PATH
-```
-
-The app detects missing optional libraries at startup. Features that require an unavailable library are disabled with a tooltip explaining what to install — the app never crashes due to a missing optional dependency.
-
----
-
 ## Troubleshooting
 
-### App does not launch / "ModuleNotFoundError: No module named 'PyQt5'"
+### App does not launch / "PyQt5 is not installed"
 
-PyQt5 is not installed in the current Python environment.
+Run setup — it installs everything automatically:
 
 ```bash
-pip install PyQt5
-```
+# macOS
+./run.sh --setup
 
-If you are using a virtual environment, make sure it is activated first (`source .venv/bin/activate` on macOS).
+# Windows
+run.bat --setup
+```
 
 ### "python3: command not found" when running run.sh
 
-Python 3 is not on your PATH. Install it via Homebrew (`brew install python`) or the official installer and then try again.
+Python 3 is not installed or not on your PATH.
 
-### Archive Extractor tab does not load / crashes on open
+```bash
+# macOS
+brew install python
 
-This was a known bug fixed in Phase 1. If you have an older version, update to the current codebase.
+# Linux
+sudo apt install python3
+```
+
+Then re-run `./run.sh --setup`.
 
 ### RAR or 7Z files are not extracted
 
-Install the optional library for the format you need:
+Re-run setup and answer **y** when prompted for RAR or 7Z support:
 
 ```bash
-pip install rarfile   # RAR
-pip install py7zr     # 7Z
+./run.sh --setup
 ```
 
-Then relaunch the app.
+### Re-running setup after the first time
+
+Setup is safe to run multiple times. It skips virtual environment creation if `.venv/` already exists and only installs what you say yes to. Use it whenever you want to add an optional dependency you skipped the first time.
 
 ### Images appear blank / thumbnails are black
 
