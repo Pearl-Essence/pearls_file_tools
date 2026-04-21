@@ -1,0 +1,18 @@
+# Pearl's File Tools - Requirements
+# Python 3.7+ required
+
+# Required
+PyQt5>=5.15.0
+
+# Optional — archive formats
+# rarfile>=4.0          # RAR archive support
+# py7zr>=0.20.0         # 7Z archive support
+
+# Optional — media metadata (install at least one for metadata features)
+# pymediainfo>=6.0.0    # Media info via MediaInfo library
+
+# Optional — watch folder automation
+# watchdog>=3.0.0       # File system event monitoring
+
+# Note: ffprobe/ffmpeg are external CLI tools, not pip packages.
+# Install via: brew install ffmpeg (macOS) or https://ffmpeg.org/download.html
