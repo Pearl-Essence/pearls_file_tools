@@ -2,7 +2,7 @@
 
 from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QLineEdit,
                             QPushButton, QRadioButton, QCheckBox, QScrollArea, QWidget,
-                            QButtonGroup)
+                            QButtonGroup, QSpinBox, QStackedWidget)
 from PyQt5.QtCore import Qt
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -12,8 +12,10 @@ from ui.widgets.file_list_widget import FileListWidget
 from constants import (ALL_EXTENSION_CATEGORIES, CASE_NONE, CASE_UPPER, CASE_LOWER,
                       CASE_TITLE, OP_TYPE_RENAME)
 from core.file_utils import get_files_in_directory
-from core.pattern_matching import detect_common_prefixes, match_prefix
-from core.name_transform import generate_new_filename
+from core.pattern_matching import (detect_common_prefixes, match_prefix,
+                                   detect_common_suffixes, match_suffix)
+from core.name_transform import (generate_new_filename, generate_sequential_filenames,
+                                  bump_version, move_suffix_to_prefix)
 from models.operation_record import OperationRecord
 
 
@@ -48,13 +50,35 @@ class BulkRenamerTab(BaseTab):
         filter_group = self.create_extension_filter_group()
         layout.addWidget(filter_group)
 
-        # Rename options
-        rename_group = self.create_rename_options_group()
-        layout.addWidget(rename_group)
+        # ── Rename mode selector ──────────────────────────────────────────
+        mode_group = QGroupBox("Rename Mode")
+        mode_layout = QHBoxLayout()
+        self.mode_btn_group = QButtonGroup()
+        self.mode_standard_radio = QRadioButton("Standard")
+        self.mode_sequential_radio = QRadioButton("Number Files")
+        self.mode_btn_group.addButton(self.mode_standard_radio, 0)
+        self.mode_btn_group.addButton(self.mode_sequential_radio, 1)
+        self.mode_standard_radio.setChecked(True)
+        self.mode_standard_radio.toggled.connect(self._on_mode_changed)
+        mode_layout.addWidget(self.mode_standard_radio)
+        mode_layout.addWidget(self.mode_sequential_radio)
+        mode_layout.addStretch()
+        mode_group.setLayout(mode_layout)
+        layout.addWidget(mode_group)
 
-        # Prefix detection section
-        prefix_group = self.create_prefix_detection_group()
-        layout.addWidget(prefix_group)
+        # ── Stacked rename options ────────────────────────────────────────
+        self.rename_stack = QStackedWidget()
+        self.rename_stack.addWidget(self.create_rename_options_group())    # page 0 — standard
+        self.rename_stack.addWidget(self.create_sequential_options_group())  # page 1 — sequential
+        layout.addWidget(self.rename_stack)
+
+        # Companion file options (visible in all modes)
+        companion_group = self.create_companion_options_group()
+        layout.addWidget(companion_group)
+
+        # Prefix/suffix transposition (standard mode only)
+        self.prefix_group_widget = self.create_transposition_group()
+        layout.addWidget(self.prefix_group_widget)
 
         # File list
         self.file_list = FileListWidget()
@@ -71,16 +95,33 @@ class BulkRenamerTab(BaseTab):
         self.apply_btn.clicked.connect(self.apply_rename)
         button_layout.addWidget(self.apply_btn)
 
+        self.bump_version_btn = QPushButton("Bump Version (_v##)")
+        self.bump_version_btn.setToolTip(
+            "Increment the _v## suffix on all selected files (e.g. HERO_v01.mov → HERO_v02.mov)"
+        )
+        self.bump_version_btn.clicked.connect(self.apply_bump_version)
+        button_layout.addWidget(self.bump_version_btn)
+
         self.undo_btn = QPushButton("Undo Last Operation")
         self.undo_btn.clicked.connect(self.undo_last_operation)
         self.undo_btn.setEnabled(False)
         button_layout.addWidget(self.undo_btn)
 
-        button_layout.addStretch()
+        self.open_csv_btn = QPushButton("Open Latest CSV Log")
+        self.open_csv_btn.setToolTip("Open the most recent rename log CSV in this directory")
+        self.open_csv_btn.clicked.connect(self.open_latest_csv)
+        button_layout.addWidget(self.open_csv_btn)
 
+        button_layout.addStretch()
         layout.addLayout(button_layout)
 
         self.setLayout(layout)
+
+    def _on_mode_changed(self):
+        is_standard = self.mode_standard_radio.isChecked()
+        self.rename_stack.setCurrentIndex(0 if is_standard else 1)
+        self.prefix_group_widget.setVisible(is_standard)
+        self.preview_btn.setEnabled(is_standard)
 
     def create_extension_filter_group(self) -> QGroupBox:
         """Create the extension filter group."""
@@ -170,45 +211,147 @@ class BulkRenamerTab(BaseTab):
         group.setLayout(layout)
         return group
 
-    def create_prefix_detection_group(self) -> QGroupBox:
-        """Create the prefix detection group."""
-        group = QGroupBox("Prefix Detection (move prefix to suffix)")
+    def create_sequential_options_group(self) -> QGroupBox:
+        """Create the sequential-numbering options panel."""
+        group = QGroupBox("Sequential Numbering Options")
         layout = QVBoxLayout()
 
-        # Detect button and manual input
+        row1 = QHBoxLayout()
+        row1.addWidget(QLabel("Base name:"))
+        self.seq_base_input = QLineEdit()
+        self.seq_base_input.setPlaceholderText("e.g. HERO or SCENE_01")
+        row1.addWidget(self.seq_base_input, stretch=1)
+        layout.addLayout(row1)
+
+        row2 = QHBoxLayout()
+        row2.addWidget(QLabel("Start at:"))
+        self.seq_start_spin = QSpinBox()
+        self.seq_start_spin.setRange(0, 99999)
+        self.seq_start_spin.setValue(1)
+        row2.addWidget(self.seq_start_spin)
+
+        row2.addSpacing(20)
+        row2.addWidget(QLabel("Padding (digits):"))
+        self.seq_padding_spin = QSpinBox()
+        self.seq_padding_spin.setRange(1, 8)
+        self.seq_padding_spin.setValue(3)
+        row2.addWidget(self.seq_padding_spin)
+
+        row2.addSpacing(20)
+        row2.addWidget(QLabel("Separator:"))
+        self.seq_separator_input = QLineEdit("_")
+        self.seq_separator_input.setMaximumWidth(40)
+        row2.addWidget(self.seq_separator_input)
+        row2.addStretch()
+        layout.addLayout(row2)
+
+        preview_label = QLabel("Preview: HERO_001.mov, HERO_002.mov, …")
+        preview_label.setStyleSheet("color: #888; font-style: italic;")
+        self.seq_preview_label = preview_label
+        layout.addWidget(preview_label)
+
+        # Update preview label live
+        for widget in (self.seq_base_input, self.seq_separator_input):
+            widget.textChanged.connect(self._update_seq_preview)
+        for widget in (self.seq_start_spin, self.seq_padding_spin):
+            widget.valueChanged.connect(self._update_seq_preview)
+
+        group.setLayout(layout)
+        return group
+
+    def _update_seq_preview(self):
+        base = self.seq_base_input.text() or "BASE"
+        sep = self.seq_separator_input.text()
+        start = self.seq_start_spin.value()
+        pad = self.seq_padding_spin.value()
+        n1 = str(start).zfill(pad)
+        n2 = str(start + 1).zfill(pad)
+        self.seq_preview_label.setText(
+            f"Preview: {base}{sep}{n1}.ext, {base}{sep}{n2}.ext, …"
+        )
+
+    def create_companion_options_group(self) -> QGroupBox:
+        """Checkboxes to control sidecar and caption co-renaming."""
+        group = QGroupBox("Companion File Renaming")
+        layout = QHBoxLayout()
+        self.rename_sidecars_chk = QCheckBox("Rename sidecar files (.xmp, .thm, .lrv, …)")
+        self.rename_sidecars_chk.setChecked(True)
+        self.rename_sidecars_chk.setToolTip(
+            "When renaming a file, also rename any same-stem sidecar files\n"
+            "(.xmp, .thm, .lrv, .json, .srt, .vtt, .ttml)"
+        )
+        self.rename_captions_chk = QCheckBox("Rename caption/subtitle files (.srt, .vtt, .ttml, …)")
+        self.rename_captions_chk.setChecked(True)
+        self.rename_captions_chk.setToolTip(
+            "When renaming a video, also rename any same-stem subtitle files\n"
+            "(.srt, .vtt, .ttml, .sbv, .ass, .ssa)"
+        )
+        layout.addWidget(self.rename_sidecars_chk)
+        layout.addWidget(self.rename_captions_chk)
+        layout.addStretch()
+        group.setLayout(layout)
+        return group
+
+    def create_transposition_group(self) -> QGroupBox:
+        """Bidirectional prefix ↔ suffix transposition panel."""
+        group = QGroupBox("Prefix / Suffix Transposition")
+        layout = QVBoxLayout()
+
+        # Direction selector
+        dir_row = QHBoxLayout()
+        self.transpose_btn_group = QButtonGroup()
+        self.transpose_p2s_radio = QRadioButton("Prefix → Suffix")
+        self.transpose_s2p_radio = QRadioButton("Suffix → Prefix")
+        self.transpose_btn_group.addButton(self.transpose_p2s_radio, 0)
+        self.transpose_btn_group.addButton(self.transpose_s2p_radio, 1)
+        self.transpose_p2s_radio.setChecked(True)
+        self.transpose_p2s_radio.toggled.connect(self._on_transpose_direction_changed)
+        dir_row.addWidget(self.transpose_p2s_radio)
+        dir_row.addWidget(self.transpose_s2p_radio)
+        dir_row.addStretch()
+        layout.addLayout(dir_row)
+
+        # Detect button + manual input
         top_layout = QHBoxLayout()
-
-        self.detect_btn = QPushButton("Detect Prefixes")
-        self.detect_btn.clicked.connect(self.detect_prefixes)
+        self.detect_btn = QPushButton("Detect")
+        self.detect_btn.clicked.connect(self.detect_tokens)
         top_layout.addWidget(self.detect_btn)
-
-        top_layout.addWidget(QLabel("Manual prefix(es):"))
+        self.manual_token_label = QLabel("Manual prefix(es):")
+        top_layout.addWidget(self.manual_token_label)
         self.manual_prefix_input = QLineEdit()
         self.manual_prefix_input.setPlaceholderText("e.g., DRAFT_, WIP_, TEMP_")
         top_layout.addWidget(self.manual_prefix_input, stretch=1)
-
         layout.addLayout(top_layout)
 
-        # Scrollable prefix list
+        # Scrollable detected token list
         scroll = QScrollArea()
-        scroll.setMaximumHeight(100)
+        scroll.setMaximumHeight(90)
         scroll.setWidgetResizable(True)
-
         self.prefix_widget = QWidget()
         self.prefix_layout = QVBoxLayout()
         self.prefix_layout.setAlignment(Qt.AlignTop)
         self.prefix_widget.setLayout(self.prefix_layout)
         scroll.setWidget(self.prefix_widget)
-
         layout.addWidget(scroll)
 
-        # Apply prefix-to-suffix button
-        self.apply_prefix_suffix_btn = QPushButton("Apply Prefix → Suffix Transform")
-        self.apply_prefix_suffix_btn.clicked.connect(self.apply_prefix_to_suffix)
-        layout.addWidget(self.apply_prefix_suffix_btn)
+        # Apply button
+        self.apply_transpose_btn = QPushButton("Apply Prefix → Suffix")
+        self.apply_transpose_btn.clicked.connect(self.apply_transposition)
+        layout.addWidget(self.apply_transpose_btn)
 
         group.setLayout(layout)
         return group
+
+    def _on_transpose_direction_changed(self):
+        if self.transpose_p2s_radio.isChecked():
+            self.manual_token_label.setText("Manual prefix(es):")
+            self.manual_prefix_input.setPlaceholderText("e.g., DRAFT_, WIP_, TEMP_")
+            self.apply_transpose_btn.setText("Apply Prefix → Suffix")
+        else:
+            self.manual_token_label.setText("Manual suffix(es):")
+            self.manual_prefix_input.setPlaceholderText("e.g., _DRAFT, _WIP, _FINAL")
+            self.apply_transpose_btn.setText("Apply Suffix → Prefix")
+        self.clear_prefix_checkboxes()
 
     def on_directory_changed(self, directory: str):
         """Handle directory change."""
@@ -258,37 +401,43 @@ class BulkRenamerTab(BaseTab):
 
         self.emit_status(f"Loaded {len(files)} files")
 
-    def detect_prefixes(self):
-        """Detect common prefixes in current file list."""
+    def detect_tokens(self):
+        """Detect common prefix or suffix tokens depending on selected direction."""
         files = self.file_list.get_all_files()
         if not files:
             self.show_warning("No Files", "No files loaded to analyze.")
             return
 
-        # Get just the filenames
         filenames = [f.name for f in files]
+        is_prefix_mode = self.transpose_p2s_radio.isChecked()
 
-        # Detect common prefixes
-        prefix_counts = detect_common_prefixes(filenames)
+        if is_prefix_mode:
+            counts = detect_common_prefixes(filenames)
+            label = "prefix"
+        else:
+            counts = detect_common_suffixes(filenames)
+            label = "suffix"
 
-        if not prefix_counts:
-            self.show_info("No Prefixes", "No common prefixes detected.")
+        if not counts:
+            self.show_info(f"No {label.capitalize()}es Found",
+                           f"No common {label} patterns detected.")
             return
 
-        # Clear existing prefix checkboxes
         self.clear_prefix_checkboxes()
+        for token in sorted(counts.keys(), key=lambda x: counts[x], reverse=True):
+            count = counts[token]
+            cb = QCheckBox(f'{token}  ({count} file{"s" if count > 1 else ""})')
+            cb.setChecked(True)
+            self.prefix_checkboxes[token] = cb
+            self.prefix_layout.addWidget(cb)
 
-        # Create checkboxes for detected prefixes
-        for prefix in sorted(prefix_counts.keys(), key=lambda x: prefix_counts[x], reverse=True):
-            count = prefix_counts[prefix]
-            checkbox = QCheckBox(f'{prefix} ({count} file{"s" if count > 1 else ""})')
-            checkbox.setChecked(True)
-            self.prefix_checkboxes[prefix] = checkbox
-            self.prefix_layout.addWidget(checkbox)
+        self.show_info(f"{label.capitalize()}es Detected",
+                       f"Found {len(counts)} common {label} pattern(s).\n"
+                       "Uncheck any you don't want to process.")
 
-        self.show_info("Prefixes Detected",
-                      f"Found {len(prefix_counts)} common prefix pattern(s).\n"
-                      "Uncheck any you don't want to process.")
+    # Keep old name as alias so existing callers don't break
+    def detect_prefixes(self):
+        self.detect_tokens()
 
     def clear_prefix_checkboxes(self):
         """Clear all prefix checkboxes."""
@@ -351,35 +500,94 @@ class BulkRenamerTab(BaseTab):
         dialog.exec_()
 
     def apply_rename(self):
-        """Apply rename operation."""
+        """Apply rename operation (standard or sequential mode)."""
         selected_files = self.file_list.get_selected_files()
         if not selected_files:
             self.show_warning("No Files", "No files selected for renaming.")
             return
 
-        # Confirm
-        if not self.confirm_action(
-            "Confirm Rename",
-            f"Are you sure you want to rename {len(selected_files)} file(s)?\n\n"
-            "This operation can be undone using 'Undo Last Operation'."
-        ):
-            return
-
-        # Create rename worker
         from workers.rename_worker import RenameWorker
 
-        self.worker_thread = RenameWorker(
-            selected_files,
-            prefix=self.prefix_input.text(),
-            suffix=self.suffix_input.text(),
-            rename_to=self.rename_input.text(),
-            case_transform=self.get_case_transform()
-        )
+        # Sequential numbering mode
+        if self.mode_sequential_radio.isChecked():
+            base = self.seq_base_input.text().strip()
+            if not base:
+                self.show_warning("Base Name Required", "Enter a base name for sequential numbering.")
+                return
+            pairs = generate_sequential_filenames(
+                [f.name for f in selected_files],
+                base_name=base,
+                start=self.seq_start_spin.value(),
+                padding=self.seq_padding_spin.value(),
+                separator=self.seq_separator_input.text(),
+            )
+            direct = [(selected_files[i], new_name) for i, (_, new_name) in enumerate(pairs)]
+            preview_lines = "\n".join(f"  {old} → {new}" for old, new in pairs[:5])
+            if len(pairs) > 5:
+                preview_lines += f"\n  … and {len(pairs) - 5} more"
+            if not self.confirm_action(
+                "Confirm Sequential Rename",
+                f"Rename {len(selected_files)} file(s) as:\n\n{preview_lines}\n\n"
+                "This can be undone using 'Undo Last Operation'."
+            ):
+                return
+            self.worker_thread = RenameWorker(
+                selected_files,
+                direct_renames=direct,
+                rename_sidecars=self.rename_sidecars_chk.isChecked(),
+                rename_captions=self.rename_captions_chk.isChecked(),
+            )
+        else:
+            # Standard mode
+            if not self.confirm_action(
+                "Confirm Rename",
+                f"Rename {len(selected_files)} file(s)?\n\n"
+                "This can be undone using 'Undo Last Operation'."
+            ):
+                return
+            self.worker_thread = RenameWorker(
+                selected_files,
+                prefix=self.prefix_input.text(),
+                suffix=self.suffix_input.text(),
+                rename_to=self.rename_input.text(),
+                case_transform=self.get_case_transform(),
+                rename_sidecars=self.rename_sidecars_chk.isChecked(),
+                rename_captions=self.rename_captions_chk.isChecked(),
+            )
 
         self.worker_thread.progress.connect(self.emit_status)
         self.worker_thread.finished.connect(self.on_rename_finished)
         self.worker_thread.start()
+        self.enable_controls(False)
 
+    def apply_bump_version(self):
+        """Bump the _v## suffix on all selected files."""
+        selected_files = self.file_list.get_selected_files()
+        if not selected_files:
+            self.show_warning("No Files", "No files selected.")
+            return
+
+        direct = [(f, bump_version(f.name)) for f in selected_files]
+        # Skip files with no version suffix
+        direct = [(path, new) for path, new in direct if new != path.name]
+
+        if not direct:
+            self.show_info("No Versions Found",
+                           "None of the selected files have a _v## version suffix.")
+            return
+
+        if not self.confirm_action(
+            "Confirm Bump Version",
+            f"Increment version suffix on {len(direct)} file(s)?\n\n"
+            "This can be undone using 'Undo Last Operation'."
+        ):
+            return
+
+        from workers.rename_worker import RenameWorker
+        self.worker_thread = RenameWorker([], direct_renames=direct)
+        self.worker_thread.progress.connect(self.emit_status)
+        self.worker_thread.finished.connect(self.on_rename_finished)
+        self.worker_thread.start()
         self.enable_controls(False)
 
     def on_rename_finished(self, success: bool, message: str, operation_record: Optional[OperationRecord] = None):
@@ -389,18 +597,27 @@ class BulkRenamerTab(BaseTab):
         if success and operation_record:
             self.undo_stack.append(operation_record)
             self.undo_btn.setEnabled(True)
+            # Persist to history DB
+            try:
+                from core.history import RenameHistory
+                RenameHistory().log_operation(operation_record)
+            except Exception:
+                pass
             self.show_info("Rename Complete", message)
             self.refresh_file_list()
-        else:
+        elif not success:
             self.show_error("Rename Failed", message)
+        else:
+            self.show_info("Rename Complete", message)
+            self.refresh_file_list()
 
         self.emit_status(message)
 
-    def apply_prefix_to_suffix(self):
-        """Apply prefix-to-suffix transformation."""
-        prefixes = self.get_selected_prefixes()
-        if not prefixes:
-            self.show_warning("No Prefixes", "Please select or enter at least one prefix.")
+    def apply_transposition(self):
+        """Apply prefix→suffix or suffix→prefix transposition to selected files."""
+        tokens = self.get_selected_prefixes()
+        if not tokens:
+            self.show_warning("No Tokens", "Please detect or enter at least one prefix/suffix.")
             return
 
         selected_files = self.file_list.get_selected_files()
@@ -408,37 +625,86 @@ class BulkRenamerTab(BaseTab):
             self.show_warning("No Files", "No files selected.")
             return
 
-        # Filter files that match the prefixes
-        matching_files = []
-        for filepath in selected_files:
-            if match_prefix(filepath.name, prefixes):
-                matching_files.append(filepath)
-
-        if not matching_files:
-            self.show_warning("No Matches", f"No files found starting with any of the selected prefixes.")
-            return
-
-        # Confirm
-        if not self.confirm_action(
-            "Confirm Prefix → Suffix",
-            f"This will move prefixes to suffixes for {len(matching_files)} file(s).\n\n"
-            "Continue?"
-        ):
-            return
-
-        # Create worker for prefix-to-suffix
+        is_prefix_mode = self.transpose_p2s_radio.isChecked()
         from workers.rename_worker import RenameWorker
 
-        self.worker_thread = RenameWorker(
-            matching_files,
-            prefix_to_suffix=prefixes
-        )
+        if is_prefix_mode:
+            matching = [f for f in selected_files if match_prefix(f.name, tokens)]
+            if not matching:
+                self.show_warning("No Matches", "No files start with the selected prefix(es).")
+                return
+            if not self.confirm_action(
+                "Confirm Prefix → Suffix",
+                f"Move prefix to suffix for {len(matching)} file(s)?\n\nThis can be undone."
+            ):
+                return
+            self.worker_thread = RenameWorker(
+                matching,
+                prefix_to_suffix=tokens,
+                rename_sidecars=self.rename_sidecars_chk.isChecked(),
+                rename_captions=self.rename_captions_chk.isChecked(),
+            )
+        else:
+            matching = [f for f in selected_files if match_suffix(f.name, tokens)]
+            if not matching:
+                self.show_warning("No Matches", "No files end with the selected suffix(es).")
+                return
+            direct = [(f, move_suffix_to_prefix(f.name, match_suffix(f.name, tokens)))
+                      for f in matching]
+            direct = [(p, n) for p, n in direct if n != p.name]
+            if not direct:
+                self.show_warning("No Changes", "No files would be changed.")
+                return
+            if not self.confirm_action(
+                "Confirm Suffix → Prefix",
+                f"Move suffix to prefix for {len(direct)} file(s)?\n\nThis can be undone."
+            ):
+                return
+            self.worker_thread = RenameWorker(
+                [],
+                direct_renames=direct,
+                rename_sidecars=self.rename_sidecars_chk.isChecked(),
+                rename_captions=self.rename_captions_chk.isChecked(),
+            )
 
         self.worker_thread.progress.connect(self.emit_status)
         self.worker_thread.finished.connect(self.on_rename_finished)
         self.worker_thread.start()
-
         self.enable_controls(False)
+
+    # Keep old name as alias
+    def apply_prefix_to_suffix(self):
+        self.apply_transposition()
+
+    def open_latest_csv(self):
+        """Open the most recent rename log CSV in the current directory."""
+        import subprocess
+        import sys
+        import glob
+
+        if not self.current_directory:
+            self.show_warning("No Directory", "No directory selected.")
+            return
+
+        pattern = str(Path(self.current_directory) / "_pearls_rename_log_*.csv")
+        matches = sorted(glob.glob(pattern))
+        if not matches:
+            self.show_info("No CSV Found",
+                           "No rename log CSV files found in the current directory.\n"
+                           "A CSV is written after each successful rename batch.")
+            return
+
+        latest = matches[-1]
+        try:
+            if sys.platform == 'darwin':
+                subprocess.Popen(['open', latest])
+            elif sys.platform == 'win32':
+                subprocess.Popen(['start', '', latest], shell=True)
+            else:
+                subprocess.Popen(['xdg-open', latest])
+            self.emit_status(f"Opened: {Path(latest).name}")
+        except Exception as e:
+            self.show_error("Could Not Open File", str(e))
 
     def undo_last_operation(self):
         """Undo the last rename operation."""

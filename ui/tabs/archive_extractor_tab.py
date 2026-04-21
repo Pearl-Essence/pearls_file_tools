@@ -136,7 +136,7 @@ class ArchiveExtractorTab(BaseTab):
 
         self.log_text = QTextEdit()
         self.log_text.setReadOnly(True)
-        self.log_text.setFont(QFont("Courier", 9))
+        self.log_text.setFont(QFont("Courier New", 9))
         log_layout.addWidget(self.log_text)
 
         log_group.setLayout(log_layout)

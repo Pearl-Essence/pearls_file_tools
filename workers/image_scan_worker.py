@@ -16,9 +16,11 @@ CACHE_FILE_NAME = '.image_browser_cache.json'
 class ImageScanWorker(BaseWorker):
     """Worker thread for scanning directories for images."""
 
-    # Signals
     progress = pyqtSignal(str)
     finished = pyqtSignal(bool, str, object)  # success, message, images list
+
+    def emit_finished(self, success: bool, message: str, images=None):
+        self.finished.emit(success, message, images)
 
     def __init__(self, root_dir: str, recursive: bool = True, use_cache: bool = True):
         """

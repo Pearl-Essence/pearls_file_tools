@@ -92,6 +92,10 @@ class MainWindow(QMainWindow):
         settings_action.triggered.connect(self.show_settings)
         edit_menu.addAction(settings_action)
 
+        history_action = QAction("Rename &History...", self)
+        history_action.triggered.connect(self.show_history)
+        edit_menu.addAction(history_action)
+
         edit_menu.addSeparator()
 
         clear_cache_action = QAction("Clear All &Caches", self)
@@ -288,6 +292,12 @@ class MainWindow(QMainWindow):
                     "No Caches Found",
                     "No cache files were found to clear."
                 )
+
+    def show_history(self):
+        """Open the rename history dialog."""
+        from ui.dialogs.history_dialog import HistoryDialog
+        dialog = HistoryDialog(self)
+        dialog.exec_()
 
     def show_about(self):
         """Show about dialog."""

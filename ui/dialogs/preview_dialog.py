@@ -39,7 +39,7 @@ class PreviewDialog(QDialog):
         # Text widget for preview
         self.text_widget = QTextEdit()
         self.text_widget.setReadOnly(True)
-        self.text_widget.setFontFamily("Courier")
+        self.text_widget.setFontFamily("Courier New")
         layout.addWidget(self.text_widget, stretch=1)
 
         # Close button

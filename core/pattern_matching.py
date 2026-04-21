@@ -141,17 +141,38 @@ def group_files_by_pattern(filenames: List[str], confidence_threshold: float = 0
 
 
 def match_prefix(filename: str, prefixes: List[str]) -> Optional[str]:
-    """
-    Check if filename starts with any of the given prefixes.
-
-    Args:
-        filename: Filename to check
-        prefixes: List of prefixes to match against
-
-    Returns:
-        Matched prefix or None
-    """
+    """Check if filename starts with any of the given prefixes (case-sensitive)."""
     for prefix in prefixes:
         if filename.startswith(prefix):
             return prefix
+    return None
+
+
+def detect_common_suffixes(filenames: List[str]) -> Dict[str, int]:
+    """Detect common suffix tokens (before the file extension) in a list of filenames.
+
+    Returns a dict mapping suffix token (e.g. '_DRAFT') to the number of files
+    whose stem ends with that token. Only tokens appearing on ≥2 files are returned.
+    """
+    suffix_counts: Dict[str, int] = defaultdict(int)
+    for filename in filenames:
+        stem = Path(filename).stem
+        for delimiter in ['_', '-', ' ']:
+            if delimiter in stem:
+                token = stem.rsplit(delimiter, 1)[-1]
+                if token:
+                    suffix_counts[f"{delimiter}{token}"] += 1
+                break
+    return {s: c for s, c in suffix_counts.items() if c >= 2}
+
+
+def match_suffix(filename: str, suffixes: List[str]) -> Optional[str]:
+    """Check if the filename stem ends with any of the given suffix tokens.
+
+    Matching is case-insensitive. Returns the matched token or None.
+    """
+    stem = Path(filename).stem
+    for token in suffixes:
+        if stem.lower().endswith(token.lower()):
+            return token
     return None
