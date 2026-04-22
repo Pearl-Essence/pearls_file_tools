@@ -98,6 +98,17 @@ class MainWindow(QMainWindow):
 
         edit_menu.addSeparator()
 
+        lint_action = QAction("&Lint Current Folder...", self)
+        lint_action.setToolTip("Check filenames in the current directory for issues")
+        lint_action.triggered.connect(self.lint_current_folder)
+        edit_menu.addAction(lint_action)
+
+        manage_profiles_action = QAction("&Manage Naming Profiles...", self)
+        manage_profiles_action.triggered.connect(self.manage_profiles)
+        edit_menu.addAction(manage_profiles_action)
+
+        edit_menu.addSeparator()
+
         clear_cache_action = QAction("Clear All &Caches", self)
         clear_cache_action.triggered.connect(self.clear_caches)
         edit_menu.addAction(clear_cache_action)
@@ -297,6 +308,18 @@ class MainWindow(QMainWindow):
         """Open the rename history dialog."""
         from ui.dialogs.history_dialog import HistoryDialog
         dialog = HistoryDialog(self)
+        dialog.exec_()
+
+    def lint_current_folder(self):
+        """Delegate lint_folder to the active tab if it supports it."""
+        tab = self.tab_widget.currentWidget()
+        if hasattr(tab, 'lint_folder'):
+            tab.lint_folder()
+
+    def manage_profiles(self):
+        """Open the naming profile manager."""
+        from ui.dialogs.profile_dialog import ProfileDialog
+        dialog = ProfileDialog(self.config, self)
         dialog.exec_()
 
     def show_about(self):

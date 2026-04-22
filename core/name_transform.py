@@ -1,9 +1,47 @@
 """Filename transformation utilities for Pearl's File Tools."""
 
 import re
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional
 from constants import CASE_NONE, CASE_UPPER, CASE_LOWER, CASE_TITLE
+
+
+@dataclass
+class ProductionTemplate:
+    """A named naming convention profile for production files."""
+    name: str
+    tokens: List[str] = field(default_factory=lambda: ['PROJECT', 'EP', 'SHOT', 'DESC', 'VER'])
+    separator: str = '_'
+    version_format: str = 'v{:02d}'
+    episode_format: str = 'EP{:02d}'
+
+    def compose(self, token_values: Dict[str, str]) -> str:
+        """Compose a filename stem from token values; empty tokens are omitted."""
+        parts = [token_values.get(t, '').strip() for t in self.tokens]
+        return self.separator.join(p for p in parts if p)
+
+    def to_dict(self) -> Dict:
+        return {
+            'name': self.name,
+            'tokens': self.tokens,
+            'separator': self.separator,
+            'version_format': self.version_format,
+            'episode_format': self.episode_format,
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict) -> 'ProductionTemplate':
+        return cls(
+            name=d.get('name', 'Unnamed'),
+            tokens=d.get('tokens', ['PROJECT', 'EP', 'SHOT', 'DESC', 'VER']),
+            separator=d.get('separator', '_'),
+            version_format=d.get('version_format', 'v{:02d}'),
+            episode_format=d.get('episode_format', 'EP{:02d}'),
+        )
+
+
+DEFAULT_TEMPLATE = ProductionTemplate(name='Studio Default')
 
 # Matches filenames ending in _v## (e.g. HERO_v01.mov, clip_v003.mp4)
 VERSION_PATTERN = re.compile(r'^(.+?)_v(\d+)(\.\w+)$', re.IGNORECASE)

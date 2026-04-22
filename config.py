@@ -69,6 +69,11 @@ class Config:
                 'confirm_before_operations': True,
                 'auto_refresh_after_operation': True
             },
+            'naming': {
+                'profiles': [],
+                'active_profile': None,
+                'bad_patterns': ['_COPY', '_BACKUP', '_OLD', 'Copy of ', 'copy_of_'],
+            },
             'tab_settings': {
                 'bulk_renamer': {
                     'recursive_default': False,
