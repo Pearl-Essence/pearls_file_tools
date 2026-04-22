@@ -7,6 +7,31 @@ from typing import Tuple, Optional, Dict, List
 from difflib import SequenceMatcher
 from collections import defaultdict
 
+
+# ── Grouping presets ──────────────────────────────────────────────────────────
+
+@dataclass
+class GroupingPreset:
+    """Describes how files are grouped during an organizer scan."""
+    name: str
+    description: str
+
+
+PRESET_STANDARD = GroupingPreset(
+    name="Standard",
+    description="Group by underscore-delimited prefix (default behaviour)",
+)
+
+PRESET_AE_RENDER = GroupingPreset(
+    name="AE Render Output",
+    description="Strip trailing _#### frame numbers before grouping sequences",
+)
+
+ALL_PRESETS: List[GroupingPreset] = [PRESET_STANDARD, PRESET_AE_RENDER]
+
+# Matches AE-style frame suffixes: Hero_Explosion_0001.exr → base='Hero_Explosion'
+AE_FRAME_PATTERN = re.compile(r'^(.+?)_(\d{4,8})(\.\w+)$')
+
 # Matches filenames like HERO_Explosion_0001.exr, shot010.0042.dpx,
 # "HCESD11 - Card - STAR - 00000.png" (space-dash-space delimiter), or
 # "HCESD11 - Card - Star-00000.png" (plain-dash delimiter).
@@ -271,3 +296,41 @@ def match_suffix(filename: str, suffixes: List[str]) -> Optional[str]:
         if stem.lower().endswith(token.lower()):
             return token
     return None
+
+
+def get_group_name_ae(filename: str) -> Tuple[str, float]:
+    """AE Render Output preset: strip trailing _#### before deriving the group name."""
+    m = AE_FRAME_PATTERN.match(filename)
+    if m:
+        return m.group(1), 1.0
+    return get_group_name(filename)
+
+
+def group_files_by_preset(
+    filenames: List[str],
+    preset: GroupingPreset,
+    confidence_threshold: float = 0.4,
+) -> Tuple[Dict[str, List[str]], List[str]]:
+    """Group files using the specified GroupingPreset.
+
+    Returns the same (groups_dict, unsorted_files) tuple as group_files_by_pattern.
+    """
+    if preset.name == PRESET_AE_RENDER.name:
+        groups: Dict[str, List[str]] = defaultdict(list)
+        unsorted: List[str] = []
+        for fname in filenames:
+            group_name, conf = get_group_name_ae(fname)
+            if conf >= confidence_threshold:
+                groups[group_name].append(fname)
+            else:
+                unsorted.append(fname)
+        # Promote single-file groups to unsorted
+        final_groups: Dict[str, List[str]] = {}
+        for gn, files in groups.items():
+            if len(files) >= 2:
+                final_groups[gn] = files
+            else:
+                unsorted.extend(files)
+        return final_groups, unsorted
+    else:
+        return group_files_by_pattern(filenames, confidence_threshold)

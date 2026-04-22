@@ -2,14 +2,16 @@
 
 from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
                             QTreeWidget, QTreeWidgetItem, QProgressBar, QInputDialog,
-                            QMenu)
+                            QMenu, QGroupBox, QComboBox, QCheckBox, QListWidget,
+                            QListWidgetItem, QSizePolicy)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QColor, QBrush
 from pathlib import Path
 from typing import Dict, List, Optional
 from ui.tabs.base_tab import BaseTab
 from ui.widgets.directory_selector import DirectorySelectorWidget
-from core.pattern_matching import group_files_by_pattern, detect_image_sequences, SequenceGroup
+from core.pattern_matching import (group_files_by_pattern, detect_image_sequences,
+                                   SequenceGroup, ALL_PRESETS, PRESET_STANDARD)
 
 
 class FileOrganizerTab(BaseTab):
@@ -23,6 +25,7 @@ class FileOrganizerTab(BaseTab):
         self.file_sequences: Dict[str, Dict[str, SequenceGroup]] = {}
         # Each entry is a list of (file_path, subdir, from_group, to_group) tuples
         self._move_undo_stack: List = []
+        self._batch_root: Optional[Path] = None
 
         super().__init__(config, parent)
 
@@ -38,6 +41,65 @@ class FileOrganizerTab(BaseTab):
         self.dir_selector = DirectorySelectorWidget(label_text="Directory:")
         self.dir_selector.directory_changed.connect(self.on_directory_changed)
         layout.addWidget(self.dir_selector)
+
+        # ── Scan options row (preset + batch mode toggle) ─────────────────
+        opts_row = QHBoxLayout()
+
+        preset_label = QLabel("Grouping preset:")
+        opts_row.addWidget(preset_label)
+        self.preset_combo = QComboBox()
+        for p in ALL_PRESETS:
+            self.preset_combo.addItem(p.name, userData=p)
+        self.preset_combo.setToolTip(
+            "Standard: group by underscore prefix\n"
+            "AE Render Output: strip trailing _#### frame numbers before grouping"
+        )
+        opts_row.addWidget(self.preset_combo)
+
+        opts_row.addSpacing(24)
+
+        self.batch_mode_chk = QCheckBox("Batch Mode")
+        self.batch_mode_chk.setToolTip(
+            "Process multiple first-level subdirectories in one run"
+        )
+        self.batch_mode_chk.toggled.connect(self._on_batch_mode_toggled)
+        opts_row.addWidget(self.batch_mode_chk)
+        opts_row.addStretch()
+        layout.addLayout(opts_row)
+
+        # ── Batch mode panel (hidden by default) ─────────────────────────
+        self.batch_panel = QGroupBox("Batch Mode — select subdirectories to process")
+        batch_layout = QVBoxLayout()
+
+        batch_dir_row = QHBoxLayout()
+        batch_dir_row.addWidget(QLabel("Root folder:"))
+        self.batch_root_selector = DirectorySelectorWidget(label_text="")
+        self.batch_root_selector.directory_changed.connect(self._on_batch_root_changed)
+        batch_dir_row.addWidget(self.batch_root_selector, stretch=1)
+        batch_layout.addLayout(batch_dir_row)
+
+        self.batch_subdir_list = QListWidget()
+        self.batch_subdir_list.setMaximumHeight(140)
+        self.batch_subdir_list.setToolTip("Check subdirectories to include in the batch")
+        batch_layout.addWidget(self.batch_subdir_list)
+
+        batch_btns = QHBoxLayout()
+        self.batch_check_all_btn = QPushButton("Check All")
+        self.batch_check_all_btn.clicked.connect(self._batch_check_all)
+        batch_btns.addWidget(self.batch_check_all_btn)
+        self.batch_uncheck_all_btn = QPushButton("Uncheck All")
+        self.batch_uncheck_all_btn.clicked.connect(self._batch_uncheck_all)
+        batch_btns.addWidget(self.batch_uncheck_all_btn)
+        self.run_batch_btn = QPushButton("Run Batch")
+        self.run_batch_btn.clicked.connect(self._run_batch)
+        self.run_batch_btn.setStyleSheet("padding: 6px 16px; font-weight: bold;")
+        batch_btns.addWidget(self.run_batch_btn)
+        batch_btns.addStretch()
+        batch_layout.addLayout(batch_btns)
+
+        self.batch_panel.setLayout(batch_layout)
+        self.batch_panel.setVisible(False)
+        layout.addWidget(self.batch_panel)
 
         # Scan button
         self.scan_btn = QPushButton("Scan Subdirectories")
@@ -105,6 +167,109 @@ class FileOrganizerTab(BaseTab):
         self.organize_btn.setEnabled(False)
         self.new_group_btn.setEnabled(False)
 
+    # ── batch mode helpers ────────────────────────────────────────────────────
+
+    def _on_batch_mode_toggled(self, checked: bool):
+        self.batch_panel.setVisible(checked)
+        # In batch mode the regular dir selector drives the tree; disable scan btn
+        # so the user uses "Run Batch" instead when batch mode is active.
+        self.scan_btn.setText("Scan Subdirectories" if not checked else "Scan Single Directory")
+
+    def _on_batch_root_changed(self, directory: str):
+        self._batch_root = Path(directory)
+        self.batch_subdir_list.clear()
+        if not self._batch_root.is_dir():
+            return
+        for d in sorted(self._batch_root.iterdir()):
+            if d.is_dir() and not d.name.startswith('.'):
+                item = QListWidgetItem(d.name)
+                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                item.setCheckState(Qt.Checked)
+                self.batch_subdir_list.addItem(item)
+
+    def _batch_check_all(self):
+        for i in range(self.batch_subdir_list.count()):
+            self.batch_subdir_list.item(i).setCheckState(Qt.Checked)
+
+    def _batch_uncheck_all(self):
+        for i in range(self.batch_subdir_list.count()):
+            self.batch_subdir_list.item(i).setCheckState(Qt.Unchecked)
+
+    def _run_batch(self):
+        """Iterate through each checked subdirectory and run organize on each."""
+        if not self._batch_root:
+            self.show_warning("No Root", "Please select a root folder in Batch Mode.")
+            return
+
+        checked_dirs = []
+        for i in range(self.batch_subdir_list.count()):
+            item = self.batch_subdir_list.item(i)
+            if item.checkState() == Qt.Checked:
+                checked_dirs.append(self._batch_root / item.text())
+
+        if not checked_dirs:
+            self.show_warning("None Selected", "Check at least one subdirectory.")
+            return
+
+        from PyQt5.QtWidgets import QProgressDialog, QApplication
+        progress = QProgressDialog(
+            "Running batch…", "Cancel", 0, len(checked_dirs), self
+        )
+        progress.setWindowTitle("Batch Organizer")
+        progress.setWindowModality(Qt.WindowModal)
+        progress.show()
+
+        errors = []
+        for idx, subdir in enumerate(checked_dirs):
+            if progress.wasCanceled():
+                break
+            progress.setLabelText(f"Processing {subdir.name}…")
+            progress.setValue(idx)
+            QApplication.processEvents()
+            try:
+                self._organize_single_dir(str(subdir))
+            except Exception as exc:
+                errors.append(f"{subdir.name}: {exc}")
+
+        progress.setValue(len(checked_dirs))
+
+        if errors:
+            self.show_warning(
+                "Batch Errors",
+                "Some directories had errors:\n\n" + "\n".join(errors)
+            )
+        else:
+            self.show_info("Batch Complete",
+                           f"Processed {len(checked_dirs)} director(ies) successfully.")
+
+    def _organize_single_dir(self, directory: str):
+        """Synchronously scan and organize a single directory (used by batch mode)."""
+        from core.pattern_matching import group_files_by_preset, detect_image_sequences
+        from core.file_utils import safe_move_file
+        import shutil
+
+        root = Path(directory)
+        preset = self.preset_combo.currentData()
+        confidence_threshold = self.config.get_tab_setting('organizer', 'confidence_threshold', 0.4)
+
+        files = [f for f in root.iterdir() if f.is_file()]
+        if not files:
+            return
+
+        filenames = [f.name for f in files]
+        groups_dict, _ = group_files_by_preset(filenames, preset, confidence_threshold)
+
+        for group_name, fnames in groups_dict.items():
+            target_dir = root / group_name
+            target_dir.mkdir(exist_ok=True)
+            for fname in fnames:
+                src = root / fname
+                dst = target_dir / fname
+                if src.exists() and src != dst:
+                    shutil.move(str(src), str(dst))
+
+    # ── scan ─────────────────────────────────────────────────────────────────
+
     def scan_directories(self):
         """Start scanning directories for files to organize."""
         if not self.current_directory:
@@ -125,8 +290,9 @@ class FileOrganizerTab(BaseTab):
         from workers.scan_worker import ScanWorker
 
         confidence_threshold = self.config.get_tab_setting('organizer', 'confidence_threshold', 0.4)
+        preset = self.preset_combo.currentData()
 
-        self.worker_thread = ScanWorker(self.current_directory, confidence_threshold)
+        self.worker_thread = ScanWorker(self.current_directory, confidence_threshold, preset=preset)
         self.worker_thread.progress.connect(self.update_scan_status)
         self.worker_thread.finished.connect(self.on_scan_finished)
         self.worker_thread.start()
@@ -646,6 +812,20 @@ class FileOrganizerTab(BaseTab):
             )
             return
 
+        # ── Pre-flight conflict check ─────────────────────────────────────
+        root_path = Path(self.current_directory)
+        from ui.dialogs.preflight_dialog import check_conflicts, PreflightDialog
+        conflicts = check_conflicts(
+            {grp: files
+             for groups in merged_groups.values()
+             for grp, files in groups.items()},
+            root_path,
+        )
+        if conflicts:
+            dlg = PreflightDialog(conflicts, self)
+            if dlg.exec_() != PreflightDialog.Accepted:
+                return  # user cancelled
+
         # Confirm action
         if not self.confirm_action(
             "Confirm Organization",
@@ -716,6 +896,14 @@ class FileOrganizerTab(BaseTab):
             self.dir_selector.set_directory(last_dir)
             self.set_directory(last_dir)
 
+        saved_preset = self.config.get_tab_setting('organizer', 'grouping_preset', PRESET_STANDARD.name)
+        for i in range(self.preset_combo.count()):
+            if self.preset_combo.itemText(i) == saved_preset:
+                self.preset_combo.setCurrentIndex(i)
+                break
+
     def save_settings(self):
         """Save tab-specific settings."""
-        pass  # Settings are saved via config automatically
+        self.config.set_tab_setting(
+            'organizer', 'grouping_preset', self.preset_combo.currentText()
+        )

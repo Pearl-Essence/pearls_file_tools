@@ -2,7 +2,8 @@
 
 from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QLineEdit,
                             QPushButton, QRadioButton, QCheckBox, QScrollArea, QWidget,
-                            QButtonGroup, QSpinBox, QStackedWidget, QFormLayout, QComboBox)
+                            QButtonGroup, QSpinBox, QStackedWidget, QFormLayout, QComboBox,
+                            QListWidget, QListWidgetItem, QApplication)
 from PyQt5.QtCore import Qt
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -30,6 +31,9 @@ class BulkRenamerTab(BaseTab):
         self.undo_stack: List[OperationRecord] = []
         self._current_template: Optional[ProductionTemplate] = None
         self.template_inputs: Dict[str, QLineEdit] = {}
+        # Ordered list of extra directories added to the rename queue
+        self._queued_dirs: List[Path] = []
+        self._batch_root: Optional[Path] = None
 
         super().__init__(config, parent)
 
@@ -48,6 +52,72 @@ class BulkRenamerTab(BaseTab):
         )
         self.dir_selector.directory_changed.connect(self.on_directory_changed)
         layout.addWidget(self.dir_selector)
+
+        # ── Multi-directory queue ─────────────────────────────────────────
+        queue_group = QGroupBox("Directory Queue (optional — files from all queued dirs are merged)")
+        queue_layout = QVBoxLayout()
+
+        queue_btn_row = QHBoxLayout()
+        self.add_dir_btn = QPushButton("Add Current Directory to Queue")
+        self.add_dir_btn.setToolTip("Add the directory shown above to the multi-directory queue")
+        self.add_dir_btn.clicked.connect(self._add_dir_to_queue)
+        queue_btn_row.addWidget(self.add_dir_btn)
+        self.remove_dir_btn = QPushButton("Remove Selected")
+        self.remove_dir_btn.clicked.connect(self._remove_queued_dir)
+        queue_btn_row.addWidget(self.remove_dir_btn)
+        self.clear_queue_btn = QPushButton("Clear Queue")
+        self.clear_queue_btn.clicked.connect(self._clear_queue)
+        queue_btn_row.addWidget(self.clear_queue_btn)
+        queue_btn_row.addStretch()
+        queue_layout.addLayout(queue_btn_row)
+
+        self.queue_list = QListWidget()
+        self.queue_list.setMaximumHeight(90)
+        self.queue_list.setToolTip("Files from all directories below are merged into the file list")
+        queue_layout.addWidget(self.queue_list)
+
+        queue_group.setLayout(queue_layout)
+        layout.addWidget(queue_group)
+
+        # ── Batch mode ────────────────────────────────────────────────────
+        self.batch_mode_chk = QCheckBox("Batch Mode — process first-level subdirectories")
+        self.batch_mode_chk.setToolTip(
+            "Select a root folder and check which subdirectories to process in one run"
+        )
+        self.batch_mode_chk.toggled.connect(self._on_batch_mode_toggled)
+        layout.addWidget(self.batch_mode_chk)
+
+        self.batch_panel = QGroupBox("Batch Mode Options")
+        batch_layout = QVBoxLayout()
+
+        batch_dir_row = QHBoxLayout()
+        batch_dir_row.addWidget(QLabel("Root folder:"))
+        self.batch_root_selector = DirectorySelectorWidget(label_text="")
+        self.batch_root_selector.directory_changed.connect(self._on_batch_root_changed)
+        batch_dir_row.addWidget(self.batch_root_selector, stretch=1)
+        batch_layout.addLayout(batch_dir_row)
+
+        self.batch_subdir_list = QListWidget()
+        self.batch_subdir_list.setMaximumHeight(120)
+        batch_layout.addWidget(self.batch_subdir_list)
+
+        batch_ctrl_row = QHBoxLayout()
+        self.batch_check_all_btn = QPushButton("Check All")
+        self.batch_check_all_btn.clicked.connect(self._batch_check_all)
+        batch_ctrl_row.addWidget(self.batch_check_all_btn)
+        self.batch_uncheck_all_btn = QPushButton("Uncheck All")
+        self.batch_uncheck_all_btn.clicked.connect(self._batch_uncheck_all)
+        batch_ctrl_row.addWidget(self.batch_uncheck_all_btn)
+        self.run_batch_btn = QPushButton("Run Batch Rename")
+        self.run_batch_btn.setStyleSheet("padding: 6px 16px; font-weight: bold;")
+        self.run_batch_btn.clicked.connect(self._run_batch)
+        batch_ctrl_row.addWidget(self.run_batch_btn)
+        batch_ctrl_row.addStretch()
+        batch_layout.addLayout(batch_ctrl_row)
+
+        self.batch_panel.setLayout(batch_layout)
+        self.batch_panel.setVisible(False)
+        layout.addWidget(self.batch_panel)
 
         # Naming profile bar
         layout.addWidget(self.create_profile_bar())
@@ -567,12 +637,195 @@ class BulkRenamerTab(BaseTab):
         directory = Path(self.current_directory)
         if not directory.exists():
             return
+
         active_extensions = self.get_active_extensions()
         extensions = active_extensions if active_extensions else None
         recursive = self.dir_selector.is_recursive()
-        files = get_files_in_directory(directory, extensions, recursive)
-        self.file_list.set_files(files, relative_to=directory if recursive else None)
-        self.emit_status(f"Loaded {len(files)} files")
+
+        # Primary directory
+        all_dirs = [directory] + [d for d in self._queued_dirs if d != directory]
+
+        if len(all_dirs) == 1:
+            files = get_files_in_directory(directory, extensions, recursive)
+            self.file_list.set_files(files, relative_to=directory if recursive else None)
+        else:
+            # Multi-directory: load from each dir; display paths relative to
+            # the nearest common ancestor so the folder name acts as a prefix.
+            all_files: List[Path] = []
+            for d in all_dirs:
+                if d.exists():
+                    all_files.extend(get_files_in_directory(d, extensions, recursive))
+            try:
+                rel_root: Optional[Path] = all_dirs[0].parent
+                for d in all_dirs[1:]:
+                    while not str(d).startswith(str(rel_root)):
+                        rel_root = rel_root.parent
+            except Exception:
+                rel_root = None
+            self.file_list.set_files(all_files, relative_to=rel_root)
+
+        n = self.file_list.table.rowCount()
+        dir_suffix = f" from {len(all_dirs)} directories" if len(all_dirs) > 1 else ""
+        self.emit_status(f"Loaded {n} files{dir_suffix}")
+
+    # ── multi-directory queue ─────────────────────────────────────────────
+
+    def _add_dir_to_queue(self):
+        if not self.current_directory:
+            self.show_warning("No Directory", "Select a directory first.")
+            return
+        p = Path(self.current_directory)
+        if p in self._queued_dirs:
+            return
+        self._queued_dirs.append(p)
+        item = QListWidgetItem(str(p))
+        item.setToolTip(str(p))
+        self.queue_list.addItem(item)
+        self.refresh_file_list()
+
+    def _remove_queued_dir(self):
+        row = self.queue_list.currentRow()
+        if row < 0:
+            return
+        self.queue_list.takeItem(row)
+        self._queued_dirs.pop(row)
+        self.refresh_file_list()
+
+    def _clear_queue(self):
+        self._queued_dirs.clear()
+        self.queue_list.clear()
+        self.refresh_file_list()
+
+    # ── batch mode ────────────────────────────────────────────────────────
+
+    def _on_batch_mode_toggled(self, checked: bool):
+        self.batch_panel.setVisible(checked)
+
+    def _on_batch_root_changed(self, directory: str):
+        self._batch_root = Path(directory)
+        self.batch_subdir_list.clear()
+        if not self._batch_root.is_dir():
+            return
+        for d in sorted(self._batch_root.iterdir()):
+            if d.is_dir() and not d.name.startswith('.'):
+                item = QListWidgetItem(d.name)
+                item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+                item.setCheckState(Qt.Checked)
+                self.batch_subdir_list.addItem(item)
+
+    def _batch_check_all(self):
+        for i in range(self.batch_subdir_list.count()):
+            self.batch_subdir_list.item(i).setCheckState(Qt.Checked)
+
+    def _batch_uncheck_all(self):
+        for i in range(self.batch_subdir_list.count()):
+            self.batch_subdir_list.item(i).setCheckState(Qt.Unchecked)
+
+    def _run_batch(self):
+        """Run the current rename settings across each checked subdirectory."""
+        if not self._batch_root:
+            self.show_warning("No Root", "Select a root folder in Batch Mode.")
+            return
+
+        checked_dirs = []
+        for i in range(self.batch_subdir_list.count()):
+            item = self.batch_subdir_list.item(i)
+            if item.checkState() == Qt.Checked:
+                checked_dirs.append(self._batch_root / item.text())
+
+        if not checked_dirs:
+            self.show_warning("None Selected", "Check at least one subdirectory.")
+            return
+
+        from PyQt5.QtWidgets import QProgressDialog
+        from workers.rename_worker import RenameWorker
+
+        active_extensions = self.get_active_extensions()
+        extensions = active_extensions if active_extensions else None
+        mode = self.mode_btn_group.checkedId()
+
+        progress = QProgressDialog(
+            "Running batch rename…", "Cancel", 0, len(checked_dirs), self
+        )
+        progress.setWindowTitle("Batch Rename")
+        progress.setWindowModality(Qt.WindowModal)
+        progress.show()
+
+        errors = []
+        for idx, subdir in enumerate(checked_dirs):
+            if progress.wasCanceled():
+                break
+            progress.setLabelText(f"Processing {subdir.name}…")
+            progress.setValue(idx)
+            QApplication.processEvents()
+
+            try:
+                files = get_files_in_directory(subdir, extensions, False)
+                if not files:
+                    continue
+
+                if mode == 1:
+                    base = self.seq_base_input.text().strip()
+                    if not base:
+                        errors.append(f"{subdir.name}: no base name set")
+                        continue
+                    pairs_seq = generate_sequential_filenames(
+                        [f.name for f in files],
+                        base_name=base,
+                        start=self.seq_start_spin.value(),
+                        padding=self.seq_padding_spin.value(),
+                        separator=self.seq_separator_input.text(),
+                    )
+                    direct = [(files[i], new) for i, (_, new) in enumerate(pairs_seq)]
+                elif mode == 2:
+                    composed = self._get_template_composed_name()
+                    if not composed:
+                        errors.append(f"{subdir.name}: template incomplete")
+                        continue
+                    sep = self._current_template.separator if self._current_template else '_'
+                    direct = [
+                        (f, f"{composed}{sep}{str(j + 1).zfill(3)}{f.suffix}")
+                        for j, f in enumerate(files)
+                    ]
+                else:
+                    direct = None
+
+                if direct is not None:
+                    worker = RenameWorker(
+                        [],
+                        direct_renames=direct,
+                        rename_sidecars=self.rename_sidecars_chk.isChecked(),
+                        rename_captions=self.rename_captions_chk.isChecked(),
+                    )
+                else:
+                    worker = RenameWorker(
+                        files,
+                        prefix=self.prefix_input.text(),
+                        suffix=self.suffix_input.text(),
+                        rename_to=self.rename_input.text(),
+                        case_transform=self.get_case_transform(),
+                        rename_sidecars=self.rename_sidecars_chk.isChecked(),
+                        rename_captions=self.rename_captions_chk.isChecked(),
+                    )
+
+                # Run synchronously in the worker thread and wait
+                worker.run()
+
+            except Exception as exc:
+                errors.append(f"{subdir.name}: {exc}")
+
+        progress.setValue(len(checked_dirs))
+
+        if errors:
+            self.show_warning(
+                "Batch Errors",
+                "Some directories had errors:\n\n" + "\n".join(errors)
+            )
+        else:
+            self.show_info("Batch Complete",
+                           f"Processed {len(checked_dirs)} director(ies) successfully.")
+
+        self.refresh_file_list()
 
     # ── token detection (transposition) ──────────────────────────────────
 

@@ -1,10 +1,10 @@
 """Scan worker thread for Pearl's File Tools."""
 
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 from PyQt5.QtCore import pyqtSignal
 from workers.base_worker import BaseWorker
-from core.pattern_matching import group_files_by_pattern
+from core.pattern_matching import group_files_by_pattern, group_files_by_preset, GroupingPreset, PRESET_STANDARD
 
 
 class ScanWorker(BaseWorker):
@@ -15,17 +15,20 @@ class ScanWorker(BaseWorker):
     def emit_finished(self, success: bool, message: str, grouped=None, unsorted=None):
         self.finished.emit(success, message, grouped, unsorted)
 
-    def __init__(self, root_dir: str, confidence_threshold: float = 0.4):
+    def __init__(self, root_dir: str, confidence_threshold: float = 0.4,
+                 preset: Optional[GroupingPreset] = None):
         """
         Initialize the scan worker.
 
         Args:
             root_dir: Root directory to scan
             confidence_threshold: Minimum confidence for grouping
+            preset: GroupingPreset to use (defaults to PRESET_STANDARD)
         """
         super().__init__()
         self.root_dir = Path(root_dir)
         self.confidence_threshold = confidence_threshold
+        self.preset = preset or PRESET_STANDARD
 
     def _scan_one_dir(self, directory: Path,
                       grouped_results: Dict, unsorted_results: Dict):
@@ -34,8 +37,8 @@ class ScanWorker(BaseWorker):
         if not files:
             return
         filenames = [f.name for f in files]
-        groups_dict, unsorted_list = group_files_by_pattern(
-            filenames, self.confidence_threshold
+        groups_dict, unsorted_list = group_files_by_preset(
+            filenames, self.preset, self.confidence_threshold
         )
         groups_with_paths = {
             grp: [directory / fn for fn in fns]
