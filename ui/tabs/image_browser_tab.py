@@ -216,7 +216,19 @@ class ImageBrowserTab(BaseTab):
         # Apply filters and display
         self.apply_filters()
 
-        self.emit_status(f"Found {len(self.all_images)} images")
+        seq_count = sum(1 for img in self.all_images if img.get('is_sequence_rep'))
+        standalone = sum(1 for img in self.all_images if not img.get('in_sequence'))
+        if seq_count:
+            seq_frames = sum(
+                img.get('sequence_total', 0)
+                for img in self.all_images if img.get('is_sequence_rep')
+            )
+            self.emit_status(
+                f"Found {standalone} image(s) + {seq_count} sequence(s) "
+                f"({seq_frames} frames)"
+            )
+        else:
+            self.emit_status(f"Found {len(self.all_images)} image(s)")
 
     def apply_filters(self):
         """Filter images based on search and filter criteria."""
@@ -230,13 +242,19 @@ class ImageBrowserTab(BaseTab):
         self.filtered_images = []
 
         for img in self.all_images:
+            # Hide individual sequence frames — only show the representative card
+            if img.get('in_sequence') and not img.get('is_sequence_rep'):
+                continue
+
             # Apply folder filter
             if selected_folder != "All Folders" and img['folder'] != selected_folder:
                 continue
 
-            # Apply search filter
-            if search_text and search_text not in img['name'].lower():
-                continue
+            # Apply search filter — match against sequence_label if it exists
+            if search_text:
+                label = img.get('sequence_label', img['name']).lower()
+                if search_text not in label and search_text not in img['name'].lower():
+                    continue
 
             self.filtered_images.append(img)
 
@@ -263,6 +281,7 @@ class ImageBrowserTab(BaseTab):
             from ui.widgets.image_card import ImageCard
             card = ImageCard(img_data, thumbnail_size=thumbnail_size)
             card.clicked.connect(self.open_image_viewer)
+            card.context_menu_requested.connect(self.show_image_context_menu)
             self.grid_layout.addWidget(card, row, col)
 
     def clear_grid(self):
@@ -283,20 +302,131 @@ class ImageBrowserTab(BaseTab):
             self.display_images()
 
     def open_image_viewer(self, img_data: Dict):
-        """Open the full image viewer."""
+        """Open the full image viewer.
+
+        For sequence representative cards, opens the viewer with every frame
+        in the sequence so the user can step through them.
+        """
         from ui.dialogs.image_viewer_dialog import ImageViewerDialog
 
-        # Find all images in the same folder for navigation
-        folder_images = [
-            img for img in self.filtered_images
-            if img['folder'] == img_data['folder']
-        ]
+        if img_data.get('is_sequence_rep') and img_data.get('sequence_files'):
+            # Build a synthetic list of image dicts — one per frame
+            folder = img_data.get('folder', '')
+            frame_images = [
+                {
+                    'name': Path(p).name,
+                    'path': p,
+                    'folder': folder,
+                    'size': 0,
+                }
+                for p in img_data['sequence_files']
+            ]
+            dialog = ImageViewerDialog(frame_images, 0, self)
+            dialog.setWindowTitle(
+                f"Sequence Viewer — {img_data.get('sequence_label', img_data['name'])}"
+            )
+        else:
+            # Normal image: navigate among all visible images in the same folder
+            folder_images = [
+                img for img in self.filtered_images
+                if img['folder'] == img_data['folder']
+            ]
+            current_index = folder_images.index(img_data) if img_data in folder_images else 0
+            dialog = ImageViewerDialog(folder_images, current_index, self)
 
-        # Find current index
-        current_index = folder_images.index(img_data) if img_data in folder_images else 0
-
-        dialog = ImageViewerDialog(folder_images, current_index, self)
         dialog.exec_()
+
+    # ── sequence reclassification ─────────────────────────────────────────
+
+    def show_image_context_menu(self, img_data: Dict, global_pos):
+        """Show right-click context menu for an image card."""
+        from PyQt5.QtWidgets import QMenu
+        menu = QMenu(self)
+
+        if img_data.get('is_sequence_rep'):
+            action = menu.addAction("Break Sequence")
+            action.triggered.connect(lambda: self.break_sequence(img_data))
+        else:
+            action = menu.addAction("Force Detect as Sequence")
+            action.triggered.connect(lambda: self.force_as_sequence(img_data))
+
+        menu.exec_(global_pos)
+
+    def break_sequence(self, rep_data: Dict):
+        """Remove sequence metadata from all frames of a sequence so they display individually."""
+        seq_paths = set(rep_data.get('sequence_files', []))
+        for img in self.all_images:
+            if img['path'] in seq_paths or img is rep_data:
+                img.pop('in_sequence', None)
+                img.pop('is_sequence_rep', None)
+                img.pop('sequence_key', None)
+                img.pop('sequence_label', None)
+                img.pop('sequence_total', None)
+                img.pop('sequence_files', None)
+        self.apply_filters()
+
+    def force_as_sequence(self, img_data: Dict):
+        """Re-run sequence detection for images in the same folder with min_frames=2.
+
+        Useful for sequences the auto-detector missed (e.g. only 2 frames, or an unusual
+        naming pattern that still matches the regexes).  If no sequence is found for this
+        image specifically, a message is shown.
+        """
+        from core.pattern_matching import detect_image_sequences
+        folder = img_data['folder']
+        folder_imgs = [img for img in self.all_images if img['folder'] == folder]
+
+        # Clear any prior annotations for this folder so re-detection is clean
+        for img in folder_imgs:
+            img.pop('in_sequence', None)
+            img.pop('is_sequence_rep', None)
+            img.pop('sequence_key', None)
+            img.pop('sequence_label', None)
+            img.pop('sequence_total', None)
+            img.pop('sequence_files', None)
+
+        filenames = [img['name'] for img in folder_imgs]
+        sequences = detect_image_sequences(filenames, min_frames=2)
+
+        if not sequences:
+            self.show_info("No Sequence Detected",
+                           f"No sequence pattern found for images in '{folder}'.\n"
+                           "Sequences require at least 2 files with a numeric frame number "
+                           "separated by _ . or - from the base name.")
+            self.apply_filters()
+            return
+
+        # Check that the clicked image is actually part of one of the found sequences
+        clicked_in_seq = False
+        fname_to_key = {
+            fname: key
+            for key, seq in sequences.items()
+            for fname in seq.files
+        }
+
+        for img in folder_imgs:
+            fname = img['name']
+            if fname not in fname_to_key:
+                continue
+            clicked_in_seq = clicked_in_seq or (img is img_data)
+            seq_key = fname_to_key[fname]
+            seq = sequences[seq_key]
+            img['in_sequence'] = True
+            img['sequence_key'] = seq_key
+            if fname == seq.files[0]:
+                from pathlib import Path as _Path
+                parent = _Path(img['path']).parent
+                img['is_sequence_rep'] = True
+                img['sequence_label'] = seq.label
+                img['sequence_total'] = len(seq.files)
+                img['sequence_files'] = [str(parent / f) for f in seq.files]
+
+        if not clicked_in_seq:
+            self.show_info("No Sequence Detected",
+                           f"'{img_data['name']}' does not match any sequence pattern.\n"
+                           "Other sequences in the folder may have been detected.")
+
+        self.apply_filters()
 
     def load_settings(self):
         """Load tab-specific settings."""

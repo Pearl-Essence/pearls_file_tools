@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from ui.tabs.base_tab import BaseTab
 from ui.widgets.directory_selector import DirectorySelectorWidget
-from core.pattern_matching import group_files_by_pattern
+from core.pattern_matching import group_files_by_pattern, detect_image_sequences, SequenceGroup
 
 
 class FileOrganizerTab(BaseTab):
@@ -19,6 +19,10 @@ class FileOrganizerTab(BaseTab):
         """Initialize the file organizer tab."""
         self.file_groups: Dict[str, Dict[str, List[Path]]] = {}
         self.unsorted_files: Dict[str, List[Path]] = {}
+        # subdir_path → {seq_key: SequenceGroup}  (files stored as filenames)
+        self.file_sequences: Dict[str, Dict[str, SequenceGroup]] = {}
+        # Each entry is a list of (file_path, subdir, from_group, to_group) tuples
+        self._move_undo_stack: List = []
 
         super().__init__(config, parent)
 
@@ -76,6 +80,12 @@ class FileOrganizerTab(BaseTab):
         self.new_group_btn.setEnabled(False)
         button_layout.addWidget(self.new_group_btn)
 
+        self.undo_move_btn = QPushButton("Undo Last Move")
+        self.undo_move_btn.setToolTip("Undo the most recent drag-and-drop or context-menu move")
+        self.undo_move_btn.clicked.connect(self.undo_last_move)
+        self.undo_move_btn.setEnabled(False)
+        button_layout.addWidget(self.undo_move_btn)
+
         self.organize_btn = QPushButton("Organize Files")
         self.organize_btn.clicked.connect(self.organize_files)
         self.organize_btn.setEnabled(False)
@@ -104,6 +114,8 @@ class FileOrganizerTab(BaseTab):
         self.scan_btn.setEnabled(False)
         self.organize_btn.setEnabled(False)
         self.new_group_btn.setEnabled(False)
+        self.undo_move_btn.setEnabled(False)
+        self._move_undo_stack.clear()
         self.tree_widget.clear()
         self.status_label.setText("Scanning...")
         self.progress_bar.setVisible(True)
@@ -135,8 +147,44 @@ class FileOrganizerTab(BaseTab):
 
         self.file_groups = grouped_results or {}
         self.unsorted_files = unsorted_results or {}
+        self.file_sequences = {}
 
-        if not self.file_groups and not self.unsorted_files:
+        # Detect image sequences across all files in each subdir, then remove
+        # sequence files from the regular grouped / unsorted buckets.
+        all_subdirs = set(list(self.file_groups.keys()) + list(self.unsorted_files.keys()))
+        for subdir_path in all_subdirs:
+            all_files: List[Path] = []
+            for files in self.file_groups.get(subdir_path, {}).values():
+                all_files.extend(files)
+            all_files.extend(self.unsorted_files.get(subdir_path, []))
+
+            if not all_files:
+                continue
+
+            sequences = detect_image_sequences([f.name for f in all_files])
+            if not sequences:
+                continue
+
+            self.file_sequences[subdir_path] = sequences
+            seq_filenames = {fname for seq in sequences.values() for fname in seq.files}
+
+            # Strip sequence files from file_groups
+            if subdir_path in self.file_groups:
+                cleaned: Dict[str, List[Path]] = {}
+                for grp, files in self.file_groups[subdir_path].items():
+                    remaining = [f for f in files if f.name not in seq_filenames]
+                    if remaining:
+                        cleaned[grp] = remaining
+                self.file_groups[subdir_path] = cleaned
+
+            # Strip from unsorted
+            if subdir_path in self.unsorted_files:
+                self.unsorted_files[subdir_path] = [
+                    f for f in self.unsorted_files[subdir_path]
+                    if f.name not in seq_filenames
+                ]
+
+        if not self.file_groups and not self.unsorted_files and not self.file_sequences:
             self.show_info("Scan Complete", "No files to organize were found in subdirectories.")
             self.status_label.setText("No files found")
             return
@@ -150,19 +198,67 @@ class FileOrganizerTab(BaseTab):
             for files in groups.values()
         )
         total_unsorted = sum(len(files) for files in self.unsorted_files.values())
-
-        self.status_label.setText(
-            f"Found {total_groups} groups ({total_grouped} files), {total_unsorted} unsorted files"
+        total_sequences = sum(len(seqs) for seqs in self.file_sequences.values())
+        total_seq_frames = sum(
+            len(seq.files)
+            for seqs in self.file_sequences.values()
+            for seq in seqs.values()
         )
+
+        parts = []
+        if total_groups:
+            parts.append(f"{total_groups} groups ({total_grouped} files)")
+        if total_sequences:
+            parts.append(f"{total_sequences} sequences ({total_seq_frames} frames)")
+        if total_unsorted:
+            parts.append(f"{total_unsorted} unsorted")
+        self.status_label.setText("Found " + ", ".join(parts) if parts else "No files found")
         self.organize_btn.setEnabled(True)
         self.new_group_btn.setEnabled(True)
 
+    def _save_expansion_state(self) -> set:
+        """Return the set of UserRole data tuples for every currently expanded item."""
+        expanded = set()
+        root = self.tree_widget.invisibleRootItem()
+        for i in range(root.childCount()):
+            top = root.child(i)
+            if top.isExpanded():
+                d = top.data(0, Qt.UserRole)
+                if d:
+                    expanded.add(d)
+                for j in range(top.childCount()):
+                    child = top.child(j)
+                    if child.isExpanded():
+                        d = child.data(0, Qt.UserRole)
+                        if d:
+                            expanded.add(d)
+        return expanded
+
+    def _restore_expansion_state(self, expanded: set, first_populate: bool):
+        """Expand items whose data key is in *expanded*; expand all top-level on first populate."""
+        root = self.tree_widget.invisibleRootItem()
+        for i in range(root.childCount()):
+            top = root.child(i)
+            d = top.data(0, Qt.UserRole)
+            if first_populate or (d and d in expanded):
+                top.setExpanded(True)
+            for j in range(top.childCount()):
+                child = top.child(j)
+                d = child.data(0, Qt.UserRole)
+                if d and d in expanded:
+                    child.setExpanded(True)
+
     def populate_tree(self):
-        """Populate the tree widget with groups and files."""
+        """Populate the tree widget with groups, sequences, and files."""
+        expanded = self._save_expansion_state()
+        first_populate = (self.tree_widget.invisibleRootItem().childCount() == 0)
         self.tree_widget.clear()
 
-        # Combine all subdirectories
-        all_subdirs = set(list(self.file_groups.keys()) + list(self.unsorted_files.keys()))
+        all_subdirs = set(
+            list(self.file_groups.keys()) +
+            list(self.unsorted_files.keys()) +
+            list(self.file_sequences.keys())
+        )
 
         for subdir_path in sorted(all_subdirs):
             subdir_name = Path(subdir_path).name
@@ -187,6 +283,35 @@ class FileOrganizerTab(BaseTab):
 
                 subdir_item.addChild(group_item)
 
+            # Add image sequences
+            sequences = self.file_sequences.get(subdir_path, {})
+            for seq_key, seq in sorted(sequences.items()):
+                seq_item = QTreeWidgetItem([
+                    seq.label,
+                    f"{len(seq.files)} frames",
+                    "Sequence",
+                ])
+                seq_item.setForeground(0, QBrush(QColor(30, 144, 255)))   # dodger blue
+                seq_item.setForeground(2, QBrush(QColor(30, 144, 255)))
+                seq_item.setData(0, Qt.UserRole, ('sequence', subdir_path, seq_key))
+                if seq.missing:
+                    seq_item.setToolTip(
+                        0,
+                        f"Missing frames: {', '.join(str(f) for f in seq.missing[:20])}"
+                        + (' …' if len(seq.missing) > 20 else '')
+                    )
+                for fname in seq.files:
+                    fpath = Path(subdir_path) / fname
+                    try:
+                        from core.file_utils import format_file_size
+                        size_str = format_file_size(fpath.stat().st_size)
+                    except Exception:
+                        size_str = ''
+                    frame_item = QTreeWidgetItem([fname, size_str, ""])
+                    frame_item.setData(0, Qt.UserRole, ('file', subdir_path, seq_key, fpath))
+                    seq_item.addChild(frame_item)
+                subdir_item.addChild(seq_item)
+
             # Add unsorted files section
             unsorted = self.unsorted_files.get(subdir_path, [])
             if unsorted:
@@ -207,7 +332,8 @@ class FileOrganizerTab(BaseTab):
                 subdir_item.addChild(unsorted_item)
 
             self.tree_widget.addTopLevelItem(subdir_item)
-            subdir_item.setExpanded(True)
+
+        self._restore_expansion_state(expanded, first_populate)
 
     def show_context_menu(self, position):
         """Show context menu on right-click."""
@@ -224,23 +350,73 @@ class FileOrganizerTab(BaseTab):
         if data[0] == 'group':
             _, subdir_path, group_name = data
 
-            # Rename group
             rename_action = menu.addAction("Rename Group")
-            rename_action.triggered.connect(lambda: self.rename_group(subdir_path, group_name))
+            rename_action.triggered.connect(
+                lambda checked=False, sp=subdir_path, gn=group_name:
+                    self.rename_group(sp, gn)
+            )
 
-            # Merge with another group
             groups = [g for g in self.file_groups.get(subdir_path, {}).keys() if g != group_name]
             if groups:
                 merge_menu = menu.addMenu("Merge with Group")
-                for other_group in groups:
+                for other_group in sorted(groups):
                     action = merge_menu.addAction(other_group)
                     action.triggered.connect(
-                        lambda checked, og=other_group: self.merge_groups(subdir_path, group_name, og)
+                        lambda checked=False, sp=subdir_path, gn=group_name, og=other_group:
+                            self.merge_groups(sp, gn, og)
                     )
 
-            # Delete group
-            delete_action = menu.addAction("Delete Group (move files to unsorted)")
-            delete_action.triggered.connect(lambda: self.delete_group(subdir_path, group_name))
+            delete_action = menu.addAction("Delete Group (move files to Unsorted)")
+            delete_action.triggered.connect(
+                lambda checked=False, sp=subdir_path, gn=group_name:
+                    self.delete_group(sp, gn)
+            )
+
+        elif data[0] == 'file':
+            _, file_subdir, file_group, file_path = data
+
+            # Only show move options for files in regular groups or in unsorted.
+            # Sequence frame items report a seq_key as file_group — skip those
+            # since sequences are managed as a unit.
+            in_group = (file_group is not None and
+                        file_group in self.file_groups.get(file_subdir, {}))
+            in_unsorted = (file_group is None)
+
+            if in_group:
+                to_unsorted = menu.addAction("Move to Unsorted")
+                to_unsorted.triggered.connect(
+                    lambda checked=False, fp=file_path, sd=file_subdir, fg=file_group:
+                        self._move_file_and_record(fp, sd, fg, None)
+                )
+
+                other_groups = sorted(
+                    g for g in self.file_groups.get(file_subdir, {}).keys()
+                    if g != file_group
+                )
+                if other_groups:
+                    move_menu = menu.addMenu("Move to Group")
+                    for grp in other_groups:
+                        action = move_menu.addAction(grp)
+                        action.triggered.connect(
+                            lambda checked=False, fp=file_path, sd=file_subdir, fg=file_group, tg=grp:
+                                self._move_file_and_record(fp, sd, fg, tg)
+                        )
+
+            elif in_unsorted:
+                # File is in Unsorted — offer to move into a group
+                groups = sorted(self.file_groups.get(file_subdir, {}).keys())
+                if groups:
+                    move_menu = menu.addMenu("Move to Group")
+                    for grp in groups:
+                        action = move_menu.addAction(grp)
+                        action.triggered.connect(
+                            lambda checked=False, fp=file_path, sd=file_subdir, tg=grp:
+                                self._move_file_and_record(fp, sd, None, tg)
+                        )
+
+        # Don't show an empty menu
+        if not menu.actions():
+            return
 
         menu.exec_(self.tree_widget.viewport().mapToGlobal(position))
 
@@ -284,6 +460,67 @@ class FileOrganizerTab(BaseTab):
                 self.populate_tree()
                 self.emit_status(f"Deleted group '{group_name}'")
 
+    # ── move helpers + undo ───────────────────────────────────────────────
+
+    def _move_file(self, file_path: Path, subdir: str,
+                   source_group: Optional[str], target_group: Optional[str],
+                   _refresh: bool = True, _keep_empty_source: bool = False):
+        """Move a single file between groups / unsorted. Does NOT push to undo stack.
+
+        _keep_empty_source: when True, an empty source group is NOT deleted after the
+        file is removed.  Used by undo so that a group the user deliberately created
+        (and then filled) isn't silently erased when the fill is undone.
+        """
+        # Remove from source
+        if source_group is None:
+            lst = self.unsorted_files.get(subdir, [])
+            if file_path in lst:
+                lst.remove(file_path)
+        else:
+            grp_files = self.file_groups.get(subdir, {}).get(source_group, [])
+            if file_path in grp_files:
+                grp_files.remove(file_path)
+                if not _keep_empty_source and not self.file_groups[subdir][source_group]:
+                    del self.file_groups[subdir][source_group]
+
+        # Add to target
+        if target_group is None:
+            self.unsorted_files.setdefault(subdir, []).append(file_path)
+        else:
+            self.file_groups.setdefault(subdir, {}).setdefault(target_group, []).append(file_path)
+
+        if _refresh:
+            self.populate_tree()
+
+    def _move_file_and_record(self, file_path: Path, subdir: str,
+                               source_group: Optional[str], target_group: Optional[str]):
+        """Move a single file and push a one-item batch to the undo stack."""
+        self._move_file(file_path, subdir, source_group, target_group)
+        self._push_undo_batch([(file_path, subdir, source_group, target_group)])
+        dest = target_group if target_group else "[UNSORTED]"
+        self.emit_status(f"Moved {file_path.name} \u2192 {dest}")
+
+    def _push_undo_batch(self, records: list):
+        """Push a list of move records onto the undo stack and enable the button."""
+        if records:
+            self._move_undo_stack.append(records)
+            self.undo_move_btn.setEnabled(True)
+
+    def undo_last_move(self):
+        """Reverse the most recent batch of file moves."""
+        if not self._move_undo_stack:
+            return
+        batch = self._move_undo_stack.pop()
+        # Reverse all moves in the batch (in reverse order for correctness)
+        for file_path, subdir, from_group, to_group in reversed(batch):
+            self._move_file(file_path, subdir, to_group, from_group,
+                            _refresh=False, _keep_empty_source=True)
+        self.populate_tree()
+        n = len(batch)
+        self.emit_status(f"Undone: moved {n} file{'s' if n > 1 else ''} back")
+        if not self._move_undo_stack:
+            self.undo_move_btn.setEnabled(False)
+
     def create_new_group(self):
         """Create a new empty group."""
         item = self.tree_widget.currentItem()
@@ -323,7 +560,6 @@ class FileOrganizerTab(BaseTab):
         if not target_data:
             return
 
-        # Determine target
         if target_data[0] == 'group':
             _, target_subdir, target_group = target_data
         elif target_data[0] == 'unsorted':
@@ -332,15 +568,14 @@ class FileOrganizerTab(BaseTab):
         else:
             return
 
-        # Move each file
-        moved_count = 0
-        for file_path in dropped_files:
-            # Find where this file currently is
-            current_group = None
-            source_subdir = None
+        records = []  # (file_path, subdir, from_group, to_group) — for undo
 
-            # Search in file_groups
+        for file_path in dropped_files:
+            # Locate the file in the current data model
+            source_subdir = None
+            current_group = None
             found = False
+
             for subdir_path, groups in self.file_groups.items():
                 for group_name, files in groups.items():
                     if file_path in files:
@@ -351,7 +586,6 @@ class FileOrganizerTab(BaseTab):
                 if found:
                     break
 
-            # Search in unsorted_files if not found
             if not found:
                 for subdir_path, files in self.unsorted_files.items():
                     if file_path in files:
@@ -363,62 +597,45 @@ class FileOrganizerTab(BaseTab):
             if not found:
                 continue
 
-            # Only allow moving within the same subdirectory
             if source_subdir != target_subdir:
-                self.show_warning(
-                    "Invalid Move",
-                    f"Cannot move files between different subdirectories."
-                )
+                self.show_warning("Invalid Move",
+                                  "Cannot move files between different subdirectories.")
                 continue
 
-            # Skip if dropping on same group
             if current_group == target_group:
                 continue
 
-            # Remove from source
-            if current_group is None:
-                # Moving from unsorted
-                if source_subdir in self.unsorted_files and file_path in self.unsorted_files[source_subdir]:
-                    self.unsorted_files[source_subdir].remove(file_path)
-                    if not self.unsorted_files[source_subdir]:
-                        del self.unsorted_files[source_subdir]
-            else:
-                # Moving from a group
-                if source_subdir in self.file_groups and current_group in self.file_groups[source_subdir]:
-                    if file_path in self.file_groups[source_subdir][current_group]:
-                        self.file_groups[source_subdir][current_group].remove(file_path)
-                        # Remove empty groups
-                        if not self.file_groups[source_subdir][current_group]:
-                            del self.file_groups[source_subdir][current_group]
+            self._move_file(file_path, source_subdir, current_group, target_group,
+                            _refresh=False)
+            records.append((file_path, source_subdir, current_group, target_group))
 
-            # Add to target
-            if target_group is None:
-                # Moving to unsorted
-                if target_subdir not in self.unsorted_files:
-                    self.unsorted_files[target_subdir] = []
-                self.unsorted_files[target_subdir].append(file_path)
-            else:
-                # Moving to a group
-                if target_subdir not in self.file_groups:
-                    self.file_groups[target_subdir] = {}
-                if target_group not in self.file_groups[target_subdir]:
-                    self.file_groups[target_subdir][target_group] = []
-                self.file_groups[target_subdir][target_group].append(file_path)
-
-            moved_count += 1
-
-        # Refresh the tree
-        if moved_count > 0:
+        if records:
             self.populate_tree()
+            self._push_undo_batch(records)
             dest = target_group if target_group else "[UNSORTED]"
-            self.emit_status(f"Moved {moved_count} file(s) to {dest}")
+            self.emit_status(f"Moved {len(records)} file(s) \u2192 {dest}")
 
     def organize_files(self):
         """Start organizing files into folders."""
+        # Merge sequences into file_groups so OrganizeWorker handles them uniformly
+        merged_groups: Dict[str, Dict[str, List[Path]]] = {
+            subdir: dict(groups) for subdir, groups in self.file_groups.items()
+        }
+        for subdir_path, seqs in self.file_sequences.items():
+            if subdir_path not in merged_groups:
+                merged_groups[subdir_path] = {}
+            for seq_key, seq in seqs.items():
+                folder_name = seq.base  # organize into a folder named by base
+                if folder_name in merged_groups[subdir_path]:
+                    folder_name = seq_key  # fallback to full key to avoid collision
+                merged_groups[subdir_path][folder_name] = [
+                    Path(subdir_path) / fname for fname in seq.files
+                ]
+
         # Count files to organize
         total_to_organize = sum(
             len(files)
-            for groups in self.file_groups.values()
+            for groups in merged_groups.values()
             for files in groups.values()
         )
 
@@ -447,7 +664,7 @@ class FileOrganizerTab(BaseTab):
         # Start organize worker
         from workers.organize_worker import OrganizeWorker
 
-        self.worker_thread = OrganizeWorker(self.file_groups, self.current_directory)
+        self.worker_thread = OrganizeWorker(merged_groups, self.current_directory)
         self.worker_thread.progress.connect(self.update_organize_progress)
         self.worker_thread.confirm_needed.connect(self.handle_conflict)
         self.worker_thread.finished.connect(self.on_organize_finished)

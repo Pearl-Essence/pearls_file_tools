@@ -27,18 +27,39 @@ class ScanWorker(BaseWorker):
         self.root_dir = Path(root_dir)
         self.confidence_threshold = confidence_threshold
 
+    def _scan_one_dir(self, directory: Path,
+                      grouped_results: Dict, unsorted_results: Dict):
+        """Scan a single directory and merge results into the provided dicts."""
+        files = [f for f in directory.iterdir() if f.is_file()]
+        if not files:
+            return
+        filenames = [f.name for f in files]
+        groups_dict, unsorted_list = group_files_by_pattern(
+            filenames, self.confidence_threshold
+        )
+        groups_with_paths = {
+            grp: [directory / fn for fn in fns]
+            for grp, fns in groups_dict.items()
+        }
+        unsorted_with_paths = [directory / fn for fn in unsorted_list]
+        if groups_with_paths:
+            grouped_results[str(directory)] = groups_with_paths
+        if unsorted_with_paths:
+            unsorted_results[str(directory)] = unsorted_with_paths
+
     def run(self):
         """Execute the directory scan."""
         grouped_results: Dict[str, Dict[str, List[Path]]] = {}
         unsorted_results: Dict[str, List[Path]] = {}
 
         try:
-            # Get all subdirectories
-            subdirs = [d for d in self.root_dir.iterdir() if d.is_dir()]
+            # Scan files directly in the root directory first so that selecting
+            # a flat folder (e.g. Desktop) still shows its files.
+            self.emit_progress(f"Scanning: {self.root_dir.name}...")
+            self._scan_one_dir(self.root_dir, grouped_results, unsorted_results)
 
-            if not subdirs:
-                self.emit_finished(True, "No subdirectories found", {}, {})
-                return
+            # Then scan each immediate subdirectory
+            subdirs = [d for d in self.root_dir.iterdir() if d.is_dir()]
 
             for subdir in subdirs:
                 if self.is_cancelled:
@@ -46,37 +67,7 @@ class ScanWorker(BaseWorker):
                     return
 
                 self.emit_progress(f"Scanning {subdir.name}...")
-
-                # Get all files in this subdirectory (not recursive)
-                files = [f for f in subdir.iterdir() if f.is_file()]
-
-                if not files:
-                    continue
-
-                # Get just filenames for grouping
-                filenames = [f.name for f in files]
-
-                # Group files by pattern
-                groups_dict, unsorted_list = group_files_by_pattern(
-                    filenames,
-                    self.confidence_threshold
-                )
-
-                # Convert filenames back to Path objects
-                groups_with_paths = {}
-                for group_name, group_filenames in groups_dict.items():
-                    groups_with_paths[group_name] = [
-                        subdir / filename for filename in group_filenames
-                    ]
-
-                unsorted_with_paths = [subdir / filename for filename in unsorted_list]
-
-                # Store results
-                if groups_with_paths:
-                    grouped_results[str(subdir)] = groups_with_paths
-
-                if unsorted_with_paths:
-                    unsorted_results[str(subdir)] = unsorted_with_paths
+                self._scan_one_dir(subdir, grouped_results, unsorted_results)
 
             self.emit_progress("Scan complete!")
             self.emit_finished(True, "Scan completed successfully", grouped_results, unsorted_results)

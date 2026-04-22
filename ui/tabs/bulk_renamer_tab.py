@@ -358,6 +358,13 @@ class BulkRenamerTab(BaseTab):
         group = QGroupBox("Rename Options")
         layout = QVBoxLayout()
 
+        rename_layout = QHBoxLayout()
+        rename_layout.addWidget(QLabel("Rename to:"))
+        self.rename_input = QLineEdit()
+        self.rename_input.setPlaceholderText("Replace entire base name (prefix/suffix still applied)")
+        rename_layout.addWidget(self.rename_input, stretch=1)
+        layout.addLayout(rename_layout)
+
         prefix_layout = QHBoxLayout()
         prefix_layout.addWidget(QLabel("Prefix:"))
         self.prefix_input = QLineEdit()
@@ -369,12 +376,6 @@ class BulkRenamerTab(BaseTab):
         self.suffix_input = QLineEdit()
         suffix_layout.addWidget(self.suffix_input, stretch=1)
         layout.addLayout(suffix_layout)
-
-        rename_layout = QHBoxLayout()
-        rename_layout.addWidget(QLabel("Rename to:"))
-        self.rename_input = QLineEdit()
-        rename_layout.addWidget(self.rename_input, stretch=1)
-        layout.addLayout(rename_layout)
 
         case_layout = QHBoxLayout()
         case_layout.addWidget(QLabel("Case:"))

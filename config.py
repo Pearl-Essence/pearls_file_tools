@@ -61,7 +61,7 @@ class Config:
                     'bulk_renamer': '',
                     'organizer': '',
                     'extractor': '',
-                    'image_viewer': ''
+                    'image_browser': ''
                 }
             },
             'preferences': {
@@ -99,7 +99,7 @@ class Config:
                         '7z': True
                     }
                 },
-                'image_viewer': {
+                'image_browser': {
                     'thumbnail_size': 200,
                     'columns': 5,
                     'cache_enabled': True,

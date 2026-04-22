@@ -46,6 +46,8 @@ class ImageScanWorker(BaseWorker):
             if self.use_cache:
                 cached_images = self._load_from_cache()
                 if cached_images is not None:
+                    # Re-annotate every time — cheap, ensures old caches get sequence data
+                    self._annotate_sequences(cached_images)
                     self.emit_progress(f"Loaded {len(cached_images)} images from cache")
                     self.emit_finished(True, f"Loaded {len(cached_images)} images from cache", cached_images)
                     return
@@ -99,6 +101,9 @@ class ImageScanWorker(BaseWorker):
             # Sort images by name
             images.sort(key=lambda x: x['name'].lower())
 
+            # Detect image sequences per folder and annotate each image dict
+            self._annotate_sequences(images)
+
             self.emit_progress(f"Found {len(images)} images")
 
             # Save to cache
@@ -111,6 +116,68 @@ class ImageScanWorker(BaseWorker):
 
         except Exception as e:
             self.emit_finished(False, f"Error scanning directory: {str(e)}", None)
+
+    @staticmethod
+    def _annotate_sequences(images: List[Dict]):
+        """Detect image sequences per folder and annotate each image dict in-place.
+
+        For each detected sequence, every frame gets ``in_sequence=True``.
+        The first frame of each sequence also gets:
+          - ``is_sequence_rep=True``
+          - ``sequence_label``  — human-readable range label
+          - ``sequence_total``  — total frame count
+          - ``sequence_files``  — ordered list of absolute path strings for all frames
+        """
+        try:
+            from core.pattern_matching import detect_image_sequences
+        except ImportError:
+            return
+
+        # Clear any stale sequence annotations from a previous scan (e.g. cached data)
+        # so that dissolved sequences don't leave hidden ghost frames.
+        for img in images:
+            img.pop('in_sequence', None)
+            img.pop('is_sequence_rep', None)
+            img.pop('sequence_key', None)
+            img.pop('sequence_label', None)
+            img.pop('sequence_total', None)
+            img.pop('sequence_files', None)
+
+        # Group image indices by folder
+        folder_map: Dict[str, List[int]] = {}
+        for i, img in enumerate(images):
+            folder_map.setdefault(img['folder'], []).append(i)
+
+        for folder, indices in folder_map.items():
+            filenames = [images[i]['name'] for i in indices]
+            sequences = detect_image_sequences(filenames)
+            if not sequences:
+                continue
+
+            # Build filename → sequence key lookup
+            fname_to_key: Dict[str, str] = {}
+            for seq_key, seq in sequences.items():
+                for fname in seq.files:
+                    fname_to_key[fname] = seq_key
+
+            # Annotate images and identify representatives
+            for i in indices:
+                fname = images[i]['name']
+                if fname not in fname_to_key:
+                    continue
+                seq_key = fname_to_key[fname]
+                seq = sequences[seq_key]
+                images[i]['in_sequence'] = True
+                images[i]['sequence_key'] = seq_key
+
+                if fname == seq.files[0]:  # First frame = representative
+                    parent_dir = Path(images[i]['path']).parent
+                    images[i]['is_sequence_rep'] = True
+                    images[i]['sequence_label'] = seq.label
+                    images[i]['sequence_total'] = len(seq.files)
+                    images[i]['sequence_files'] = [
+                        str(parent_dir / f) for f in seq.files
+                    ]
 
     def _get_directory_hash(self) -> str:
         """Generate a hash based on directory structure for cache validation."""
