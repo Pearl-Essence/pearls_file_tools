@@ -20,8 +20,8 @@ from PyQt5.QtGui import QBrush, QColor, QFont
 from PyQt5.QtWidgets import (
     QButtonGroup, QCheckBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QProgressBar,
-    QPushButton, QRadioButton, QScrollArea, QSpinBox, QStackedWidget, QTabWidget,
-    QTextEdit, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
+    QPushButton, QRadioButton, QScrollArea, QSizePolicy, QSpinBox, QStackedWidget,
+    QTabWidget, QTextEdit, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
 from ui.tabs.base_tab import BaseTab
@@ -178,6 +178,23 @@ def _open_path(path: Path):
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Layout helper
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _options_scroll(inner: QWidget) -> QScrollArea:
+    """Wrap *inner* in a scroll area that sizes to content and scrolls when compressed."""
+    sa = QScrollArea()
+    sa.setWidget(inner)
+    sa.setWidgetResizable(True)
+    sa.setFrameShape(QScrollArea.NoFrame)
+    sa.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+    sa.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+    sa.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+    sa.setMinimumHeight(40)
+    return sa
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Validator pane
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -193,37 +210,43 @@ class _ValidatorPane(QWidget):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
+        layout.setSpacing(6)
 
-        # Directory selector
-        dir_group = QGroupBox("Directory to validate")
-        dir_layout = QVBoxLayout()
+        # ── Top pinned: directory ─────────────────────────────────────────────
         self.dir_selector = DirectorySelectorWidget(label_text="Folder:")
-        dir_layout.addWidget(self.dir_selector)
-        dir_group.setLayout(dir_layout)
-        layout.addWidget(dir_group)
+        layout.addWidget(self.dir_selector)
 
-        # Profile options
-        opt_group = QGroupBox("Validation rules")
-        opt_layout = QFormLayout()
+        # ── Scrollable options ────────────────────────────────────────────────
+        opts_widget = QGroupBox("Validation rules")
+        opts_layout = QFormLayout(opts_widget)
         self.chk_version = QCheckBox("Video files must have _FINAL or _v## suffix")
         self.chk_version.setChecked(True)
-        opt_layout.addRow(self.chk_version)
+        opts_layout.addRow(self.chk_version)
         self.chk_hidden = QCheckBox("Flag hidden files (starting with '.')")
         self.chk_hidden.setChecked(True)
-        opt_layout.addRow(self.chk_hidden)
+        opts_layout.addRow(self.chk_hidden)
         self.chk_case_dup = QCheckBox("Flag case-insensitive name collisions")
         self.chk_case_dup.setChecked(True)
-        opt_layout.addRow(self.chk_case_dup)
+        opts_layout.addRow(self.chk_case_dup)
         self.spn_min_mb = QSpinBox()
         self.spn_min_mb.setRange(0, 10000)
         self.spn_min_mb.setValue(1)
         self.spn_min_mb.setSuffix(" MB")
         self.spn_min_mb.setToolTip("Flag video files smaller than this (0 = disabled)")
-        opt_layout.addRow("Min video file size:", self.spn_min_mb)
-        opt_group.setLayout(opt_layout)
-        layout.addWidget(opt_group)
+        opts_layout.addRow("Min video file size:", self.spn_min_mb)
+        layout.addWidget(_options_scroll(opts_widget))
 
-        # Buttons
+        # ── Results (fills remaining space) ───────────────────────────────────
+        self.result_list = QListWidget()
+        self.result_list.setAlternatingRowColors(True)
+        self.result_list.setMinimumHeight(120)
+        layout.addWidget(self.result_list, stretch=1)
+
+        # ── Bottom pinned: summary + run button ───────────────────────────────
+        self.summary_label = QLabel("")
+        self.summary_label.setStyleSheet("font-weight: bold; padding: 2px 0;")
+        layout.addWidget(self.summary_label)
+
         btn_row = QHBoxLayout()
         self.run_btn = QPushButton("Run Validation")
         self.run_btn.setStyleSheet("padding: 8px 20px;")
@@ -233,20 +256,6 @@ class _ValidatorPane(QWidget):
         btn_row.addWidget(self.status_label)
         btn_row.addStretch()
         layout.addLayout(btn_row)
-
-        # Results
-        results_label = QLabel("Results:")
-        results_label.setStyleSheet("font-weight: bold; margin-top: 6px;")
-        layout.addWidget(results_label)
-
-        self.result_list = QListWidget()
-        self.result_list.setAlternatingRowColors(True)
-        layout.addWidget(self.result_list, stretch=1)
-
-        # Summary bar
-        self.summary_label = QLabel("")
-        self.summary_label.setStyleSheet("font-weight: bold; padding: 4px;")
-        layout.addWidget(self.summary_label)
 
     def _build_profile(self):
         from core.delivery import DeliveryProfile
@@ -324,35 +333,38 @@ class _PackagePane(QWidget):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
+        layout.setSpacing(6)
 
-        src_group = QGroupBox("Source folder (must pass validation first)")
-        src_layout = QVBoxLayout()
+        # ── Top pinned: source, destination, project name ─────────────────────
         self.src_selector = DirectorySelectorWidget(label_text="Source:")
         self.src_selector.directory_changed.connect(self._update_source)
-        src_layout.addWidget(self.src_selector)
-        src_group.setLayout(src_layout)
-        layout.addWidget(src_group)
+        layout.addWidget(QLabel("<b>Source folder</b> (must pass validation first)"))
+        layout.addWidget(self.src_selector)
 
-        dst_group = QGroupBox("Output folder")
-        dst_layout = QVBoxLayout()
         self.dst_selector = DirectorySelectorWidget(label_text="Destination:")
-        dst_layout.addWidget(self.dst_selector)
-        dst_group.setLayout(dst_layout)
-        layout.addWidget(dst_group)
+        layout.addWidget(QLabel("<b>Output folder</b>"))
+        layout.addWidget(self.dst_selector)
 
-        name_row = QFormLayout()
+        name_row = QHBoxLayout()
+        name_row.addWidget(QLabel("Project name:"))
         self.project_edit = QLineEdit()
         self.project_edit.setPlaceholderText("e.g. PROJECT_S01E03")
-        name_row.addRow("Project name:", self.project_edit)
-        layout.addLayout(name_row)
-
-        # Preview
-        self.preview_label = QLabel("")
-        self.preview_label.setStyleSheet("color: #888; font-style: italic; padding: 4px;")
-        layout.addWidget(self.preview_label)
         self.project_edit.textChanged.connect(self._update_preview)
         self.src_selector.directory_changed.connect(self._update_preview)
+        name_row.addWidget(self.project_edit)
+        layout.addLayout(name_row)
 
+        self.preview_label = QLabel("")
+        self.preview_label.setStyleSheet("color: #888; font-style: italic; padding: 2px 0;")
+        layout.addWidget(self.preview_label)
+
+        # ── Log (fills remaining space) ───────────────────────────────────────
+        self.log = QTextEdit()
+        self.log.setReadOnly(True)
+        self.log.setMinimumHeight(120)
+        layout.addWidget(self.log, stretch=1)
+
+        # ── Bottom pinned: action button ──────────────────────────────────────
         btn_row = QHBoxLayout()
         self.zip_btn = QPushButton("Create Delivery Zip")
         self.zip_btn.setStyleSheet("padding: 8px 20px;")
@@ -362,13 +374,6 @@ class _PackagePane(QWidget):
         btn_row.addWidget(self.status_label)
         btn_row.addStretch()
         layout.addLayout(btn_row)
-
-        self.log = QTextEdit()
-        self.log.setReadOnly(True)
-        self.log.setMaximumHeight(160)
-        layout.addWidget(self.log)
-
-        layout.addStretch()
 
     def _update_source(self, path: str):
         self._source_dir = Path(path) if path else None
@@ -453,13 +458,25 @@ class _DuplicatesPane(QWidget):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
+        layout.setSpacing(6)
 
-        dir_group = QGroupBox("Scan folder")
-        dir_layout = QVBoxLayout()
+        # ── Top pinned: directory ─────────────────────────────────────────────
         self.dir_selector = DirectorySelectorWidget(label_text="Folder:")
-        dir_layout.addWidget(self.dir_selector)
-        dir_group.setLayout(dir_layout)
-        layout.addWidget(dir_group)
+        layout.addWidget(self.dir_selector)
+
+        # ── Results tree (fills remaining space) ──────────────────────────────
+        self.tree = QTreeWidget()
+        self.tree.setHeaderLabels(["File / Group", "Size", "MD5 (first 8)"])
+        self.tree.setColumnWidth(0, 500)
+        self.tree.setColumnWidth(1, 100)
+        self.tree.setAlternatingRowColors(True)
+        self.tree.setMinimumHeight(120)
+        layout.addWidget(self.tree, stretch=1)
+
+        # ── Bottom pinned: summary + scan button ──────────────────────────────
+        self.summary_label = QLabel("")
+        self.summary_label.setStyleSheet("font-weight: bold; padding: 2px 0;")
+        layout.addWidget(self.summary_label)
 
         btn_row = QHBoxLayout()
         self.scan_btn = QPushButton("Find Duplicates")
@@ -470,18 +487,6 @@ class _DuplicatesPane(QWidget):
         btn_row.addWidget(self.status_label)
         btn_row.addStretch()
         layout.addLayout(btn_row)
-
-        self.summary_label = QLabel("")
-        self.summary_label.setStyleSheet("font-weight: bold; padding: 2px 0;")
-        layout.addWidget(self.summary_label)
-
-        # Tree: group → files
-        self.tree = QTreeWidget()
-        self.tree.setHeaderLabels(["File / Group", "Size", "MD5 (first 8)"])
-        self.tree.setColumnWidth(0, 500)
-        self.tree.setColumnWidth(1, 100)
-        self.tree.setAlternatingRowColors(True)
-        layout.addWidget(self.tree, stretch=1)
 
     def _scan(self):
         directory = Path(self.dir_selector.get_directory())
@@ -563,14 +568,33 @@ class _HandoffPane(QWidget):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
+        layout.setSpacing(6)
 
-        dir_group = QGroupBox("Delivery folder")
-        dir_layout = QVBoxLayout()
+        # ── Top pinned: directory ─────────────────────────────────────────────
         self.dir_selector = DirectorySelectorWidget(label_text="Folder:")
-        dir_layout.addWidget(self.dir_selector)
-        dir_group.setLayout(dir_layout)
-        layout.addWidget(dir_group)
+        layout.addWidget(self.dir_selector)
 
+        # ── Scrollable options: rule description note ─────────────────────────
+        note_widget = QWidget()
+        note_layout = QVBoxLayout(note_widget)
+        note_layout.setContentsMargins(0, 0, 0, 0)
+        note = QLabel(
+            "Default rules check for luts/ folder, audio stems, no OFFLINE files, "
+            "and no tiny video files (<1 MB). Required rules must pass; optional rules "
+            "show a warning."
+        )
+        note.setWordWrap(True)
+        note.setStyleSheet("color: #888; font-size: 11px;")
+        note_layout.addWidget(note)
+        layout.addWidget(_options_scroll(note_widget))
+
+        # ── Results (fills remaining space) ───────────────────────────────────
+        self.result_list = QListWidget()
+        self.result_list.setAlternatingRowColors(True)
+        self.result_list.setMinimumHeight(120)
+        layout.addWidget(self.result_list, stretch=1)
+
+        # ── Bottom pinned: run button ─────────────────────────────────────────
         btn_row = QHBoxLayout()
         self.run_btn = QPushButton("Run Handoff Checks")
         self.run_btn.setStyleSheet("padding: 8px 20px;")
@@ -578,18 +602,6 @@ class _HandoffPane(QWidget):
         btn_row.addWidget(self.run_btn)
         btn_row.addStretch()
         layout.addLayout(btn_row)
-
-        self.result_list = QListWidget()
-        self.result_list.setAlternatingRowColors(True)
-        layout.addWidget(self.result_list, stretch=1)
-
-        note = QLabel(
-            "Default rules check for luts/ folder, audio stems, no OFFLINE files, "
-            "and no tiny video files. Rules are saved per delivery profile."
-        )
-        note.setWordWrap(True)
-        note.setStyleSheet("color: #888; font-size: 11px; margin-top: 4px;")
-        layout.addWidget(note)
 
     def _run(self):
         directory = Path(self.dir_selector.get_directory())
@@ -649,19 +661,19 @@ class _ExportPane(QWidget):
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
+        layout.setSpacing(6)
 
-        # ── Shared: directory + project name ──────────────────────────────────
-        shared_group = QGroupBox("Source")
-        shared_form = QFormLayout()
+        # ── Top pinned: directory, project name, format toggle ────────────────
         self.dir_selector = DirectorySelectorWidget(label_text="Folder:")
-        shared_form.addRow(self.dir_selector)
+        layout.addWidget(self.dir_selector)
+
+        name_row = QHBoxLayout()
+        name_row.addWidget(QLabel("Project name:"))
         self.project_edit = QLineEdit()
         self.project_edit.setPlaceholderText("e.g. PROJECT_S01E03  (used by QC Report; optional for CSV)")
-        shared_form.addRow("Project name:", self.project_edit)
-        shared_group.setLayout(shared_form)
-        layout.addWidget(shared_group)
+        name_row.addWidget(self.project_edit)
+        layout.addLayout(name_row)
 
-        # ── Mode toggle ───────────────────────────────────────────────────────
         toggle_group = QGroupBox("Output format")
         toggle_layout = QHBoxLayout()
         self._radio_csv = QRadioButton("CSV Manifest")
@@ -676,13 +688,13 @@ class _ExportPane(QWidget):
         toggle_group.setLayout(toggle_layout)
         layout.addWidget(toggle_group)
 
-        # ── Format-specific options (QStackedWidget) ──────────────────────────
+        # ── Scrollable format-specific options ────────────────────────────────
         self._stack = QStackedWidget()
 
         # Page 0 — CSV options
         csv_page = QWidget()
         csv_layout = QVBoxLayout(csv_page)
-        csv_layout.setContentsMargins(0, 4, 0, 0)
+        csv_layout.setContentsMargins(4, 4, 4, 4)
         csv_note = QLabel(
             "Writes filename, folder, size_bytes, extension, duration_secs, date_modified.\n"
             "duration_secs is populated when ffprobe or pymediainfo is available."
@@ -690,12 +702,11 @@ class _ExportPane(QWidget):
         csv_note.setWordWrap(True)
         csv_note.setStyleSheet("color: #888; font-size: 11px;")
         csv_layout.addWidget(csv_note)
-        csv_layout.addStretch()
 
         # Page 1 — QC Report options
         qc_page = QWidget()
         qc_layout = QFormLayout(qc_page)
-        qc_layout.setContentsMargins(0, 4, 0, 0)
+        qc_layout.setContentsMargins(4, 4, 4, 4)
         self.spn_min_mb = QSpinBox()
         self.spn_min_mb.setRange(0, 10000)
         self.spn_min_mb.setValue(1)
@@ -714,13 +725,19 @@ class _ExportPane(QWidget):
             self.chk_thumbs.setChecked(False)
             self.chk_thumbs.setEnabled(False)
 
-        self._stack.addWidget(csv_page)   # index 0
-        self._stack.addWidget(qc_page)    # index 1
-        layout.addWidget(self._stack)
+        self._stack.addWidget(csv_page)
+        self._stack.addWidget(qc_page)
+        layout.addWidget(_options_scroll(self._stack))
 
         self._btn_group.idClicked.connect(self._on_mode_changed)
 
-        # ── Export button + status ────────────────────────────────────────────
+        # ── Log (fills remaining space) ───────────────────────────────────────
+        self.log = QTextEdit()
+        self.log.setReadOnly(True)
+        self.log.setMinimumHeight(100)
+        layout.addWidget(self.log, stretch=1)
+
+        # ── Bottom pinned: export button ──────────────────────────────────────
         btn_row = QHBoxLayout()
         self.export_btn = QPushButton("Export CSV Manifest")
         self.export_btn.setStyleSheet("padding: 8px 20px;")
@@ -730,14 +747,6 @@ class _ExportPane(QWidget):
         btn_row.addWidget(self.status_label)
         btn_row.addStretch()
         layout.addLayout(btn_row)
-
-        # ── Log ───────────────────────────────────────────────────────────────
-        self.log = QTextEdit()
-        self.log.setReadOnly(True)
-        self.log.setMaximumHeight(140)
-        layout.addWidget(self.log)
-
-        layout.addStretch()
 
     def _on_mode_changed(self, mode_id: int):
         self._stack.setCurrentIndex(mode_id)

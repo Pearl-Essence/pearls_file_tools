@@ -34,8 +34,14 @@ class MainWindow(QMainWindow):
         """Setup the user interface."""
         self.setWindowTitle("Pearl's File Tools")
 
+        # Allow the window to be resized freely regardless of tab content minimums.
+        # Individual tabs may have large natural heights; the window should not be
+        # locked to the tallest one.
+        self.setMinimumSize(700, 500)
+
         # Create tab widget
         self.tab_widget = QTabWidget()
+        self.tab_widget.setMinimumSize(0, 0)  # don't let tab widget enforce child minimums
         self.setCentralWidget(self.tab_widget)
 
         # Add tabs
@@ -155,14 +161,29 @@ class MainWindow(QMainWindow):
         close_shortcut.activated.connect(self.close)
 
     def load_window_state(self):
-        """Load window geometry and state from config."""
+        """Load window geometry and state from config, clamped to available screen."""
+        from PyQt5.QtWidgets import QApplication
+        screen = QApplication.primaryScreen().availableGeometry()
+
         geometry = self.config.get('window.geometry')
         if geometry and len(geometry) == 4:
             x, y, width, height = geometry
-            self.setGeometry(x, y, width, height)
         else:
-            # Default size
-            self.resize(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
+            width  = DEFAULT_WINDOW_WIDTH
+            height = DEFAULT_WINDOW_HEIGHT
+            x = screen.x() + (screen.width()  - width)  // 2
+            y = screen.y() + (screen.height() - height) // 2
+
+        # Clamp size — cap at 90% width and 85% height so there's always breathing room
+        max_w = int(screen.width()  * 0.90)
+        max_h = int(screen.height() * 0.85)
+        width  = min(width,  max_w)
+        height = min(height, max_h)
+        # Clamp position so the window is fully on-screen
+        x = max(screen.x(), min(x, screen.x() + screen.width()  - width))
+        y = max(screen.y(), min(y, screen.y() + screen.height() - height))
+
+        self.setGeometry(x, y, width, height)
 
         # Check if window was maximized
         if self.config.get('window.maximized', False):

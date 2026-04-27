@@ -45,7 +45,7 @@ class BulkRenamerTab(BaseTab):
         """Setup the user interface."""
         layout = QVBoxLayout()
 
-        # Directory selection
+        # Directory selection — pinned at top
         self.dir_selector = DirectorySelectorWidget(
             label_text="Directory:",
             show_recursive=True
@@ -53,7 +53,13 @@ class BulkRenamerTab(BaseTab):
         self.dir_selector.directory_changed.connect(self.on_directory_changed)
         layout.addWidget(self.dir_selector)
 
-        # ── Multi-directory queue ─────────────────────────────────────────
+        # ── All options in a single scrollable container ───────────────────
+        opts_container = QWidget()
+        opts_layout = QVBoxLayout(opts_container)
+        opts_layout.setContentsMargins(0, 0, 0, 0)
+        opts_layout.setSpacing(4)
+
+        # ── Multi-directory queue ──────────────────────────────────────────
         queue_group = QGroupBox("Directory Queue (optional — files from all queued dirs are merged)")
         queue_layout = QVBoxLayout()
 
@@ -77,15 +83,15 @@ class BulkRenamerTab(BaseTab):
         queue_layout.addWidget(self.queue_list)
 
         queue_group.setLayout(queue_layout)
-        layout.addWidget(queue_group)
+        opts_layout.addWidget(queue_group)
 
-        # ── Batch mode ────────────────────────────────────────────────────
+        # ── Batch mode ─────────────────────────────────────────────────────
         self.batch_mode_chk = QCheckBox("Batch Mode — process first-level subdirectories")
         self.batch_mode_chk.setToolTip(
             "Select a root folder and check which subdirectories to process in one run"
         )
         self.batch_mode_chk.toggled.connect(self._on_batch_mode_toggled)
-        layout.addWidget(self.batch_mode_chk)
+        opts_layout.addWidget(self.batch_mode_chk)
 
         self.batch_panel = QGroupBox("Batch Mode Options")
         batch_layout = QVBoxLayout()
@@ -117,16 +123,16 @@ class BulkRenamerTab(BaseTab):
 
         self.batch_panel.setLayout(batch_layout)
         self.batch_panel.setVisible(False)
-        layout.addWidget(self.batch_panel)
+        opts_layout.addWidget(self.batch_panel)
 
         # Naming profile bar
-        layout.addWidget(self.create_profile_bar())
+        opts_layout.addWidget(self.create_profile_bar())
 
         # Extension filters
         filter_group = self.create_extension_filter_group()
-        layout.addWidget(filter_group)
+        opts_layout.addWidget(filter_group)
 
-        # ── Rename mode selector ──────────────────────────────────────────
+        # ── Rename mode selector ───────────────────────────────────────────
         mode_group = QGroupBox("Rename Mode")
         mode_layout = QHBoxLayout()
         self.mode_btn_group = QButtonGroup()
@@ -145,28 +151,39 @@ class BulkRenamerTab(BaseTab):
         mode_layout.addWidget(self.mode_template_radio)
         mode_layout.addStretch()
         mode_group.setLayout(mode_layout)
-        layout.addWidget(mode_group)
+        opts_layout.addWidget(mode_group)
 
-        # ── Stacked rename options ────────────────────────────────────────
+        # ── Stacked rename options ─────────────────────────────────────────
         self.rename_stack = QStackedWidget()
         self.rename_stack.addWidget(self.create_rename_options_group())      # 0 — standard
         self.rename_stack.addWidget(self.create_sequential_options_group())  # 1 — sequential
         self.rename_stack.addWidget(self.create_template_options_group())    # 2 — template
-        layout.addWidget(self.rename_stack)
+        opts_layout.addWidget(self.rename_stack)
 
         # Companion file options (visible in all modes)
         companion_group = self.create_companion_options_group()
-        layout.addWidget(companion_group)
+        opts_layout.addWidget(companion_group)
 
         # Prefix/suffix transposition (standard mode only)
         self.prefix_group_widget = self.create_transposition_group()
-        layout.addWidget(self.prefix_group_widget)
+        opts_layout.addWidget(self.prefix_group_widget)
 
-        # File list
+        opts_layout.addStretch()
+
+        opts_scroll = QScrollArea()
+        opts_scroll.setWidget(opts_container)
+        opts_scroll.setWidgetResizable(True)
+        opts_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        opts_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+        opts_scroll.setFrameShape(QScrollArea.NoFrame)
+        layout.addWidget(opts_scroll, stretch=1)
+
+        # File list — below the options scroll area, pinned above the buttons
         self.file_list = FileListWidget()
+        self.file_list.setMinimumHeight(100)
         layout.addWidget(self.file_list, stretch=1)
 
-        # Action buttons
+        # Action buttons — pinned at bottom
         button_layout = QHBoxLayout()
 
         self.preview_btn = QPushButton("Preview Changes")
