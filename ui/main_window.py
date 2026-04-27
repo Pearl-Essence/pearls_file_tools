@@ -44,6 +44,7 @@ class MainWindow(QMainWindow):
         from ui.tabs.archive_extractor_tab import ArchiveExtractorTab
         from ui.tabs.image_browser_tab import ImageBrowserTab
         from ui.tabs.ingest_tab import IngestTab
+        from ui.tabs.delivery_tab import DeliveryTab
 
         self.bulk_renamer_tab = BulkRenamerTab(self.config)
         self.tab_widget.addTab(self.bulk_renamer_tab, "Bulk Renamer")
@@ -60,12 +61,16 @@ class MainWindow(QMainWindow):
         self.ingest_tab = IngestTab(self.config)
         self.tab_widget.addTab(self.ingest_tab, "Ingest")
 
+        self.delivery_tab = DeliveryTab(self.config)
+        self.tab_widget.addTab(self.delivery_tab, "Delivery")
+
         # Connect status signals
         self.bulk_renamer_tab.status_changed.connect(self.update_status)
         self.file_organizer_tab.status_changed.connect(self.update_status)
         self.archive_extractor_tab.status_changed.connect(self.update_status)
         self.image_browser_tab.status_changed.connect(self.update_status)
         self.ingest_tab.status_changed.connect(self.update_status)
+        self.delivery_tab.status_changed.connect(self.update_status)
 
         # Status bar
         self.statusBar().showMessage("Ready")
