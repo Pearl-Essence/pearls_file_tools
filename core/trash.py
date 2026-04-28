@@ -76,17 +76,41 @@ class StudioTrash:
     def list_trash(self) -> List[TrashItem]:
         return [TrashItem(**r) for r in self._load()]
 
-    def restore(self, item: TrashItem) -> bool:
-        """Move item back to its original location."""
+    def restore(self, item: TrashItem) -> Path:
+        """Move item back to its original location.
+
+        Returns the actual restored path (which may differ from the
+        original if a new file with the same name was created in the
+        meantime — in that case the restored copy gets a ``_restored``
+        / ``_restored_N`` suffix so the user's current file is preserved).
+
+        Returns ``None`` on failure.
+        """
+        from core.file_utils import resolve_name_conflict
+
         src = self.trash_dir / item.trash_name
         dst = Path(item.original_path)
         try:
             dst.parent.mkdir(parents=True, exist_ok=True)
+
+            # If a file already exists at the original path, do NOT overwrite —
+            # the user has likely created a new file there in the meantime.
+            # Pick a non-colliding name and restore beside it.
+            if dst.exists():
+                stem = dst.stem
+                suffix = dst.suffix
+                candidate = dst.with_name(f"{stem}_restored{suffix}")
+                if candidate.exists():
+                    candidate = resolve_name_conflict(candidate)
+                if candidate is None:
+                    return None
+                dst = candidate
+
             shutil.move(str(src), str(dst))
             self._save([r for r in self._load() if r['trash_name'] != item.trash_name])
-            return True
+            return dst
         except Exception:
-            return False
+            return None
 
     def purge(self, item: TrashItem) -> bool:
         """Permanently delete item from the trash dir."""

@@ -122,6 +122,10 @@ class IngestWorker(BaseWorker):
             # 1. Wait for the source to stop growing (handles NLE renders
             #    still being written when ingest fires from a watcher).
             if not self._wait_for_stable(src):
+                # Distinguish cancellation from settle-timeout / disappearance —
+                # a misleading "settle timeout" message used to mask user cancels.
+                if self.is_cancelled:
+                    break
                 fail_count += 1
                 err = (
                     "Source still growing — settle timeout"

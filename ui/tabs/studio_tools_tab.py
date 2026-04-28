@@ -938,8 +938,25 @@ class _TrashPane(QWidget):
         if not selected:
             QMessageBox.information(self, "None Selected", "Select items to restore.")
             return
-        ok = sum(1 for item in selected if self._trash.restore(item))
-        QMessageBox.information(self, "Restore", f"Restored {ok}/{len(selected)} item(s).")
+
+        ok = 0
+        renamed: List[str] = []   # items whose original location was occupied
+        for item in selected:
+            restored_to = self._trash.restore(item)
+            if restored_to is None:
+                continue
+            ok += 1
+            if Path(restored_to).name != Path(item.original_path).name:
+                renamed.append(f"{Path(item.original_path).name} → {Path(restored_to).name}")
+
+        msg = f"Restored {ok}/{len(selected)} item(s)."
+        if renamed:
+            msg += (
+                "\n\nThe following item(s) were restored under a new name "
+                "because the original location already contained a file:\n  • "
+                + "\n  • ".join(renamed)
+            )
+        QMessageBox.information(self, "Restore", msg)
         self._refresh()
 
     def _purge_selected(self):
