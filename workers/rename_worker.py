@@ -7,7 +7,7 @@ from typing import List, Optional, Tuple
 from PyQt5.QtCore import pyqtSignal
 from workers.base_worker import BaseWorker
 from core.name_transform import generate_new_filename, move_prefix_to_suffix
-from core.file_utils import resolve_name_conflict, safe_rename
+from core.file_utils import resolve_name_conflict, safe_rename, same_inode, split_compound_suffix
 from core.pattern_matching import match_prefix
 from models.operation_record import OperationRecord
 from constants import OP_TYPE_RENAME, SIDECAR_EXTENSIONS, CAPTION_EXTENSIONS
@@ -68,14 +68,38 @@ class RenameWorker(BaseWorker):
         return exts
 
     def _find_companions(self, filepath: Path, new_stem: str) -> List[Tuple[Path, Path]]:
-        """Return (old_companion, new_companion) pairs for same-stem sidecars/captions."""
-        companions = []
-        stem = filepath.stem
+        """Return (old_companion, new_companion) pairs for same-stem sidecars/captions.
+
+        Honours compound suffixes (``.en.srt``, ``.es.vtt``, ``.tar.gz``) so
+        multi-language captions and similar siblings stay paired with the
+        primary on rename. The sibling must (a) share the primary's "true
+        stem" once the compound suffix is stripped and (b) end in a registered
+        sidecar/caption tail.
+        """
+        companions: List[Tuple[Path, Path]] = []
+        primary_stem, _ = split_compound_suffix(filepath.name)
         parent = filepath.parent
-        for ext in self._companion_extensions():
-            candidate = parent / f"{stem}{ext}"
-            if candidate.exists() and candidate != filepath:
-                companions.append((candidate, parent / f"{new_stem}{ext}"))
+        valid_tails = self._companion_extensions()  # e.g. {'.srt', '.vtt', '.xmp', ...}
+
+        try:
+            siblings = list(parent.iterdir())
+        except OSError:
+            return companions
+
+        for sibling in siblings:
+            try:
+                if not sibling.is_file() or sibling == filepath:
+                    continue
+            except OSError:
+                continue
+            sib_stem, sib_suffix = split_compound_suffix(sibling.name)
+            if sib_stem != primary_stem or not sib_suffix:
+                continue
+            # Final dot-segment must be a registered sidecar/caption extension
+            final_tail = '.' + sib_suffix.rsplit('.', 1)[-1]
+            if final_tail.lower() not in valid_tails:
+                continue
+            companions.append((sibling, parent / f"{new_stem}{sib_suffix}"))
         return companions
 
     def _write_manifest(self, log_rows: List[Tuple[str, str]], target_dir: Path):
@@ -119,7 +143,17 @@ class RenameWorker(BaseWorker):
 
                 new_path = filepath.parent / new_name
 
-                if new_path.exists() and new_path != filepath:
+                # On case-insensitive filesystems (APFS / NTFS), Path.exists()
+                # for a target that differs from the source only by case will
+                # return True (the OS resolves it to the source itself). Don't
+                # treat that as a conflict — same_inode confirms it's the same
+                # file viewed under a different case, and safe_rename handles
+                # the two-step rename.
+                if (
+                    new_path.exists()
+                    and new_path != filepath
+                    and not same_inode(new_path, filepath)
+                ):
                     new_path = resolve_name_conflict(new_path)
                     if new_path is None:
                         errors.append(f"{filepath.name}: target already exists")
@@ -139,9 +173,13 @@ class RenameWorker(BaseWorker):
                 self.emit_progress(f"Renamed: {filepath.name} → {new_path.name}")
 
                 # Rename companion sidecar / caption files
-                new_stem = new_path.stem
+                new_stem, _ = split_compound_suffix(new_path.name)
                 for old_comp, new_comp in self._find_companions(filepath, new_stem):
-                    if new_comp.exists() and new_comp != old_comp:
+                    if (
+                        new_comp.exists()
+                        and new_comp != old_comp
+                        and not same_inode(new_comp, old_comp)
+                    ):
                         new_comp = resolve_name_conflict(new_comp)
                     if new_comp and safe_rename(old_comp, new_comp):
                         rename_operations.append((new_comp, old_comp))

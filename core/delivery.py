@@ -2,11 +2,33 @@
 
 import datetime
 import hashlib
+import os
 import re
+import sys
 import zipfile
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
+
+
+def _long_path(p: Path) -> str:
+    """Return a path string safe for >260-char paths on Windows.
+
+    On macOS/Linux this is just ``str(p)``. On Windows we prepend ``\\\\?\\``
+    (or ``\\\\?\\UNC\\`` for UNC paths) so ``open()`` and ``os.stat()`` work
+    even when LongPathsEnabled is off in the registry — a common situation
+    on locked-down studio Windows boxes.
+    """
+    if sys.platform != 'win32':
+        return str(p)
+    s = os.fspath(p)
+    if s.startswith('\\\\?\\'):
+        return s
+    abspath = os.path.abspath(s)
+    if abspath.startswith('\\\\'):
+        return '\\\\?\\UNC\\' + abspath.lstrip('\\')
+    return '\\\\?\\' + abspath
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -274,24 +296,63 @@ class DeliveryValidator:
 
 def list_delivery_files(source_dir: Path) -> List[Path]:
     """Return files that would be included in a delivery zip (no hidden files)."""
-    return sorted(
-        fp for fp in source_dir.rglob('*')
-        if fp.is_file() and not fp.name.startswith('.')
-    )
+    out: List[Path] = []
+    for fp in source_dir.rglob('*'):
+        try:
+            if fp.is_file() and not fp.is_symlink() and not fp.name.startswith('.'):
+                out.append(fp)
+        except OSError:
+            continue
+    return sorted(out)
 
 
-def create_delivery_zip(source_dir: Path, project_name: str, output_dir: Path) -> Path:
-    """Create [PROJECT]_DELIVERY_[YYYYMMDD].zip and return its path."""
+def create_delivery_zip(
+    source_dir: Path,
+    project_name: str,
+    output_dir: Path,
+    progress_cb: Optional[Callable[[str, int, int], None]] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+) -> Path:
+    """Create ``[PROJECT]_DELIVERY_[YYYYMMDD].zip`` and return its path.
+
+    * ``allowZip64=True`` is set explicitly so 4+ GB archives never silently
+      fail if a downstream Python build flips the global default.
+    * Per-file failures (permission errors, vanished files, "size unexpectedly
+      increased" from a still-being-written render) are caught and reported
+      via *progress_cb* — they no longer abort the whole zip.
+    * If *cancel_check* returns True between files the partial zip is deleted
+      and ``InterruptedError`` is raised.
+    """
     date_str = datetime.date.today().strftime('%Y%m%d')
     safe_name = re.sub(r'[^\w\-]', '_', project_name)
     zip_name = f"{safe_name}_DELIVERY_{date_str}.zip"
     zip_path = output_dir / zip_name
 
     files = list_delivery_files(source_dir)
-    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-        for fp in files:
-            arcname = fp.relative_to(source_dir)
-            zf.write(fp, arcname)
+    total = len(files)
+
+    try:
+        with zipfile.ZipFile(_long_path(zip_path), 'w', zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
+            for idx, fp in enumerate(files):
+                if cancel_check is not None and cancel_check():
+                    raise InterruptedError("Cancelled mid-zip")
+                try:
+                    arcname = fp.relative_to(source_dir)
+                    zf.write(_long_path(fp), str(arcname))
+                except (OSError, RuntimeError) as exc:
+                    # OSError → permission denied / file gone
+                    # RuntimeError → "File size unexpectedly increased during write"
+                    if progress_cb is not None:
+                        progress_cb(f"Skipping {fp.name}: {exc}", idx + 1, total)
+                    continue
+                if progress_cb is not None and (idx % 16 == 0 or idx == total - 1):
+                    progress_cb(f"Zipped {fp.name}", idx + 1, total)
+    except InterruptedError:
+        try:
+            zip_path.unlink()
+        except OSError:
+            pass
+        raise
 
     return zip_path
 
@@ -302,24 +363,57 @@ def create_delivery_zip(source_dir: Path, project_name: str, output_dir: Path) -
 
 def _md5(filepath: Path) -> str:
     h = hashlib.md5()
-    with open(filepath, 'rb') as f:
+    with open(_long_path(filepath), 'rb') as f:
         for chunk in iter(lambda: f.read(65536), b''):
             h.update(chunk)
     return h.hexdigest()
 
 
-def find_duplicates(directory: Path) -> List[DuplicateGroup]:
-    """Group files by MD5 hash. Returns groups with 2+ files."""
-    hash_map: Dict[str, List[Path]] = {}
+def find_duplicates(
+    directory: Path,
+    progress_cb: Optional[Callable[[str, int, int], None]] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+) -> List[DuplicateGroup]:
+    """Group files by MD5 hash. Returns groups with 2+ files.
 
+    Two-pass algorithm: bucket by file size first, then only MD5 files whose
+    size matches at least one other file. On a 4 GB tree of mostly-unique
+    files this cuts disk I/O by orders of magnitude — only same-sized
+    candidates ever get hashed.
+    """
+    if cancel_check is None:
+        cancel_check = lambda: False
+
+    # Pass 1 — bucket by size
+    size_buckets: Dict[int, List[Path]] = defaultdict(list)
     for fp in directory.rglob('*'):
-        if not fp.is_file():
+        if cancel_check():
+            return []
+        try:
+            if not fp.is_file() or fp.is_symlink():
+                continue
+            size_buckets[fp.stat().st_size].append(fp)
+        except OSError:
             continue
+
+    # Only files in same-size buckets are duplicate candidates
+    candidates: List[Path] = [
+        fp for files in size_buckets.values() if len(files) > 1 for fp in files
+    ]
+    total = len(candidates)
+
+    # Pass 2 — hash candidates only
+    hash_map: Dict[str, List[Path]] = defaultdict(list)
+    for idx, fp in enumerate(candidates):
+        if cancel_check():
+            return []
         try:
             digest = _md5(fp)
-            hash_map.setdefault(digest, []).append(fp)
+            hash_map[digest].append(fp)
         except OSError:
-            pass
+            continue
+        if progress_cb is not None and (idx % 16 == 0 or idx == total - 1):
+            progress_cb(f"Hashed {fp.name}", idx + 1, total)
 
     return [
         DuplicateGroup(hash=h, files=sorted(files))

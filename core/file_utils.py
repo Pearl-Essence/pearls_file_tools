@@ -3,11 +3,61 @@
 import hashlib
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from datetime import datetime
 from constants import (
     ALL_EXTENSION_CATEGORIES, CONFLICT_COUNTER, CONFLICT_TIMESTAMP, CONFLICT_SKIP
 )
+
+
+def split_compound_suffix(filename: str) -> Tuple[str, str]:
+    """Split *filename* into ``(stem, compound_suffix)``.
+
+    Walks dot-separated segments from the right. The *final* segment may be
+    alphanumeric (e.g. ``mp4``, ``7z``) but every preceding segment must be
+    purely alphabetic (e.g. ``en``, ``es``, ``tar``). This recognises
+    ``.en.srt``, ``.es.vtt``, ``.tar.gz`` as a single compound suffix while
+    refusing to swallow numeric frame indices — ``shot1.0.42.exr`` keeps
+    its full stem ``shot1.0.42`` and suffix ``.exr``, exactly what frame
+    sequences need.
+    """
+    parts = filename.split('.')
+    if len(parts) < 2:
+        return filename, ''
+    suffix_parts: List[str] = []
+    for i, seg in enumerate(reversed(parts[1:])):
+        if not (1 <= len(seg) <= 5 and seg.isascii()):
+            break
+        if i == 0:
+            # Final extension token — alphanumeric ok ('mp4', '7z', 'srt')
+            if not seg.isalnum():
+                break
+        else:
+            # Preceding modifier token — must be purely alphabetic
+            # so '.en.srt' splits but '.0001.exr' doesn't
+            if not seg.isalpha():
+                break
+        suffix_parts.insert(0, seg)
+    if not suffix_parts:
+        return filename, ''
+    stem = '.'.join(parts[: len(parts) - len(suffix_parts)])
+    suffix = '.' + '.'.join(suffix_parts)
+    return stem, suffix
+
+
+def same_inode(a: Path, b: Path) -> bool:
+    """True iff *a* and *b* refer to the same on-disk inode.
+
+    On case-insensitive filesystems (APFS default, NTFS) two paths that differ
+    only in case will resolve to the same inode; this lets ``safe_rename``
+    distinguish "target is genuinely a different file" from "target is the
+    same file viewed under a different case".
+    """
+    try:
+        sa, sb = a.stat(), b.stat()
+        return sa.st_dev == sb.st_dev and sa.st_ino == sb.st_ino
+    except (OSError, FileNotFoundError):
+        return False
 
 
 def has_keyword(filename: str, keywords: List[str]) -> bool:
@@ -134,22 +184,32 @@ def calculate_directory_hash(directory: Path) -> str:
 
 
 def safe_rename(old_path: Path, new_path: Path) -> bool:
-    """
-    Safely rename a file with error handling.
+    """Safely rename a file, including case-only renames on case-insensitive FS.
 
-    Args:
-        old_path: Current file path
-        new_path: Desired new file path
-
-    Returns:
-        True if successful, False otherwise
+    On APFS / NTFS, ``Path("foo.MP4").exists()`` is True even when only
+    ``foo.mp4`` is on disk (the OS resolves the case-insensitive lookup).
+    A naïve ``new_path.exists()`` guard would refuse case-only renames.
+    We detect this via :func:`same_inode` and route the rename through a
+    temporary intermediate name so the filesystem can't short-circuit.
     """
     try:
         if not old_path.exists():
             return False
 
-        if new_path.exists() and new_path != old_path:
+        if new_path.exists() and new_path != old_path and not same_inode(old_path, new_path):
             return False
+
+        if same_inode(old_path, new_path) and old_path.name != new_path.name:
+            # Case-only rename on a case-insensitive volume — two-step it
+            tmp = old_path.with_name(f".pearls_caseflip_{os.getpid()}_{old_path.name}")
+            old_path.rename(tmp)
+            try:
+                tmp.rename(new_path)
+            except Exception:
+                # roll back the temp name so we don't leave a dangling fixture
+                tmp.rename(old_path)
+                raise
+            return True
 
         old_path.rename(new_path)
         return True

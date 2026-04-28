@@ -192,16 +192,44 @@ class _NLEBackupWorker(BaseWorker):
         self.finished.emit(success, message, result)
 
     def _find_projects(self) -> List[Path]:
-        """Return all matching project files and package directories."""
+        """Return all matching project files and package directories.
+
+        Walks the tree manually rather than using :meth:`Path.rglob` so we
+        can skip the *contents* of package directories (e.g. ``.fcpbundle``,
+        ``.logicx``). Without this, a Final Cut scan that lists both
+        ``.fcpbundle`` and ``.fcpxml`` extensions would harvest the
+        ``CurrentVersion.fcpxml`` *inside* every bundle as a separate
+        "project", duplicating work and confusing the manifest. It also
+        avoids descending tens-of-thousands of internal files in real
+        bundles, which is a major performance footgun.
+        """
         found: List[Path] = []
-        for item in self.scan_dir.rglob('*'):
-            suffix = item.suffix.lower()
-            if suffix not in self.extensions:
-                continue
-            if item.is_file() and suffix not in _PACKAGE_EXTS:
-                found.append(item)
-            elif item.is_dir() and suffix in _PACKAGE_EXTS:
-                found.append(item)
+
+        def walk(directory: Path) -> None:
+            try:
+                entries = list(directory.iterdir())
+            except (PermissionError, OSError):
+                return
+            for child in entries:
+                try:
+                    suffix = child.suffix.lower()
+                    if child.is_dir():
+                        # A package directory we care about — register and
+                        # do NOT descend into it.
+                        if suffix in _PACKAGE_EXTS and suffix in self.extensions:
+                            found.append(child)
+                            continue
+                        # Other apps' packages — opaque, also skip.
+                        if suffix in _PACKAGE_EXTS:
+                            continue
+                        walk(child)
+                    elif child.is_file():
+                        if suffix in self.extensions and suffix not in _PACKAGE_EXTS:
+                            found.append(child)
+                except OSError:
+                    continue
+
+        walk(self.scan_dir)
         return sorted(found)
 
     def run(self):

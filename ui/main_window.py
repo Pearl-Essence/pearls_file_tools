@@ -1,7 +1,7 @@
 """Main window for Pearl's File Tools."""
 
 from PyQt5.QtWidgets import (QMainWindow, QTabWidget, QAction, QMessageBox,
-                            QApplication)
+                            QApplication, QLabel)
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QKeySequence
 from config import Config
@@ -86,6 +86,14 @@ class MainWindow(QMainWindow):
         # Status bar
         self.statusBar().showMessage("Ready")
 
+        # Watch indicator in status bar
+        self.watch_indicator = QLabel("●  Not watching")
+        self.watch_indicator.setStyleSheet("color: grey; padding: 0 6px;")
+        self.statusBar().addPermanentWidget(self.watch_indicator)
+
+        # Watch dialog (persistent so running worker is preserved)
+        self._watch_dialog = None
+
     def setup_menu_bar(self):
         """Setup the menu bar."""
         menu_bar = self.menuBar()
@@ -127,6 +135,16 @@ class MainWindow(QMainWindow):
         manage_profiles_action = QAction("&Manage Naming Profiles...", self)
         manage_profiles_action.triggered.connect(self.manage_profiles)
         edit_menu.addAction(manage_profiles_action)
+
+        edit_menu.addSeparator()
+
+        watch_action = QAction("Watch Folders\u2026", self)
+        watch_action.triggered.connect(self.show_watch_manager)
+        edit_menu.addAction(watch_action)
+
+        sync_action = QAction("Sync Check\u2026", self)
+        sync_action.triggered.connect(self.show_sync_dialog)
+        edit_menu.addAction(sync_action)
 
         edit_menu.addSeparator()
 
@@ -356,6 +374,31 @@ class MainWindow(QMainWindow):
         """Open the naming profile manager."""
         from ui.dialogs.profile_dialog import ProfileDialog
         dialog = ProfileDialog(self.config, self)
+        dialog.exec_()
+
+    def update_watch_indicator(self, active: bool):
+        """Update the status-bar watch indicator dot."""
+        if active:
+            self.watch_indicator.setText("●  Watching")
+            self.watch_indicator.setStyleSheet("color: #4ec94e; padding: 0 6px;")
+        else:
+            self.watch_indicator.setText("●  Not watching")
+            self.watch_indicator.setStyleSheet("color: grey; padding: 0 6px;")
+
+    def show_watch_manager(self):
+        """Show (or raise) the Watch Folder Manager dialog."""
+        if self._watch_dialog is None:
+            from ui.dialogs.watch_manager_dialog import WatchManagerDialog
+            self._watch_dialog = WatchManagerDialog(self.config, self)
+            self._watch_dialog._update_indicator_cb = self.update_watch_indicator
+        self._watch_dialog.show()
+        self._watch_dialog.raise_()
+        self._watch_dialog.activateWindow()
+
+    def show_sync_dialog(self):
+        """Show the Multi-site Sync Check dialog."""
+        from ui.dialogs.sync_dialog import SyncDialog
+        dialog = SyncDialog(self.config, self)
         dialog.exec_()
 
     def show_about(self):

@@ -82,8 +82,15 @@ class _DuplicateWorker(BaseWorker):
     def run(self):
         from core.delivery import find_duplicates
         try:
-            self.emit_progress("Hashing files…")
-            groups = find_duplicates(self.directory)
+            self.emit_progress("Bucketing files by size…")
+            groups = find_duplicates(
+                self.directory,
+                progress_cb=lambda msg, cur, tot: self.emit_progress(f"{msg} ({cur}/{tot})"),
+                cancel_check=lambda: self.is_cancelled,
+            )
+            if self.is_cancelled:
+                self.emit_finished(False, "Duplicate scan cancelled", None)
+                return
             self.emit_finished(True, f"Found {len(groups)} duplicate group(s)", groups)
         except Exception as exc:
             self.emit_finished(False, str(exc), None)
@@ -105,9 +112,17 @@ class _ZipWorker(BaseWorker):
         from core.delivery import create_delivery_zip
         try:
             self.emit_progress("Creating delivery zip…")
-            path = create_delivery_zip(self.source_dir, self.project_name, self.output_dir)
+            path = create_delivery_zip(
+                self.source_dir,
+                self.project_name,
+                self.output_dir,
+                progress_cb=lambda msg, cur, tot: self.emit_progress(f"{msg} ({cur}/{tot})"),
+                cancel_check=lambda: self.is_cancelled,
+            )
             size_mb = path.stat().st_size / (1024 * 1024)
             self.emit_finished(True, f"Created {path.name} ({size_mb:.1f} MB)", path)
+        except InterruptedError:
+            self.emit_finished(False, "Zip cancelled by user", None)
         except Exception as exc:
             self.emit_finished(False, str(exc), None)
 

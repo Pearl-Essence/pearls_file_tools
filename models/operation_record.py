@@ -15,46 +15,60 @@ class OperationRecord:
 
         Args:
             operation_type: Type of operation ('rename', 'organize', 'extract')
-            files_affected: List of (old_path, new_path) tuples
+            files_affected: List of ``(new_path, old_path)`` tuples — the path
+                that exists *after* the operation comes first. The rename and
+                history modules both rely on this order; do not flip it.
             metadata: Additional operation-specific data
         """
         self.timestamp = datetime.now()
         self.operation_type = operation_type
-        self.files_affected = files_affected  # List of (old_path, new_path)
+        self.files_affected = files_affected  # List of (new_path, old_path)
         self.metadata = metadata or {}
 
     def undo(self) -> Tuple[int, int, List[str]]:
-        """
-        Undo the operation by reversing file operations.
+        """Undo the operation by reversing each file rename in turn.
+
+        ``files_affected`` is stored as ``[(new_path, old_path), ...]`` by the
+        rename and organize workers — see core/history.py which documents
+        and relies on the same convention. Earlier versions of this method
+        unpacked the tuple in the opposite order, which made every undo
+        either a no-op (existence guard tripped) or, worse, a silent re-do of
+        the original rename. This implementation matches the storage order
+        and routes the rename through :func:`core.file_utils.safe_rename` so
+        case-only renames on case-insensitive filesystems also undo cleanly.
 
         Returns:
             Tuple of (success_count, error_count, error_messages)
         """
+        from core.file_utils import safe_rename, same_inode
+
         success_count = 0
         error_count = 0
-        errors = []
+        errors: List[str] = []
 
-        # Reverse the operations (in reverse order)
-        for old_path, new_path in reversed(self.files_affected):
+        for new_path, old_path in reversed(self.files_affected):
             try:
-                # Check if the new path still exists
                 if not new_path.exists():
-                    errors.append(f"{new_path.name}: File no longer exists")
+                    errors.append(f"{new_path.name}: file no longer exists at renamed location")
                     error_count += 1
                     continue
 
-                # Check if old path would conflict
-                if old_path.exists():
-                    errors.append(f"{old_path.name}: Original location already occupied")
+                # An unrelated file genuinely occupying the original path blocks undo.
+                # A same-inode hit is the case-flip case and is OK — safe_rename handles it.
+                if old_path.exists() and not same_inode(new_path, old_path):
+                    errors.append(
+                        f"{old_path.name}: original location occupied by a different file"
+                    )
                     error_count += 1
                     continue
 
-                # Rename back to original
-                new_path.rename(old_path)
-                success_count += 1
-
+                if safe_rename(new_path, old_path):
+                    success_count += 1
+                else:
+                    errors.append(f"{new_path.name}: rename back failed")
+                    error_count += 1
             except Exception as e:
-                errors.append(f"{new_path.name}: {str(e)}")
+                errors.append(f"{new_path.name}: {e}")
                 error_count += 1
 
         return success_count, error_count, errors
@@ -69,9 +83,10 @@ class OperationRecord:
         return {
             'timestamp': self.timestamp.isoformat(),
             'operation_type': self.operation_type,
+            # Stored as (new_path, old_path) — see __init__ docstring.
             'files_affected': [
-                (str(old_path), str(new_path))
-                for old_path, new_path in self.files_affected
+                (str(new_path), str(old_path))
+                for new_path, old_path in self.files_affected
             ],
             'metadata': self.metadata
         }
@@ -90,8 +105,8 @@ class OperationRecord:
         record = cls(
             operation_type=data['operation_type'],
             files_affected=[
-                (Path(old_path), Path(new_path))
-                for old_path, new_path in data['files_affected']
+                (Path(new_path), Path(old_path))
+                for new_path, old_path in data['files_affected']
             ],
             metadata=data.get('metadata', {})
         )
