@@ -13,7 +13,7 @@ import datetime
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QBrush, QColor, QFont
@@ -531,17 +531,66 @@ class _DuplicatesPane(QWidget):
 
         self.tree.clear()
         wasted = 0
+
+        # Sequence-aware presentation. A duplicate group whose files all live
+        # in the same folder *and* form a contiguous image sequence
+        # (e.g. 36 EXR frames of a render that looped on a hold frame) is
+        # collapsed into a single row labeled with the sequence's range,
+        # rather than 36 separate "duplicate" rows. Real production users
+        # have the same primitive intuition: that's a sequence, not 36
+        # accidentally-duplicate files.
+        from collections import defaultdict
+        from core.pattern_matching import detect_image_sequences
+        sequence_groups: List = []
+        regular_groups: List = []
         for grp in groups:
+            by_dir: Dict[Path, List[Path]] = defaultdict(list)
+            for fp in grp.files:
+                by_dir[fp.parent].append(fp)
+            # A sequence group: every file shares the same parent and the
+            # filenames form a single detected image sequence.
+            if len(by_dir) == 1:
+                parent_dir, members = next(iter(by_dir.items()))
+                fnames = [p.name for p in members]
+                seqs = detect_image_sequences(fnames, min_frames=2)
+                if seqs and len(next(iter(seqs.values())).files) == len(members):
+                    sequence_groups.append((grp, parent_dir, next(iter(seqs.values()))))
+                    continue
+            regular_groups.append(grp)
+
+        def _fmt(n):
+            if n < 1024:
+                return f"{n} B"
+            if n < 1024 ** 2:
+                return f"{n / 1024:.1f} KB"
+            return f"{n / 1024 ** 2:.1f} MB"
+
+        # Render sequence-collapsed rows first so they're visually distinct
+        for grp, parent_dir, seq in sequence_groups:
             sz = grp.size_bytes()
             waste = grp.wasted_bytes()
             wasted += waste
+            label = (
+                f"Image sequence ({len(grp.files)} identical frames)  —  "
+                f"{seq.label}"
+            )
+            parent_item = QTreeWidgetItem([label, _fmt(sz), grp.hash[:8]])
+            parent_item.setForeground(0, QBrush(_GREY))
+            parent_item.setToolTip(
+                0,
+                "All files in this duplicate group form a contiguous image "
+                "sequence with identical content — typically a hold frame "
+                "render or a stalled NLE export. Collapsed for readability."
+            )
+            child = QTreeWidgetItem([str(parent_dir), "", ""])
+            parent_item.addChild(child)
+            self.tree.addTopLevelItem(parent_item)
+            parent_item.setExpanded(False)
 
-            def _fmt(n):
-                if n < 1024:
-                    return f"{n} B"
-                if n < 1024 ** 2:
-                    return f"{n / 1024:.1f} KB"
-                return f"{n / 1024 ** 2:.1f} MB"
+        for grp in regular_groups:
+            sz = grp.size_bytes()
+            waste = grp.wasted_bytes()
+            wasted += waste
 
             parent_item = QTreeWidgetItem([
                 f"Duplicate group ({len(grp.files)} copies)",

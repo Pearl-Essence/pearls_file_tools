@@ -3,9 +3,53 @@
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Tuple, Optional, Dict, List
+from typing import Tuple, Optional, Dict, List, Iterable
 from difflib import SequenceMatcher
 from collections import defaultdict
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Delimiter auto-detection
+# ─────────────────────────────────────────────────────────────────────────────
+# Real-world filenames mix conventions: AE renders use ``_``, Resolve exports
+# use ``-``, DPX stacks use ``.``, and casual exports use space. We score each
+# candidate delimiter by how many *distinct* filenames in the batch contain it
+# and pick the most popular. Files that contain none of these fall back to
+# ``_`` (the historical default), so single-word stems still group correctly.
+
+DELIMITER_CANDIDATES: Tuple[str, ...] = ('_', '-', ' ', '.')
+DEFAULT_DELIMITER = '_'
+
+
+def detect_dominant_delimiter(filenames: Iterable[str]) -> str:
+    """Return the delimiter that appears in the most distinct filenames.
+
+    Counts each candidate (``_``, ``-``, ' ', ``.``) by the number of *file
+    stems* it appears in (we ignore the extension dot — every file has one
+    so it would always win otherwise). Ties break in the order
+    ``_  >  -  >  ' '  >  .`` to match historic behaviour. Returns
+    ``DEFAULT_DELIMITER`` (``_``) when nothing matches.
+    """
+    counts: Dict[str, int] = {d: 0 for d in DELIMITER_CANDIDATES}
+    total = 0
+    for fname in filenames:
+        if not fname:
+            continue
+        total += 1
+        stem = Path(fname).stem
+        for delim in DELIMITER_CANDIDATES:
+            if delim in stem:
+                counts[delim] += 1
+    if total == 0:
+        return DEFAULT_DELIMITER
+    # Prefer the most-common delimiter; on ties keep the canonical order.
+    best = DEFAULT_DELIMITER
+    best_count = counts[DEFAULT_DELIMITER]
+    for delim in DELIMITER_CANDIDATES:
+        if counts[delim] > best_count:
+            best = delim
+            best_count = counts[delim]
+    return best
 
 
 # ── Grouping presets ──────────────────────────────────────────────────────────
@@ -126,27 +170,38 @@ def detect_image_sequences(filenames: List[str],
     return sequences
 
 
-def get_group_name(filename: str, similarity_threshold: float = 0.6) -> Tuple[str, float]:
-    """
-    Extract a group name from a filename.
-    First tries to use text before the second underscore.
+def get_group_name(
+    filename: str,
+    similarity_threshold: float = 0.6,
+    delimiter: Optional[str] = None,
+) -> Tuple[str, float]:
+    """Extract a group name from a filename.
+
+    Splits the stem on *delimiter* (defaulting to ``_`` when not given) and
+    returns the text before the second occurrence as the group, mirroring
+    the historic AE-render heuristic but generalised to any delimiter.
 
     Args:
-        filename: Filename to analyze
-        similarity_threshold: Minimum confidence threshold
+        filename: Filename to analyse.
+        similarity_threshold: Currently unused; preserved for API stability.
+        delimiter: Override the split delimiter. Pass the result of
+            :func:`detect_dominant_delimiter` to honour the dataset's
+            actual convention.
 
     Returns:
-        Tuple of (group_name, confidence_level)
+        Tuple of ``(group_name, confidence_level)``.
     """
+    if not delimiter:
+        delimiter = '_'
     base_name = Path(filename).stem
-    parts = base_name.split('_')
+    parts = base_name.split(delimiter)
 
     if len(parts) >= 2:
-        # Use text before second underscore
-        group = '_'.join(parts[:2])
+        # Use text before second delimiter
+        group = delimiter.join(parts[:2])
         return group, 1.0  # High confidence
     elif len(parts) == 1 and parts[0]:
-        # Single word or no underscores
+        # Single word or no delimiter
         return parts[0], 0.5  # Medium confidence
     else:
         return base_name, 0.3  # Low confidence
@@ -183,54 +238,71 @@ def find_best_group(filename: str, existing_groups: List[str], threshold: float 
     return best_match, best_score
 
 
-def detect_common_prefixes(filenames: List[str]) -> Dict[str, int]:
-    """
-    Detect common prefixes in a list of filenames.
+def detect_common_prefixes(
+    filenames: List[str],
+    delimiter: Optional[str] = None,
+) -> Dict[str, int]:
+    """Detect common prefixes in a list of filenames.
 
     Args:
-        filenames: List of filenames to analyze
+        filenames: List of filenames to analyse.
+        delimiter: When supplied (``"_"``, ``"-"``, ``" "``, ``"."``),
+            only that delimiter is used. ``None`` (the default) auto-detects
+            the dataset's dominant delimiter via
+            :func:`detect_dominant_delimiter`. Pass ``"any"`` to retain the
+            historical "first of ``_-``space" probing.
 
     Returns:
-        Dictionary mapping prefix to count of files with that prefix
+        Dictionary mapping prefix-with-trailing-delimiter to count of files
+        with that prefix (entries seen on at least 2 files).
     """
-    prefix_counts = defaultdict(int)
+    prefix_counts: Dict[str, int] = defaultdict(int)
+
+    if delimiter is None:
+        delimiter = detect_dominant_delimiter(filenames)
+    if delimiter == 'any':
+        candidates = list(DELIMITER_CANDIDATES)
+    else:
+        candidates = [delimiter]
 
     for filename in filenames:
-        # Try different delimiters
-        for delimiter in ['_', '-', ' ']:
-            if delimiter in filename:
-                potential_prefix = filename.split(delimiter)[0] + delimiter
+        for d in candidates:
+            if d in filename:
+                potential_prefix = filename.split(d)[0] + d
                 prefix_counts[potential_prefix] += 1
                 break  # Only count first delimiter found
 
-    # Filter prefixes that appear on multiple files (at least 2)
-    common_prefixes = {
-        prefix: count
-        for prefix, count in prefix_counts.items()
-        if count >= 2
-    }
-
-    return common_prefixes
+    return {p: c for p, c in prefix_counts.items() if c >= 2}
 
 
-def group_files_by_pattern(filenames: List[str], confidence_threshold: float = 0.4) -> Tuple[Dict[str, List[str]], List[str]]:
-    """
-    Group files by naming patterns.
+def group_files_by_pattern(
+    filenames: List[str],
+    confidence_threshold: float = 0.4,
+    delimiter: Optional[str] = None,
+) -> Tuple[Dict[str, List[str]], List[str]]:
+    """Group files by naming patterns.
 
     Args:
-        filenames: List of filenames to group
-        confidence_threshold: Minimum confidence to include in a group
+        filenames: List of filenames to group.
+        confidence_threshold: Minimum confidence to include in a group.
+        delimiter: Optional override; passing ``None`` triggers
+            :func:`detect_dominant_delimiter` so the dataset's most common
+            convention is used. Pass an explicit ``"_"`` / ``"-"`` etc. to
+            force a specific split character.
 
     Returns:
-        Tuple of (groups_dict, unsorted_files)
+        Tuple of (groups_dict, unsorted_files):
             - groups_dict: Dictionary mapping group names to list of filenames
             - unsorted_files: List of filenames that didn't fit into any group
     """
-    groups = defaultdict(list)
-    unsorted = []
+    groups: Dict[str, List[str]] = defaultdict(list)
+    unsorted: List[str] = []
+
+    if delimiter is None:
+        delimiter = detect_dominant_delimiter(filenames)
 
     for filename in filenames:
-        group_name, confidence = get_group_name(filename)
+        group_name, confidence = get_group_name(filename, delimiter=delimiter)
 
         if confidence >= confidence_threshold:
             # Good confidence - add to group
@@ -268,20 +340,37 @@ def match_prefix(filename: str, prefixes: List[str]) -> Optional[str]:
     return None
 
 
-def detect_common_suffixes(filenames: List[str]) -> Dict[str, int]:
+def detect_common_suffixes(
+    filenames: List[str],
+    delimiter: Optional[str] = None,
+) -> Dict[str, int]:
     """Detect common suffix tokens (before the file extension) in a list of filenames.
 
-    Returns a dict mapping suffix token (e.g. '_DRAFT') to the number of files
-    whose stem ends with that token. Only tokens appearing on ≥2 files are returned.
+    Args:
+        filenames: List of filenames to analyse.
+        delimiter: ``None`` → auto-detect; ``"any"`` → try ``_-``/space in
+            order; specific delimiter → use only that one.
+
+    Returns:
+        Dict mapping suffix token (e.g. ``"_DRAFT"``) to number of files
+        whose stem ends with it (only ≥2 are returned).
     """
     suffix_counts: Dict[str, int] = defaultdict(int)
+
+    if delimiter is None:
+        delimiter = detect_dominant_delimiter(filenames)
+    if delimiter == 'any':
+        candidates = list(DELIMITER_CANDIDATES)
+    else:
+        candidates = [delimiter]
+
     for filename in filenames:
         stem = Path(filename).stem
-        for delimiter in ['_', '-', ' ']:
-            if delimiter in stem:
-                token = stem.rsplit(delimiter, 1)[-1]
+        for d in candidates:
+            if d in stem:
+                token = stem.rsplit(d, 1)[-1]
                 if token:
-                    suffix_counts[f"{delimiter}{token}"] += 1
+                    suffix_counts[f"{d}{token}"] += 1
                 break
     return {s: c for s, c in suffix_counts.items() if c >= 2}
 
@@ -310,10 +399,13 @@ def group_files_by_preset(
     filenames: List[str],
     preset: GroupingPreset,
     confidence_threshold: float = 0.4,
+    delimiter: Optional[str] = None,
 ) -> Tuple[Dict[str, List[str]], List[str]]:
-    """Group files using the specified GroupingPreset.
+    """Group files using the specified :class:`GroupingPreset`.
 
-    Returns the same (groups_dict, unsorted_files) tuple as group_files_by_pattern.
+    The optional *delimiter* override is forwarded to the underlying
+    grouper for ``PRESET_STANDARD``. The AE preset always strips trailing
+    frame indices regardless of delimiter.
     """
     if preset.name == PRESET_AE_RENDER.name:
         groups: Dict[str, List[str]] = defaultdict(list)
@@ -333,4 +425,4 @@ def group_files_by_preset(
                 unsorted.extend(files)
         return final_groups, unsorted
     else:
-        return group_files_by_pattern(filenames, confidence_threshold)
+        return group_files_by_pattern(filenames, confidence_threshold, delimiter=delimiter)

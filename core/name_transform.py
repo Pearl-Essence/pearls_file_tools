@@ -43,8 +43,27 @@ class ProductionTemplate:
 
 DEFAULT_TEMPLATE = ProductionTemplate(name='Studio Default')
 
-# Matches filenames ending in _v## (e.g. HERO_v01.mov, clip_v003.mp4)
-VERSION_PATTERN = re.compile(r'^(.+?)_v(\d+)(\.\w+)$', re.IGNORECASE)
+# Matches filenames ending in a version token. Accepts a wide variety of
+# real-world conventions:
+#
+#   HERO_v01.mov           — underscore, lowercase v, two digits
+#   HERO-v01.mov           — dash separator
+#   HERO V01.mov           — space separator, uppercase V
+#   HERO  v003.mp4         — multiple spaces
+#   HERO_-_v01.mov         — combined separators
+#   shot_V0001.mp4         — uppercase V, 4-digit padding
+#   HERO_v1.mov            — single digit
+#   HERO.v01.mov           — dot separator (rarer but seen)
+#
+# Captures: stem, separator-as-found, v-letter-as-found, digits, extension —
+# so we can preserve the user's existing punctuation and case on bump.
+VERSION_PATTERN = re.compile(
+    r'^(?P<stem>.+?)'
+    r'(?P<sep>[_\-.\s]+)'
+    r'(?P<vchar>[vV])'
+    r'(?P<digits>\d+)'
+    r'(?P<ext>\.[A-Za-z0-9]+)$'
+)
 
 
 def apply_case_transform(text: str, transform_type: str) -> str:
@@ -232,29 +251,41 @@ def generate_sequential_filenames(
 
 
 def detect_version(filename: str) -> Optional[Tuple[str, int, str]]:
-    """Return (stem_without_version, version_number, extension) or None."""
+    """Return ``(stem_without_version, version_number, extension)`` or None.
+
+    The stem returned does *not* include the separator + ``v`` letter that
+    preceded the digits — that information is preserved internally by
+    :func:`bump_version` so a round-trip preserves the original punctuation.
+    """
     match = VERSION_PATTERN.match(filename)
     if not match:
         return None
-    stem, version_str, ext = match.groups()
-    return stem, int(version_str), ext
+    return match.group('stem'), int(match.group('digits')), match.group('ext')
 
 
 def bump_version(filename: str) -> str:
-    """Increment the _v## suffix, preserving zero-padding width.
+    """Increment the version suffix, preserving the user's chosen punctuation.
+
+    Recognises a wide range of conventions (``_v##``, ``-v##``, `` V##``,
+    ``-V0001``, ``.v01``, etc.). The new filename uses the *same* separator
+    and ``v``/``V`` case that the input had, and at least the original
+    zero-pad width.
 
     Returns the original filename unchanged if no version suffix is found.
     """
-    result = detect_version(filename)
-    if result is None:
-        return filename
-    stem, version_num, ext = result
-    # Determine original zero-pad width from the matched digits
     match = VERSION_PATTERN.match(filename)
-    original_digits = match.group(2)
-    pad = max(len(original_digits), len(str(version_num + 1)))
-    new_version = str(version_num + 1).zfill(pad)
-    return f"{stem}_v{new_version}{ext}"
+    if match is None:
+        return filename
+    stem = match.group('stem')
+    sep = match.group('sep')
+    vchar = match.group('vchar')
+    digits = match.group('digits')
+    ext = match.group('ext')
+
+    new_num = int(digits) + 1
+    pad = max(len(digits), len(str(new_num)))
+    new_digits = str(new_num).zfill(pad)
+    return f"{stem}{sep}{vchar}{new_digits}{ext}"
 
 
 def is_valid_filename(filename: str) -> bool:

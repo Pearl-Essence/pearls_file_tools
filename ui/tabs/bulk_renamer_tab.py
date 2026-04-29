@@ -6,7 +6,7 @@ from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QLineE
                             QListWidget, QListWidgetItem, QApplication)
 from PyQt5.QtCore import Qt
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 from ui.tabs.base_tab import BaseTab
 from ui.widgets.directory_selector import DirectorySelectorWidget
 from ui.widgets.file_list_widget import FileListWidget
@@ -194,9 +194,11 @@ class BulkRenamerTab(BaseTab):
         self.apply_btn.clicked.connect(self.apply_rename)
         button_layout.addWidget(self.apply_btn)
 
-        self.bump_version_btn = QPushButton("Bump Version (_v##)")
+        self.bump_version_btn = QPushButton("Bump Version")
         self.bump_version_btn.setToolTip(
-            "Increment the _v## suffix on all selected files (e.g. HERO_v01.mov → HERO_v02.mov)"
+            "Increment the trailing version token on all selected files.\n"
+            "Recognises _v##, -v##, ' v##', _V##, .v##, etc. Preserves the\n"
+            "user's original separator, case, and zero-padding width."
         )
         self.bump_version_btn.clicked.connect(self.apply_bump_version)
         button_layout.addWidget(self.bump_version_btn)
@@ -407,7 +409,12 @@ class BulkRenamerTab(BaseTab):
         self.rename_stack.setCurrentIndex(mode)
         is_standard = (mode == 0)
         self.prefix_group_widget.setVisible(is_standard)
-        self.preview_btn.setEnabled(is_standard)
+        # Preview now works in every mode — Standard, Number Files, and
+        # Template all compute their own "what-would-rename-to" projection
+        # and feed it to the same PreviewDialog. Disabling the button in
+        # non-Standard modes was the source of the "preview doesn't pop up"
+        # confusion the user reported.
+        self.preview_btn.setEnabled(True)
 
     # ── extension filters ─────────────────────────────────────────────────
 
@@ -547,9 +554,13 @@ class BulkRenamerTab(BaseTab):
     # ── companion file options ────────────────────────────────────────────
 
     def create_companion_options_group(self) -> QGroupBox:
-        """Checkboxes to control sidecar and caption co-renaming."""
-        group = QGroupBox("Companion File Renaming")
-        layout = QHBoxLayout()
+        """Checkboxes to control sidecar / caption co-rename, hidden-file inclusion,
+        and the prefix/suffix delimiter override."""
+        group = QGroupBox("Rename Behaviour")
+        layout = QVBoxLayout()
+
+        # Row 1 \u2014 sidecar / caption companion renaming
+        comp_row = QHBoxLayout()
         self.rename_sidecars_chk = QCheckBox("Rename sidecar files (.xmp, .thm, .lrv, \u2026)")
         self.rename_sidecars_chk.setChecked(True)
         self.rename_sidecars_chk.setToolTip(
@@ -562,9 +573,41 @@ class BulkRenamerTab(BaseTab):
             "When renaming a video, also rename any same-stem subtitle files\n"
             "(.srt, .vtt, .ttml, .sbv, .ass, .ssa)"
         )
-        layout.addWidget(self.rename_sidecars_chk)
-        layout.addWidget(self.rename_captions_chk)
-        layout.addStretch()
+        comp_row.addWidget(self.rename_sidecars_chk)
+        comp_row.addWidget(self.rename_captions_chk)
+        comp_row.addStretch()
+        layout.addLayout(comp_row)
+
+        # Row 2 \u2014 hidden-file opt-in + delimiter override
+        opts_row = QHBoxLayout()
+        self.include_hidden_chk = QCheckBox("Include hidden files (start with '.')")
+        self.include_hidden_chk.setChecked(False)
+        self.include_hidden_chk.setToolTip(
+            "By default, files whose name starts with '.' are skipped during\n"
+            "rename \u2014 they are usually OS / config files (.DS_Store, .gitignore,\n"
+            ".env) that you didn't mean to touch. Tick this to include them."
+        )
+        opts_row.addWidget(self.include_hidden_chk)
+
+        opts_row.addSpacing(20)
+        opts_row.addWidget(QLabel("Delimiter for prefix/suffix detection:"))
+        self.delimiter_combo = QComboBox()
+        # Order matters \u2014 first item is the default. 'auto' uses the
+        # dataset's most-common delimiter via detect_dominant_delimiter.
+        self.delimiter_combo.addItem("auto", "auto")
+        self.delimiter_combo.addItem("_  (underscore)", "_")
+        self.delimiter_combo.addItem("-  (dash)", "-")
+        self.delimiter_combo.addItem("space", " ")
+        self.delimiter_combo.addItem(".  (dot)", ".")
+        self.delimiter_combo.setToolTip(
+            "Controls how the Detect button finds common prefixes / suffixes.\n"
+            "'auto' (default) picks the delimiter that appears in the most\n"
+            "filenames in the current folder."
+        )
+        opts_row.addWidget(self.delimiter_combo)
+        opts_row.addStretch()
+        layout.addLayout(opts_row)
+
         group.setLayout(layout)
         return group
 
@@ -609,9 +652,16 @@ class BulkRenamerTab(BaseTab):
         scroll.setWidget(self.prefix_widget)
         layout.addWidget(scroll)
 
-        self.apply_transpose_btn = QPushButton("Apply Prefix \u2192 Suffix")
-        self.apply_transpose_btn.clicked.connect(self.apply_transposition)
-        layout.addWidget(self.apply_transpose_btn)
+        # No standalone apply button anymore \u2014 tokens checked here ride
+        # along with the next "Apply Rename" so the user can compose
+        # transposition with prefix / suffix / case changes in one click.
+        hint = QLabel(
+            "Selected tokens will be moved as part of the next Apply Rename "
+            "(combined with Prefix / Suffix / Rename / Case settings above)."
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #888; font-size: 11px;")
+        layout.addWidget(hint)
 
         group.setLayout(layout)
         return group
@@ -620,11 +670,9 @@ class BulkRenamerTab(BaseTab):
         if self.transpose_p2s_radio.isChecked():
             self.manual_token_label.setText("Manual prefix(es):")
             self.manual_prefix_input.setPlaceholderText("e.g., DRAFT_, WIP_, TEMP_")
-            self.apply_transpose_btn.setText("Apply Prefix \u2192 Suffix")
         else:
             self.manual_token_label.setText("Manual suffix(es):")
             self.manual_prefix_input.setPlaceholderText("e.g., _DRAFT, _WIP, _FINAL")
-            self.apply_transpose_btn.setText("Apply Suffix \u2192 Prefix")
         self.clear_prefix_checkboxes()
 
     # ── directory / file list ─────────────────────────────────────────────
@@ -907,21 +955,101 @@ class BulkRenamerTab(BaseTab):
     # ── preview ───────────────────────────────────────────────────────────
 
     def preview_changes(self):
+        """Show the would-be rename results for the active mode.
+
+        Works in all three rename modes (Standard / Number Files / Template),
+        and applies the same hidden-file filter and prefix→suffix /
+        suffix→prefix transposition tokens that ``Apply Rename`` will use.
+        """
         selected_files = self.file_list.get_selected_files()
         if not selected_files:
             self.show_warning("No Files", "No files selected for preview.")
             return
-        from ui.dialogs.preview_dialog import PreviewDialog
-        preview_data = []
-        for filepath in selected_files:
-            new_name = generate_new_filename(
-                filepath.name,
-                prefix=self.prefix_input.text(),
-                suffix=self.suffix_input.text(),
-                rename_to=self.rename_input.text(),
-                case_transform=self.get_case_transform()
+
+        # Apply the dot-file skip the same way Apply Rename does, so what
+        # the user sees in the preview matches what will actually happen.
+        include_hidden = self.include_hidden_chk.isChecked()
+        if not include_hidden:
+            from core.file_utils import is_hidden_file
+            selected_files = [f for f in selected_files if not is_hidden_file(f.name)]
+        if not selected_files:
+            self.show_info(
+                "All Files Hidden",
+                "All selected files are hidden (start with '.').\n"
+                "Tick 'Include hidden files' to rename them."
             )
-            preview_data.append((filepath.name, new_name))
+            return
+
+        from ui.dialogs.preview_dialog import PreviewDialog
+        mode = self.mode_btn_group.checkedId()
+        preview_data: List[Tuple[str, str]] = []
+
+        if mode == 1:
+            # Number Files mode
+            base = self.seq_base_input.text().strip()
+            if not base:
+                self.show_warning(
+                    "Base Name Required",
+                    "Enter a base name for sequential numbering before previewing."
+                )
+                return
+            pairs = generate_sequential_filenames(
+                [f.name for f in selected_files],
+                base_name=base,
+                start=self.seq_start_spin.value(),
+                padding=self.seq_padding_spin.value(),
+                separator=self.seq_separator_input.text(),
+            )
+            preview_data = list(pairs)
+
+        elif mode == 2:
+            # Template mode
+            base = self._get_template_composed_name()
+            if not base:
+                self.show_warning(
+                    "Incomplete Template",
+                    "Fill in at least one template token before previewing."
+                )
+                return
+            sep = self._current_template.separator if self._current_template else '_'
+            if len(selected_files) == 1:
+                preview_data = [
+                    (selected_files[0].name, f"{base}{selected_files[0].suffix}")
+                ]
+            else:
+                preview_data = [
+                    (f.name, f"{base}{sep}{str(i + 1).zfill(3)}{f.suffix}")
+                    for i, f in enumerate(selected_files)
+                ]
+
+        else:
+            # Standard mode — including any prefix→suffix / suffix→prefix
+            # tokens currently selected in the transposition group. Mirrors
+            # RenameWorker._build_work_list so what you see is what you get.
+            from core.name_transform import move_prefix_to_suffix, move_suffix_to_prefix
+            from core.pattern_matching import match_prefix, match_suffix
+            tokens = self.get_selected_prefixes()
+            is_p2s = self.transpose_p2s_radio.isChecked()
+            for filepath in selected_files:
+                current = filepath.name
+                if tokens:
+                    if is_p2s:
+                        m = match_prefix(current, tokens)
+                        if m:
+                            current = move_prefix_to_suffix(current, m)
+                    else:
+                        m = match_suffix(current, tokens)
+                        if m:
+                            current = move_suffix_to_prefix(current, m)
+                new_name = generate_new_filename(
+                    current,
+                    prefix=self.prefix_input.text(),
+                    suffix=self.suffix_input.text(),
+                    rename_to=self.rename_input.text(),
+                    case_transform=self.get_case_transform(),
+                )
+                preview_data.append((filepath.name, new_name))
+
         dialog = PreviewDialog(preview_data, self)
         dialog.exec_()
 
@@ -1003,7 +1131,15 @@ class BulkRenamerTab(BaseTab):
             )
 
         else:
-            # Standard mode
+            # Standard mode — picks up any transposition tokens checked in
+            # the Prefix / Suffix Transposition group, plus the hidden-file
+            # opt-in. There is no separate "Apply Prefix → Suffix" path
+            # anymore; everything funnels through this one Apply Rename.
+            tokens = self.get_selected_prefixes()
+            is_p2s = self.transpose_p2s_radio.isChecked()
+            prefix_to_suffix = tokens if (tokens and is_p2s) else None
+            suffix_to_prefix = tokens if (tokens and not is_p2s) else None
+
             if not self.confirm_action(
                 "Confirm Rename",
                 f"Rename {len(selected_files)} file(s)?\n\n"
@@ -1016,6 +1152,9 @@ class BulkRenamerTab(BaseTab):
                 suffix=self.suffix_input.text(),
                 rename_to=self.rename_input.text(),
                 case_transform=self.get_case_transform(),
+                prefix_to_suffix=prefix_to_suffix,
+                suffix_to_prefix=suffix_to_prefix,
+                include_hidden=self.include_hidden_chk.isChecked(),
                 rename_sidecars=self.rename_sidecars_chk.isChecked(),
                 rename_captions=self.rename_captions_chk.isChecked(),
             )
@@ -1034,8 +1173,11 @@ class BulkRenamerTab(BaseTab):
         direct = [(f, bump_version(f.name)) for f in selected_files]
         direct = [(path, new) for path, new in direct if new != path.name]
         if not direct:
-            self.show_info("No Versions Found",
-                           "None of the selected files have a _v## version suffix.")
+            self.show_info(
+                "No Versions Found",
+                "None of the selected files have a recognisable trailing version "
+                "token. Supported formats: _v##, -v##, ' v##', _V##, .v##."
+            )
             return
         if not self.confirm_action(
             "Confirm Bump Version",
@@ -1072,65 +1214,10 @@ class BulkRenamerTab(BaseTab):
 
     # ── transposition ─────────────────────────────────────────────────────
 
-    def apply_transposition(self):
-        tokens = self.get_selected_prefixes()
-        if not tokens:
-            self.show_warning("No Tokens",
-                              "Please detect or enter at least one prefix/suffix.")
-            return
-        selected_files = self.file_list.get_selected_files()
-        if not selected_files:
-            self.show_warning("No Files", "No files selected.")
-            return
-        is_prefix_mode = self.transpose_p2s_radio.isChecked()
-        from workers.rename_worker import RenameWorker
-        if is_prefix_mode:
-            matching = [f for f in selected_files if match_prefix(f.name, tokens)]
-            if not matching:
-                self.show_warning("No Matches",
-                                  "No files start with the selected prefix(es).")
-                return
-            if not self.confirm_action(
-                "Confirm Prefix \u2192 Suffix",
-                f"Move prefix to suffix for {len(matching)} file(s)?\n\nThis can be undone."
-            ):
-                return
-            self.worker_thread = RenameWorker(
-                matching,
-                prefix_to_suffix=tokens,
-                rename_sidecars=self.rename_sidecars_chk.isChecked(),
-                rename_captions=self.rename_captions_chk.isChecked(),
-            )
-        else:
-            matching = [f for f in selected_files if match_suffix(f.name, tokens)]
-            if not matching:
-                self.show_warning("No Matches",
-                                  "No files end with the selected suffix(es).")
-                return
-            direct = [(f, move_suffix_to_prefix(f.name, match_suffix(f.name, tokens)))
-                      for f in matching]
-            direct = [(p, n) for p, n in direct if n != p.name]
-            if not direct:
-                self.show_warning("No Changes", "No files would be changed.")
-                return
-            if not self.confirm_action(
-                "Confirm Suffix \u2192 Prefix",
-                f"Move suffix to prefix for {len(direct)} file(s)?\n\nThis can be undone."
-            ):
-                return
-            self.worker_thread = RenameWorker(
-                [],
-                direct_renames=direct,
-                rename_sidecars=self.rename_sidecars_chk.isChecked(),
-                rename_captions=self.rename_captions_chk.isChecked(),
-            )
-        self.worker_thread.progress.connect(self.emit_status)
-        self.worker_thread.finished.connect(self.on_rename_finished)
-        self.worker_thread.start()
-        self.enable_controls(False)
-
-    def apply_prefix_to_suffix(self):
-        self.apply_transposition()
+    # The standalone apply_transposition / apply_prefix_to_suffix flow was
+    # removed \u2014 transposition tokens now ride along with Apply Rename via
+    # RenameWorker(prefix_to_suffix=..., suffix_to_prefix=...). One Undo
+    # entry, one CSV log, one click.
 
     # ── CSV log ───────────────────────────────────────────────────────────
 

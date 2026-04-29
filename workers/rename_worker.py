@@ -6,9 +6,12 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 from PyQt5.QtCore import pyqtSignal
 from workers.base_worker import BaseWorker
-from core.name_transform import generate_new_filename, move_prefix_to_suffix
-from core.file_utils import resolve_name_conflict, safe_rename, same_inode, split_compound_suffix
-from core.pattern_matching import match_prefix
+from core.name_transform import generate_new_filename, move_prefix_to_suffix, move_suffix_to_prefix
+from core.file_utils import (
+    resolve_name_conflict, safe_rename, same_inode,
+    split_compound_suffix, is_hidden_file,
+)
+from core.pattern_matching import match_prefix, match_suffix
 from models.operation_record import OperationRecord
 from constants import OP_TYPE_RENAME, SIDECAR_EXTENSIONS, CAPTION_EXTENSIONS
 
@@ -29,21 +32,33 @@ class RenameWorker(BaseWorker):
         rename_to: str = "",
         case_transform: str = "none",
         prefix_to_suffix: Optional[List[str]] = None,
+        suffix_to_prefix: Optional[List[str]] = None,
         direct_renames: Optional[List[Tuple[Path, str]]] = None,
         rename_sidecars: bool = True,
         rename_captions: bool = True,
         write_manifest: bool = True,
+        include_hidden: bool = False,
     ):
         """
         Args:
             files: Files to rename (ignored when direct_renames is provided).
             prefix/suffix/rename_to/case_transform: Standard transform options.
-            prefix_to_suffix: Move these prefixes to suffix position.
+            prefix_to_suffix: Tokens to move from the beginning to the end.
+                Combines with the standard transforms (prefix/suffix/case)
+                so the user can do "strip DRAFT_" *and* "add HERO_" in one
+                Apply Rename click — historically these were two separate
+                button presses.
+            suffix_to_prefix: Tokens to move from the end to the beginning.
+                Same combination semantics as ``prefix_to_suffix``.
             direct_renames: Pre-computed [(Path, new_name)] pairs — bypasses all
                             transform logic (used by sequential numbering mode).
             rename_sidecars: Also rename same-stem sidecar files.
             rename_captions: Also rename same-stem caption/subtitle files.
             write_manifest: Write a CSV log of the batch to the target directory.
+            include_hidden: When False (default), files whose name starts with
+                ``.`` are silently dropped from the batch. Hidden files are
+                almost always config/OS files (``.DS_Store``, ``.gitignore``)
+                that the user does not intend to rename.
         """
         super().__init__()
         self.files = files
@@ -52,10 +67,12 @@ class RenameWorker(BaseWorker):
         self.rename_to = rename_to
         self.case_transform = case_transform
         self.prefix_to_suffix = prefix_to_suffix
+        self.suffix_to_prefix = suffix_to_prefix
         self.direct_renames = direct_renames
         self.rename_sidecars = rename_sidecars
         self.rename_captions = rename_captions
         self.write_manifest = write_manifest
+        self.include_hidden = include_hidden
 
     # ── helpers ──────────────────────────────────────────────────────────────
 
@@ -223,22 +240,44 @@ class RenameWorker(BaseWorker):
         self.emit_finished(error_count == 0, message, operation_record)
 
     def _build_work_list(self) -> List[Tuple[Path, str]]:
-        """Convert self.files into (Path, new_name) pairs using transform settings."""
-        work = []
+        """Convert self.files into ``(Path, new_name)`` pairs.
+
+        Order of operations within a single Apply Rename:
+          1. Skip dot-files unless ``include_hidden`` is True.
+          2. If ``prefix_to_suffix`` matched, move that token first.
+          3. If ``suffix_to_prefix`` matched, move that token first.
+          4. Apply prefix / suffix / rename_to / case_transform in that
+             order on the resulting name.
+
+        This means the user can configure "strip ``DRAFT_`` prefix + add
+        ``HERO_`` prefix" as one operation rather than two button clicks.
+        """
+        work: List[Tuple[Path, str]] = []
         for filepath in self.files:
+            # Skip hidden files unless explicitly included
+            if not self.include_hidden and is_hidden_file(filepath.name):
+                continue
+
+            current_name = filepath.name
+
+            # Transposition pass — moves a leading or trailing token across
             if self.prefix_to_suffix:
-                matched = match_prefix(filepath.name, self.prefix_to_suffix)
+                matched = match_prefix(current_name, self.prefix_to_suffix)
                 if matched:
-                    new_name = move_prefix_to_suffix(filepath.name, matched)
-                else:
-                    continue
-            else:
-                new_name = generate_new_filename(
-                    filepath.name,
-                    prefix=self.prefix,
-                    suffix=self.suffix,
-                    rename_to=self.rename_to,
-                    case_transform=self.case_transform,
-                )
+                    current_name = move_prefix_to_suffix(current_name, matched)
+            if self.suffix_to_prefix:
+                matched = match_suffix(current_name, self.suffix_to_prefix)
+                if matched:
+                    current_name = move_suffix_to_prefix(current_name, matched)
+
+            # Standard transform pass — runs even after a transposition so
+            # users can chain "remove DRAFT_" and "add HERO_" in one click.
+            new_name = generate_new_filename(
+                current_name,
+                prefix=self.prefix,
+                suffix=self.suffix,
+                rename_to=self.rename_to,
+                case_transform=self.case_transform,
+            )
             work.append((filepath, new_name))
         return work

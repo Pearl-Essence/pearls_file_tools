@@ -858,6 +858,22 @@ class _TrashPane(QWidget):
         self.dir_selector.directory_changed.connect(self._load_trash)
         layout.addWidget(self.dir_selector)
 
+        # Empty-state hint — explains what populates this tab. Selecting a
+        # folder that hasn't had any soft-deletes yet shows an empty tree
+        # with no obvious affordance otherwise.
+        self.help_label = QLabel(
+            "<i>Each project folder has its own .pearls_trash/. Files arrive "
+            "here when you use Studio Tools → Stale Files → Send to Trash. "
+            "Selecting a folder with no prior soft-deletes will show an empty "
+            "list — that's expected.</i>"
+        )
+        self.help_label.setWordWrap(True)
+        self.help_label.setStyleSheet(
+            "color: #888; padding: 6px 8px; "
+            "background-color: #2b2b2b; border-radius: 4px;"
+        )
+        layout.addWidget(self.help_label)
+
         self.tree = QTreeWidget()
         self.tree.setHeaderLabels(["Name", "Original Path", "Deleted At", "Size"])
         self.tree.setColumnWidth(0, 200)

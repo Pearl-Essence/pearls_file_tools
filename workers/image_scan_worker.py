@@ -75,11 +75,26 @@ class ImageScanWorker(BaseWorker):
                     for filename in filenames:
                         if Path(filename).suffix.lower() in IMAGE_EXTENSIONS:
                             file_path = current_dir / filename
+                            try:
+                                # Skip broken symlinks — pointing at deleted
+                                # targets would raise FileNotFoundError below
+                                # and abort the whole scan otherwise.
+                                if file_path.is_symlink() and not file_path.exists():
+                                    self.emit_progress(
+                                        f"Skipping broken symlink: {filename}"
+                                    )
+                                    continue
+                                size = file_path.stat().st_size
+                            except (OSError, PermissionError) as exc:
+                                self.emit_progress(
+                                    f"Skipping {filename}: {exc}"
+                                )
+                                continue
                             images.append({
                                 'name': filename,
                                 'path': str(file_path),
                                 'folder': folder_name,
-                                'size': file_path.stat().st_size
+                                'size': size,
                             })
             else:
                 # Non-recursive scan (only root directory)

@@ -10,6 +10,17 @@ from constants import (
 )
 
 
+def is_hidden_file(filename: str) -> bool:
+    """True if *filename* is a Unix-style hidden / dot-file.
+
+    Per the user's policy choice, the renamer skips these by default and
+    requires an explicit "Include hidden files" opt-in to touch them — they
+    are almost always config / OS files (``.DS_Store``, ``.gitignore``,
+    ``.env``) and the visual surprise of moving the dot is rarely intended.
+    """
+    return bool(filename) and filename.startswith('.')
+
+
 def split_compound_suffix(filename: str) -> Tuple[str, str]:
     """Split *filename* into ``(stem, compound_suffix)``.
 
