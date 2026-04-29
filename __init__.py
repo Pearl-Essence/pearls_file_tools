@@ -1,2 +1,2 @@
-"""Pearl's File Tools - Unified file management application."""
-__version__ = '1.0.0'
+"""Pearl Post Suite - Premium post-production file management."""
+__version__ = '0.11'

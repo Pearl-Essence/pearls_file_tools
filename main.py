@@ -1,67 +1,42 @@
 #!/usr/bin/env python3
-"""
-Pearl's File Tools - Unified file management application.
-
-Entry point for the application.
-"""
+"""Pearl Post Suite — entry point."""
 
 import sys
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtGui import QPalette, QColor
-from PyQt5.QtCore import Qt
-from ui.main_window import MainWindow
-from constants import THEME_DARK
 
-# Enable Retina / High-DPI rendering on macOS before QApplication is created
+from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import QApplication
+
+from branding import APP_NAME, ICONS_DIR, ORG_NAME, QSS_PATH
+from ui.main_window import MainWindow
+
+# High-DPI / Retina before QApplication is constructed
 if hasattr(Qt, 'AA_EnableHighDpiScaling'):
     QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
 if hasattr(Qt, 'AA_UseHighDpiPixmaps'):
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 
 
-def apply_dark_theme(app: QApplication):
-    """
-    Apply dark theme to the application.
-
-    Args:
-        app: QApplication instance
-    """
+def _apply_theme(app: QApplication):
     app.setStyle("Fusion")
-
-    # Create dark palette
-    palette = QPalette()
-    palette.setColor(QPalette.Window, QColor(53, 53, 53))
-    palette.setColor(QPalette.WindowText, Qt.white)
-    palette.setColor(QPalette.Base, QColor(25, 25, 25))
-    palette.setColor(QPalette.AlternateBase, QColor(53, 53, 53))
-    palette.setColor(QPalette.ToolTipBase, Qt.white)
-    palette.setColor(QPalette.ToolTipText, Qt.white)
-    palette.setColor(QPalette.Text, Qt.white)
-    palette.setColor(QPalette.Button, QColor(53, 53, 53))
-    palette.setColor(QPalette.ButtonText, Qt.white)
-    palette.setColor(QPalette.BrightText, Qt.red)
-    palette.setColor(QPalette.Link, QColor(42, 130, 218))
-    palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
-    palette.setColor(QPalette.HighlightedText, Qt.black)
-
-    app.setPalette(palette)
+    if QSS_PATH.exists():
+        app.setStyleSheet(QSS_PATH.read_text(encoding="utf-8"))
 
 
 def main():
-    """Main entry point for Pearl's File Tools."""
-    # Create application
     app = QApplication(sys.argv)
-    app.setApplicationName("Pearl's File Tools")
-    app.setOrganizationName("Pearl")
+    app.setApplicationName(APP_NAME)
+    app.setOrganizationName(ORG_NAME)
 
-    # Apply dark theme
-    apply_dark_theme(app)
+    # App icon — falls through to default if the SVG isn't there yet
+    icon_path = ICONS_DIR / "pearl-mark.svg"
+    if icon_path.exists():
+        app.setWindowIcon(QIcon(str(icon_path)))
 
-    # Create and show main window
+    _apply_theme(app)
+
     window = MainWindow()
     window.show()
-
-    # Run application
     sys.exit(app.exec_())
 
 
