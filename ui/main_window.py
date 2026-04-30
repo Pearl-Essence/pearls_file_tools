@@ -109,10 +109,8 @@ class MainWindow(QMainWindow):
         col.setSpacing(0)
         name = QLabel("Pearl")
         name.setObjectName("brandName")
-        name.setStyleSheet(
-            "font-family: 'Iowan Old Style', 'Source Serif Pro', Georgia, serif;"
-            "font-size: 17px; color: #E8E6DF;"
-        )
+        # Styling lives in pearl_dark.qss under QLabel#brandName so the
+        # serif resolves through the __BRAND_SERIF__ substitution.
         tag = QLabel(APP_TAGLINE)
         tag.setObjectName("eyebrow")
         col.addWidget(name)
