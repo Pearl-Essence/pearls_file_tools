@@ -10,7 +10,7 @@ from PySide6.QtCore import Qt, Signal, QDate
 from PySide6.QtGui import QAction, QColor
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTreeWidget, QTreeWidgetItem, QCheckBox, QDateEdit,
+    QTreeWidget, QTreeWidgetItem, QCheckBox, QDateEdit, QHeaderView,
     QMenu, QSizePolicy, QApplication, QMessageBox,
 )
 
@@ -127,7 +127,7 @@ class SyncDialog(QDialog):
             ["File", "Status", "Size A", "Size B", "Modified A", "Modified B"]
         )
         self._tree.header().setStretchLastSection(False)
-        self._tree.header().setSectionResizeMode(0, self._tree.header().Stretch)
+        self._tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self._tree.setContextMenuPolicy(Qt.CustomContextMenu)
         self._tree.customContextMenuRequested.connect(self._context_menu)
         root.addWidget(self._tree, stretch=1)

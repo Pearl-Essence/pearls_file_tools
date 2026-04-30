@@ -5,11 +5,29 @@
          app.setStyleSheet(f.read())
    ============================================================ */
 
-QMainWindow, QWidget {
+/* App shell painted only by the top-level window so child widgets don't
+   inherit a dark fill that punches through panel backgrounds. */
+QMainWindow,
+QStackedWidget,
+QSplitter,
+QFrame#leftRail,
+QFrame#projectStrip,
+QFrame#userFooter {
     background-color: #0B0B0D;
+}
+
+QWidget {
     color: #E8E6DF;
     font-family: "Inter", "SF Pro Text", "Segoe UI", sans-serif;
     font-size: 13px;
+}
+
+/* Text-bearing leaves are transparent — they let panel/parent color show
+   through instead of stamping a dark rectangle around every label. */
+QLabel,
+QCheckBox,
+QRadioButton {
+    background: transparent;
 }
 
 /* ---------- Sidebar ---------- */
@@ -63,7 +81,12 @@ QLabel#h1 {
     color: #E8E6DF;
     font-size: 22px;
     font-weight: 600;
-    font-family: "Iowan Old Style", "Source Serif Pro", Georgia, serif;
+    font-family: __BRAND_SERIF__, Georgia, serif;
+}
+QLabel#brandName {
+    color: #E8E6DF;
+    font-size: 17px;
+    font-family: __BRAND_SERIF__, Georgia, serif;
 }
 QLabel#h2 {
     color: #9A958A;

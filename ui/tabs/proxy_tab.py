@@ -36,33 +36,22 @@ class _ProxyPane(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
         root.setSpacing(16)
-        root.addLayout(self._build_header())
+        root.addWidget(self._build_header())
         root.addLayout(self._build_path_row())
         root.addWidget(self._build_results(), stretch=1)
         root.addLayout(self._build_actions_row())
 
-    def _build_header(self) -> QHBoxLayout:
-        row = QHBoxLayout()
-        row.setSpacing(8)
-        col = QVBoxLayout()
-        col.setSpacing(2)
-        eye = QLabel("01 · INGEST · PROXY GENERATION")
-        eye.setObjectName("eyebrow")
-        title = QLabel("Proxy Generation")
-        title.setObjectName("h1")
-        sub = QLabel("Pair full-resolution clips with their proxy counterparts and align filenames.")
-        sub.setObjectName("h2")
-        col.addWidget(eye)
-        col.addWidget(title)
-        col.addWidget(sub)
-        row.addLayout(col, stretch=1)
-
-        self.btn_match = QPushButton("Match files")
-        self.btn_match.setProperty("role", "primary")
-        self.btn_match.setMinimumHeight(34)
-        self.btn_match.clicked.connect(self._run_match)
-        row.addWidget(self.btn_match, alignment=Qt.AlignVCenter)
-        return row
+    def _build_header(self) -> QWidget:
+        from ui.widgets.tab_header import TabHeader
+        header = TabHeader(
+            eyebrow="01 · INGEST · PROXY GENERATION",
+            title="Proxy Generation",
+            subtitle="Pair full-resolution clips with their proxy counterparts and align filenames.",
+        )
+        self.btn_match = header.add_action(
+            "Match files", on_click=self._run_match, primary=True,
+        )
+        return header
 
     def _build_path_row(self) -> QHBoxLayout:
         row = QHBoxLayout()

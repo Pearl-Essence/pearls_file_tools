@@ -62,47 +62,29 @@ class _OffloadPane(QWidget):
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
         root.setSpacing(16)
-        root.addLayout(self._build_header())
+        root.addWidget(self._build_header())
         root.addLayout(self._build_path_row())
         root.addLayout(self._build_options_row())
         root.addWidget(self._build_manifest(), stretch=1)
         root.addWidget(self._build_footer())
 
-    def _build_header(self) -> QHBoxLayout:
-        row = QHBoxLayout()
-        row.setSpacing(8)
-
-        col = QVBoxLayout()
-        col.setSpacing(2)
-        eyebrow = QLabel("01 · INGEST · OFFLOAD")
-        eyebrow.setObjectName("eyebrow")
-        title = QLabel("Offload")
-        title.setObjectName("h1")
-        sub = QLabel("Copy and verify camera media into the destination volume.")
-        sub.setObjectName("h2")
-        col.addWidget(eyebrow)
-        col.addWidget(title)
-        col.addWidget(sub)
-        row.addLayout(col, stretch=1)
-
-        self.btn_preset = QPushButton("Preset · NETFLIX_4K_SDR")
-        self.btn_preset.setObjectName("ghostBtn")
-        self.btn_preset.setEnabled(False)
-        self.btn_preset.setToolTip("Delivery presets — coming in Pearl v0.12")
-
-        self.btn_analyze = QPushButton("Analyze")
-        self.btn_analyze.setObjectName("ghostBtn")
-        self.btn_analyze.clicked.connect(self._analyze)
-
-        self.btn_start = QPushButton("Start ingest")
-        self.btn_start.setProperty("role", "primary")
-        self.btn_start.setEnabled(False)
-        self.btn_start.clicked.connect(self._start)
-
-        for b in (self.btn_preset, self.btn_analyze, self.btn_start):
-            b.setMinimumHeight(34)
-            row.addWidget(b, alignment=Qt.AlignVCenter)
-        return row
+    def _build_header(self) -> QWidget:
+        from ui.widgets.tab_header import TabHeader
+        header = TabHeader(
+            eyebrow="01 · INGEST · OFFLOAD",
+            title="Offload",
+            subtitle="Copy and verify camera media into the destination volume.",
+        )
+        self.btn_preset = header.add_action(
+            "Preset · NETFLIX_4K_SDR",
+            enabled=False,
+            tooltip="Delivery presets — coming in Pearl v0.12",
+        )
+        self.btn_analyze = header.add_action("Analyze", on_click=self._analyze)
+        self.btn_start = header.add_action(
+            "Start ingest", on_click=self._start, primary=True, enabled=False,
+        )
+        return header
 
     def _build_path_row(self) -> QHBoxLayout:
         row = QHBoxLayout()
