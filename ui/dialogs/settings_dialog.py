@@ -1,9 +1,9 @@
 """Settings dialog for Pearl's File Tools."""
 
-from PyQt5.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
+from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
                             QTabWidget, QWidget, QLabel, QSpinBox, QGroupBox,
                             QCheckBox, QDoubleSpinBox, QMessageBox)
-from PyQt5.QtCore import Qt
+from PySide6.QtCore import Qt
 from pathlib import Path
 
 

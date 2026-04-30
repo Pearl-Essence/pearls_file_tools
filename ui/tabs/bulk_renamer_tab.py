@@ -1,10 +1,10 @@
 """Bulk File Renamer tab for Pearl's File Tools."""
 
-from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QLineEdit,
+from PySide6.QtWidgets import (QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QLineEdit,
                             QPushButton, QRadioButton, QCheckBox, QScrollArea, QWidget,
                             QButtonGroup, QSpinBox, QStackedWidget, QFormLayout, QComboBox,
                             QListWidget, QListWidgetItem, QApplication)
-from PyQt5.QtCore import Qt
+from PySide6.QtCore import Qt
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
 from ui.tabs.base_tab import BaseTab
@@ -291,7 +291,7 @@ class BulkRenamerTab(BaseTab):
         self._rebuild_template_panel(self._get_active_profile())
 
     def _save_as_profile(self):
-        from PyQt5.QtWidgets import QInputDialog
+        from PySide6.QtWidgets import QInputDialog
         profile = self._get_active_profile() or DEFAULT_TEMPLATE
         name, ok = QInputDialog.getText(self, "Save as Profile", "Profile name:")
         if not ok or not name.strip():
@@ -317,7 +317,7 @@ class BulkRenamerTab(BaseTab):
     def _manage_profiles(self):
         from ui.dialogs.profile_dialog import ProfileDialog
         dialog = ProfileDialog(self.config, self)
-        dialog.exec_()
+        dialog.exec()
         active = self.config.get('naming.active_profile')
         self._load_profile_combo()
         if active:
@@ -802,7 +802,7 @@ class BulkRenamerTab(BaseTab):
             self.show_warning("None Selected", "Check at least one subdirectory.")
             return
 
-        from PyQt5.QtWidgets import QProgressDialog
+        from PySide6.QtWidgets import QProgressDialog
         from workers.rename_worker import RenameWorker
 
         active_extensions = self.get_active_extensions()
@@ -1051,7 +1051,7 @@ class BulkRenamerTab(BaseTab):
                 preview_data.append((filepath.name, new_name))
 
         dialog = PreviewDialog(preview_data, self)
-        dialog.exec_()
+        dialog.exec()
 
     # ── apply rename ──────────────────────────────────────────────────────
 
@@ -1296,7 +1296,7 @@ class BulkRenamerTab(BaseTab):
             return
         from ui.dialogs.normalize_dialog import NormalizeDialog
         dialog = NormalizeDialog(files, self.config, self)
-        if dialog.exec_() != NormalizeDialog.Accepted:
+        if dialog.exec() != NormalizeDialog.Accepted:
             return
         pairs = dialog.get_rename_pairs()
         if not pairs:

@@ -1,8 +1,8 @@
 """Image card widget for displaying image thumbnails."""
 
-from PyQt5.QtWidgets import QFrame, QVBoxLayout, QLabel
-from PyQt5.QtCore import Qt, QRectF, pyqtSignal
-from PyQt5.QtGui import QBrush, QPixmap, QColor, QPainter, QFont
+from PySide6.QtWidgets import QFrame, QVBoxLayout, QLabel
+from PySide6.QtCore import Qt, QRectF, Signal
+from PySide6.QtGui import QBrush, QPixmap, QColor, QPainter, QFont
 from pathlib import Path
 from typing import Dict
 
@@ -10,8 +10,8 @@ from typing import Dict
 class ImageCard(QFrame):
     """A card widget displaying an image thumbnail and info."""
 
-    clicked = pyqtSignal(object)               # Emits the image data dict
-    context_menu_requested = pyqtSignal(object, object)  # img_data, QPoint (global)
+    clicked = Signal(object)               # Emits the image data dict
+    context_menu_requested = Signal(object, object)  # img_data, QPoint (global)
 
     def __init__(self, image_data: Dict, thumbnail_size: int = 200):
         """

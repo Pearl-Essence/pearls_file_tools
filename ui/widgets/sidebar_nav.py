@@ -7,9 +7,9 @@ selection without this widget knowing anything about tabs or dialogs.
 
 from typing import Dict, Optional
 
-from PyQt5.QtCore import Qt, QSize, pyqtSignal
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QFrame, QListWidget, QListWidgetItem
+from PySide6.QtCore import Qt, QSize, Signal
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QFrame, QListWidget, QListWidgetItem
 
 
 _ROLE_KEY     = Qt.UserRole + 1   # the factory_key string, or "" for headers
@@ -19,7 +19,7 @@ _ROLE_ISHEAD  = Qt.UserRole + 2   # bool
 class SidebarNav(QListWidget):
     """Left-rail navigation for the sidebar shell."""
 
-    activated = pyqtSignal(str)   # factory_key
+    activated = Signal(str)   # factory_key
 
     def __init__(self, nav_tree, icons_dir, parent=None):
         super().__init__(parent)

@@ -7,8 +7,8 @@ Whole card is the click target for opening a folder picker.
 from pathlib import Path
 from typing import Optional
 
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtWidgets import QFileDialog, QHBoxLayout, QLabel, QVBoxLayout
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QLabel, QVBoxLayout
 
 from ui.widgets.panel import Panel
 from ui.widgets.pill import Pill, KIND_MUTED, KIND_OK
@@ -20,7 +20,7 @@ class PathCard(Panel):
     Emits ``path_changed(str)`` when the user picks a new folder.
     """
 
-    path_changed = pyqtSignal(str)
+    path_changed = Signal(str)
 
     def __init__(self, role: str, parent=None):
         """``role`` is a label like 'SOURCE' or 'DESTINATION'."""

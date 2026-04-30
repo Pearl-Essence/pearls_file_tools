@@ -1,9 +1,9 @@
 """Image Browser tab for Pearl's File Tools."""
 
-from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
+from PySide6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
                             QLineEdit, QScrollArea, QGridLayout, QCheckBox,
                             QComboBox, QSpinBox, QGroupBox)
-from PyQt5.QtCore import Qt
+from PySide6.QtCore import Qt
 from pathlib import Path
 from typing import List, Dict
 from ui.tabs.base_tab import BaseTab
@@ -108,7 +108,7 @@ class ImageBrowserTab(BaseTab):
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
 
-        from PyQt5.QtWidgets import QWidget
+        from PySide6.QtWidgets import QWidget
         self.grid_widget = QWidget()
         self.grid_layout = QGridLayout()
         self.grid_layout.setSpacing(10)
@@ -334,13 +334,13 @@ class ImageBrowserTab(BaseTab):
             current_index = folder_images.index(img_data) if img_data in folder_images else 0
             dialog = ImageViewerDialog(folder_images, current_index, self)
 
-        dialog.exec_()
+        dialog.exec()
 
     # ── sequence reclassification ─────────────────────────────────────────
 
     def show_image_context_menu(self, img_data: Dict, global_pos):
         """Show right-click context menu for an image card."""
-        from PyQt5.QtWidgets import QMenu
+        from PySide6.QtWidgets import QMenu
         menu = QMenu(self)
 
         if img_data.get('is_sequence_rep'):
@@ -350,7 +350,7 @@ class ImageBrowserTab(BaseTab):
             action = menu.addAction("Force Detect as Sequence")
             action.triggered.connect(lambda: self.force_as_sequence(img_data))
 
-        menu.exec_(global_pos)
+        menu.exec(global_pos)
 
     def break_sequence(self, rep_data: Dict):
         """Remove sequence metadata from all frames of a sequence so they display individually."""

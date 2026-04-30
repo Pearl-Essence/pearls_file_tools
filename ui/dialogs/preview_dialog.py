@@ -5,9 +5,9 @@ a top summary bar, and visual treatment so users can scan large rename
 batches without losing track of which line maps to which.
 """
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QBrush, QColor, QFont
-from PyQt5.QtWidgets import (
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
     QHeaderView,

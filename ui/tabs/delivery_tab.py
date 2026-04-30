@@ -15,9 +15,9 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QBrush, QColor, QFont
-from PyQt5.QtWidgets import (
+from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtWidgets import (
     QButtonGroup, QCheckBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
     QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QProgressBar,
     QPushButton, QRadioButton, QScrollArea, QSizePolicy, QSpinBox, QStackedWidget,
@@ -49,7 +49,7 @@ def _colored_item(text: str, color: QColor) -> QListWidgetItem:
 # ─────────────────────────────────────────────────────────────────────────────
 
 class _ValidateWorker(BaseWorker):
-    finished = pyqtSignal(bool, str, object)  # success, msg, ValidationReport|None
+    finished = Signal(bool, str, object)  # success, msg, ValidationReport|None
 
     def __init__(self, directory: Path, profile):
         super().__init__()
@@ -70,7 +70,7 @@ class _ValidateWorker(BaseWorker):
 
 
 class _DuplicateWorker(BaseWorker):
-    finished = pyqtSignal(bool, str, object)  # success, msg, List[DuplicateGroup]
+    finished = Signal(bool, str, object)  # success, msg, List[DuplicateGroup]
 
     def __init__(self, directory: Path):
         super().__init__()
@@ -97,7 +97,7 @@ class _DuplicateWorker(BaseWorker):
 
 
 class _ZipWorker(BaseWorker):
-    finished = pyqtSignal(bool, str, object)  # success, msg, zip_path|None
+    finished = Signal(bool, str, object)  # success, msg, zip_path|None
 
     def __init__(self, source_dir: Path, project_name: str, output_dir: Path):
         super().__init__()
@@ -128,7 +128,7 @@ class _ZipWorker(BaseWorker):
 
 
 class _ManifestWorker(BaseWorker):
-    finished = pyqtSignal(bool, str, object)  # success, msg, output_path|None
+    finished = Signal(bool, str, object)  # success, msg, output_path|None
 
     def __init__(self, source_dir: Path, output_path: Path):
         super().__init__()
@@ -149,7 +149,7 @@ class _ManifestWorker(BaseWorker):
 
 
 class _QCWorker(BaseWorker):
-    finished = pyqtSignal(bool, str, object)
+    finished = Signal(bool, str, object)
 
     def __init__(self, source_dir: Path, project_name: str, min_size: int, thumbnails: bool):
         super().__init__()
@@ -214,7 +214,7 @@ def _options_scroll(inner: QWidget) -> QScrollArea:
 # ─────────────────────────────────────────────────────────────────────────────
 
 class _ValidatorPane(QWidget):
-    validation_passed = pyqtSignal(bool)   # emitted after each run
+    validation_passed = Signal(bool)   # emitted after each run
 
     def __init__(self, config, parent=None):
         super().__init__(parent)

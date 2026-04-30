@@ -8,9 +8,9 @@ around the results tree, primary CTA in the header bar).
 from pathlib import Path
 from typing import Dict, List, Tuple
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QBrush, QColor, QFont
-from PyQt5.QtWidgets import (
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtWidgets import (
     QHBoxLayout, QLabel, QMessageBox, QPushButton, QTreeWidget,
     QTreeWidgetItem, QVBoxLayout, QWidget,
 )

@@ -8,9 +8,9 @@ Two sub-modes (inner QTabWidget):
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QBrush, QColor, QFont
-from PyQt5.QtWidgets import (
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtWidgets import (
     QFileDialog, QGroupBox, QHBoxLayout, QLabel, QListWidget,
     QListWidgetItem, QProgressBar, QPushButton, QSplitter, QTabWidget,
     QTextEdit, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
@@ -134,11 +134,11 @@ class _IngestPane(QWidget):
         src = self.src_selector.get_directory()
         dst = self.dst_selector.get_directory()
         if not src or src == str(Path.home()):
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.warning(self, "No Source", "Please select a source folder.")
             return
         if not dst or dst == str(Path.home()):
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.warning(self, "No Destination", "Please select a destination folder.")
             return
 
@@ -189,7 +189,7 @@ class _IngestPane(QWidget):
             self._worker.cancel()
 
     def _eject(self):
-        from PyQt5.QtWidgets import QMessageBox
+        from PySide6.QtWidgets import QMessageBox
         QMessageBox.information(
             self, "Ingest Complete",
             "All files have been verified. You may safely eject the source card."
@@ -313,7 +313,7 @@ class _ProxyMatchPane(QWidget):
         proxy_dir = self.proxy_selector.get_directory()
 
         if fullres_dir == str(Path.home()) or proxy_dir == str(Path.home()):
-            from PyQt5.QtWidgets import QMessageBox
+            from PySide6.QtWidgets import QMessageBox
             QMessageBox.warning(self, "Select Folders", "Please select both folders first.")
             return
 
@@ -367,7 +367,7 @@ class _ProxyMatchPane(QWidget):
 
     def _rename_proxies(self):
         """Rename proxy files so their stem matches the full-res counterpart."""
-        from PyQt5.QtWidgets import QMessageBox
+        from PySide6.QtWidgets import QMessageBox
 
         matched_stems = set(self._full_res_files) & set(self._proxy_files)
         if not matched_stems:

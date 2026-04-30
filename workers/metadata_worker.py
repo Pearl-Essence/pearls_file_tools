@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import List
 
-from PyQt5.QtCore import pyqtSignal
+from PySide6.QtCore import Signal
 
 from workers.base_worker import BaseWorker
 
@@ -19,7 +19,7 @@ class MetadataWorker(BaseWorker):
                         'duration_secs', 'audio_channels'
     """
 
-    metadata_ready = pyqtSignal(str, dict)
+    metadata_ready = Signal(str, dict)
 
     def __init__(self, files: List[Path]):
         super().__init__()

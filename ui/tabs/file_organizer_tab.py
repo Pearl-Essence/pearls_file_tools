@@ -1,11 +1,11 @@
 """File Organizer tab for Pearl's File Tools."""
 
-from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
+from PySide6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
                             QTreeWidget, QTreeWidgetItem, QProgressBar, QInputDialog,
                             QMenu, QGroupBox, QComboBox, QCheckBox, QListWidget,
                             QListWidgetItem, QSizePolicy)
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont, QColor, QBrush
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont, QColor, QBrush
 from pathlib import Path
 from typing import Dict, List, Optional
 from ui.tabs.base_tab import BaseTab
@@ -211,7 +211,7 @@ class FileOrganizerTab(BaseTab):
             self.show_warning("None Selected", "Check at least one subdirectory.")
             return
 
-        from PyQt5.QtWidgets import QProgressDialog, QApplication
+        from PySide6.QtWidgets import QProgressDialog, QApplication
         progress = QProgressDialog(
             "Running batch…", "Cancel", 0, len(checked_dirs), self
         )
@@ -584,7 +584,7 @@ class FileOrganizerTab(BaseTab):
         if not menu.actions():
             return
 
-        menu.exec_(self.tree_widget.viewport().mapToGlobal(position))
+        menu.exec(self.tree_widget.viewport().mapToGlobal(position))
 
     def rename_group(self, subdir_path: str, old_name: str):
         """Rename a group."""
@@ -823,7 +823,7 @@ class FileOrganizerTab(BaseTab):
         )
         if conflicts:
             dlg = PreflightDialog(conflicts, self)
-            if dlg.exec_() != PreflightDialog.Accepted:
+            if dlg.exec() != PreflightDialog.Accepted:
                 return  # user cancelled
 
         # Confirm action
@@ -862,7 +862,7 @@ class FileOrganizerTab(BaseTab):
         from ui.dialogs.confirm_dialog import ConfirmDialog
 
         dialog = ConfirmDialog(folder_name, subdir, files, self)
-        dialog.exec_()  # Show dialog and wait for user response
+        dialog.exec()  # Show dialog and wait for user response
 
         action, apply_to_all = dialog.get_result()
 

@@ -11,9 +11,9 @@ destination — see ui/tabs/proxy_tab.py.
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QBrush, QColor, QFont
-from PyQt5.QtWidgets import (
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtWidgets import (
     QCheckBox, QFrame, QHBoxLayout, QHeaderView, QLabel, QMessageBox,
     QProgressBar, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout,
     QWidget,

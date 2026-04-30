@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import List, Tuple
 
-from PyQt5.QtWidgets import (
+from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
     QTableWidget, QTableWidgetItem, QHeaderView, QCheckBox, QDialogButtonBox,
 )

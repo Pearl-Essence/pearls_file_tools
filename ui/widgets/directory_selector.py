@@ -1,7 +1,7 @@
 """Directory selector widget for Pearl's File Tools."""
 
-from PyQt5.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QFileDialog, QCheckBox
-from PyQt5.QtCore import pyqtSignal
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QFileDialog, QCheckBox
+from PySide6.QtCore import Signal
 from pathlib import Path
 
 
@@ -9,7 +9,7 @@ class DirectorySelectorWidget(QWidget):
     """Reusable widget for selecting a directory."""
 
     # Signals
-    directory_changed = pyqtSignal(str)  # Emits the selected directory path
+    directory_changed = Signal(str)  # Emits the selected directory path
 
     def __init__(self, label_text: str = "Directory:", show_recursive: bool = False, parent=None):
         """

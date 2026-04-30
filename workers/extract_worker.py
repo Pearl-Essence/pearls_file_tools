@@ -4,7 +4,7 @@ import os
 import datetime
 from pathlib import Path
 from typing import Dict
-from PyQt5.QtCore import pyqtSignal
+from PySide6.QtCore import Signal
 from workers.base_worker import BaseWorker
 from core.file_utils import has_keyword
 from core.archive_utils import extract_archive
@@ -17,9 +17,9 @@ class ExtractWorker(BaseWorker):
     """Worker thread for extracting archives."""
 
     # Signals
-    progress = pyqtSignal(str, int, int)  # message, current, total
-    log_message = pyqtSignal(str)
-    finished = pyqtSignal(bool, str, object)  # success, message, extraction_record
+    progress = Signal(str, int, int)  # message, current, total
+    log_message = Signal(str)
+    finished = Signal(bool, str, object)  # success, message, extraction_record
 
     def __init__(self, root_dir: str, settings: Dict):
         """

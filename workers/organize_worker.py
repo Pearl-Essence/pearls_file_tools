@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from typing import Dict, List, Optional
-from PyQt5.QtCore import pyqtSignal
+from PySide6.QtCore import Signal
 from workers.base_worker import BaseWorker
 from core.file_utils import resolve_name_conflict, safe_move
 
@@ -11,9 +11,9 @@ class OrganizeWorker(BaseWorker):
     """Worker thread for organizing files into folders."""
 
     # Additional signals
-    progress = pyqtSignal(str, int, int)  # message, current, total
-    confirm_needed = pyqtSignal(str, str, list)  # folder_name, subdir, files
-    finished = pyqtSignal(bool, str)  # success, message
+    progress = Signal(str, int, int)  # message, current, total
+    confirm_needed = Signal(str, str, list)  # folder_name, subdir, files
+    finished = Signal(bool, str)  # success, message
 
     def __init__(self, file_groups: Dict[str, Dict[str, List[Path]]], root_dir: str):
         """

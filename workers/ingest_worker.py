@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Tuple
 
-from PyQt5.QtCore import pyqtSignal
+from PySide6.QtCore import Signal
 
 from workers.base_worker import BaseWorker
 
@@ -34,9 +34,9 @@ class IngestWorker(BaseWorker):
         overall_progress(int, int)  — (current_index, total)
     """
 
-    finished = pyqtSignal(bool, str, list)
-    file_status = pyqtSignal(str, bool, str)
-    overall_progress = pyqtSignal(int, int)
+    finished = Signal(bool, str, list)
+    file_status = Signal(str, bool, str)
+    overall_progress = Signal(int, int)
 
     # ── Stability / settle tuning ────────────────────────────────────────────
     # Wait for the source file size to remain unchanged across SETTLE_PASSES

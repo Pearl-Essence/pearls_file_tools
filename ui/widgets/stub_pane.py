@@ -1,7 +1,7 @@
 """StubPane — empty-state placeholder for sidebar items not yet implemented."""
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 
 class StubPane(QWidget):

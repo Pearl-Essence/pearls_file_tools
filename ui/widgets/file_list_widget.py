@@ -3,8 +3,8 @@
 from pathlib import Path
 from typing import List, Optional
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
     QApplication, QHBoxLayout, QHeaderView, QLabel,
     QMenu, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
@@ -215,7 +215,7 @@ class FileListWidget(QWidget):
             action.triggered.connect(
                 lambda checked, c=col: self._toggle_meta_col(c, checked)
             )
-        menu.exec_(self.table.horizontalHeader().mapToGlobal(pos))
+        menu.exec(self.table.horizontalHeader().mapToGlobal(pos))
 
     def _toggle_meta_col(self, col: int, show: bool):
         self.table.setColumnHidden(col, not show)

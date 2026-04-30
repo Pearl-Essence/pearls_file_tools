@@ -1,8 +1,8 @@
 """Draggable tree widget for file organization."""
 
-from PyQt5.QtWidgets import QApplication, QTreeWidget, QTreeWidgetItem
-from PyQt5.QtCore import Qt, pyqtSignal, QMimeData, QPoint
-from PyQt5.QtGui import QDrag
+from PySide6.QtWidgets import QApplication, QTreeWidget, QTreeWidgetItem
+from PySide6.QtCore import Qt, Signal, QMimeData, QPoint
+from PySide6.QtGui import QDrag
 from pathlib import Path
 from typing import List, Optional
 
@@ -20,7 +20,7 @@ class DraggableTreeWidget(QTreeWidget):
     Drag is initiated manually so Qt's rubber-band selector never fires.
     """
 
-    files_dropped = pyqtSignal(list, object)  # List[Path], QTreeWidgetItem
+    files_dropped = Signal(list, object)  # List[Path], QTreeWidgetItem
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -128,7 +128,7 @@ class DraggableTreeWidget(QTreeWidget):
 
         drag = QDrag(self)
         drag.setMimeData(mime_data)
-        drag.exec_(Qt.MoveAction)
+        drag.exec(Qt.MoveAction)
 
     # ── drop events ───────────────────────────────────────────────────────
 

@@ -1,9 +1,9 @@
 """Archive Extractor tab for Pearl's File Tools."""
 
-from PyQt5.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
+from PySide6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
                             QTextEdit, QProgressBar, QGroupBox, QCheckBox)
-from PyQt5.QtGui import QFont
-from PyQt5.QtCore import Qt
+from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt
 from pathlib import Path
 from typing import Dict, Any
 from ui.tabs.base_tab import BaseTab

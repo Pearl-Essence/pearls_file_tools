@@ -1,12 +1,12 @@
 """Base tab class for Pearl's File Tools."""
 
 from abc import ABCMeta, abstractmethod
-from PyQt5.QtWidgets import QWidget, QMessageBox
-from PyQt5.QtCore import pyqtSignal, QObject
+from PySide6.QtWidgets import QWidget, QMessageBox
+from PySide6.QtCore import Signal, QObject
 from typing import Optional
 
 
-# Create a metaclass that combines PyQt5's metaclass with ABCMeta
+# Create a metaclass that combines PySide6's metaclass with ABCMeta
 class QABCMeta(type(QObject), ABCMeta):
     """Metaclass that combines Qt's metaclass with ABC's metaclass."""
     pass
@@ -16,8 +16,8 @@ class BaseTab(QWidget, metaclass=QABCMeta):
     """Abstract base class for all tabs in the application."""
 
     # Signals
-    status_changed = pyqtSignal(str)  # Status message
-    operation_completed = pyqtSignal(str, bool)  # (message, success)
+    status_changed = Signal(str)  # Status message
+    operation_completed = Signal(str, bool)  # (message, success)
 
     def __init__(self, config, parent=None):
         """

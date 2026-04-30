@@ -6,7 +6,7 @@ import hashlib
 from pathlib import Path
 from datetime import datetime
 from typing import List, Dict
-from PyQt5.QtCore import pyqtSignal
+from PySide6.QtCore import Signal
 from workers.base_worker import BaseWorker
 from constants import IMAGE_EXTENSIONS
 
@@ -16,8 +16,8 @@ CACHE_FILE_NAME = '.image_browser_cache.json'
 class ImageScanWorker(BaseWorker):
     """Worker thread for scanning directories for images."""
 
-    progress = pyqtSignal(str)
-    finished = pyqtSignal(bool, str, object)  # success, message, images list
+    progress = Signal(str)
+    finished = Signal(bool, str, object)  # success, message, images list
 
     def emit_finished(self, success: bool, message: str, images=None):
         self.finished.emit(success, message, images)

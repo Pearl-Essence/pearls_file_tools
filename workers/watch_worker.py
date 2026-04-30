@@ -4,7 +4,7 @@ import time
 from pathlib import Path
 from typing import List
 
-from PyQt5.QtCore import pyqtSignal
+from PySide6.QtCore import Signal
 
 from workers.base_worker import BaseWorker
 from core.watch_service import WatchRule, WatchService, HAS_WATCHDOG
@@ -18,8 +18,8 @@ class WatchWorker(BaseWorker):
         file_arrived(str, str): (absolute path string, profile_name)
     """
 
-    finished = pyqtSignal(bool, str, object)   # shadows BaseWorker.finished
-    file_arrived = pyqtSignal(str, str)        # path, profile_name
+    finished = Signal(bool, str, object)   # shadows BaseWorker.finished
+    file_arrived = Signal(str, str)        # path, profile_name
 
     def __init__(self, rules: List[WatchRule], poll_interval_secs: int = 30):
         super().__init__()

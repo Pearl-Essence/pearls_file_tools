@@ -6,12 +6,12 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from PyQt5.QtCore import Qt, pyqtSignal, QDate
-from PyQt5.QtGui import QColor
-from PyQt5.QtWidgets import (
+from PySide6.QtCore import Qt, Signal, QDate
+from PySide6.QtGui import QAction, QColor
+from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTreeWidget, QTreeWidgetItem, QCheckBox, QDateEdit,
-    QMenu, QAction, QSizePolicy, QApplication, QMessageBox,
+    QMenu, QSizePolicy, QApplication, QMessageBox,
 )
 
 from core.sync_check import SyncEntry, SyncReport, compare_directories
@@ -26,7 +26,7 @@ from workers.base_worker import BaseWorker
 class _SyncWorker(BaseWorker):
     """Run compare_directories in a background thread."""
 
-    finished = pyqtSignal(bool, str, object)   # shadows BaseWorker.finished
+    finished = Signal(bool, str, object)   # shadows BaseWorker.finished
 
     def __init__(self, dir_a: Path, dir_b: Path, since: Optional[datetime.datetime]):
         super().__init__()
@@ -249,7 +249,7 @@ class SyncDialog(QDialog):
         open_in_finder.triggered.connect(lambda: self._open_in_finder(entry))
         menu.addAction(open_in_finder)
 
-        menu.exec_(self._tree.viewport().mapToGlobal(pos))
+        menu.exec(self._tree.viewport().mapToGlobal(pos))
 
     def _keep_a(self, entry: SyncEntry, item: QTreeWidgetItem):
         if self._report is None or entry.path_a is None:

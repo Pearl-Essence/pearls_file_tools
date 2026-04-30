@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from typing import Dict, List, Optional
-from PyQt5.QtCore import pyqtSignal
+from PySide6.QtCore import Signal
 from workers.base_worker import BaseWorker
 from core.pattern_matching import group_files_by_pattern, group_files_by_preset, GroupingPreset, PRESET_STANDARD
 
@@ -10,7 +10,7 @@ from core.pattern_matching import group_files_by_pattern, group_files_by_preset,
 class ScanWorker(BaseWorker):
     """Worker thread for scanning directories and grouping files."""
 
-    finished = pyqtSignal(bool, str, object, object)  # success, message, grouped_results, unsorted_results
+    finished = Signal(bool, str, object, object)  # success, message, grouped_results, unsorted_results
 
     def emit_finished(self, success: bool, message: str, grouped=None, unsorted=None):
         self.finished.emit(success, message, grouped, unsorted)

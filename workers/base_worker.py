@@ -1,6 +1,6 @@
 """Base worker thread class for Pearl's File Tools."""
 
-from PyQt5.QtCore import QThread, pyqtSignal
+from PySide6.QtCore import QThread, Signal
 
 
 class BaseWorker(QThread):
@@ -10,8 +10,8 @@ class BaseWorker(QThread):
     incompatible with ABCMeta. Subclasses must implement run().
     """
 
-    progress = pyqtSignal(str)       # status message
-    finished = pyqtSignal(bool, str) # (success, message)
+    progress = Signal(str)       # status message
+    finished = Signal(bool, str) # (success, message)
 
     def __init__(self):
         super().__init__()

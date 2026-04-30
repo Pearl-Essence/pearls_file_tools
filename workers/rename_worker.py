@@ -4,7 +4,7 @@ import csv
 import datetime
 from pathlib import Path
 from typing import List, Optional, Tuple
-from PyQt5.QtCore import pyqtSignal
+from PySide6.QtCore import Signal
 from workers.base_worker import BaseWorker
 from core.name_transform import generate_new_filename, move_prefix_to_suffix, move_suffix_to_prefix
 from core.file_utils import (
@@ -19,7 +19,7 @@ from constants import OP_TYPE_RENAME, SIDECAR_EXTENSIONS, CAPTION_EXTENSIONS
 class RenameWorker(BaseWorker):
     """Worker thread for renaming files."""
 
-    finished = pyqtSignal(bool, str, object)  # success, message, operation_record
+    finished = Signal(bool, str, object)  # success, message, operation_record
 
     def emit_finished(self, success: bool, message: str, record=None):
         self.finished.emit(success, message, record)

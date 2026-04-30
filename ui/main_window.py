@@ -8,11 +8,11 @@ the activation and open the dialog without changing the current pane.
 
 from typing import Dict, Optional
 
-from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QIcon, QKeySequence
-from PyQt5.QtWidgets import (
-    QAction, QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow,
-    QMessageBox, QShortcut, QSplitter, QStackedWidget, QVBoxLayout, QWidget,
+from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QAction, QIcon, QKeySequence, QShortcut
+from PySide6.QtWidgets import (
+    QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
+    QSplitter, QStackedWidget, QVBoxLayout, QWidget,
 )
 
 from branding import APP_NAME, APP_TAGLINE, ICONS_DIR, NAV_TREE
@@ -235,7 +235,7 @@ class MainWindow(QMainWindow):
     def _open_sync_dialog(self):
         from ui.dialogs.sync_dialog import SyncDialog
         dlg = SyncDialog(self.config, self)
-        dlg.exec_()
+        dlg.exec()
 
     def _open_watch_dialog(self):
         if self._watch_dialog is None:
@@ -366,17 +366,17 @@ class MainWindow(QMainWindow):
     def _show_settings(self):
         from ui.dialogs.settings_dialog import SettingsDialog
         dlg = SettingsDialog(self.config, self)
-        if dlg.exec_() == SettingsDialog.Accepted and getattr(dlg, 'settings_changed', False):
+        if dlg.exec() == SettingsDialog.Accepted and getattr(dlg, 'settings_changed', False):
             QMessageBox.information(self, "Settings saved",
                                     "Some changes may require restarting the application.")
 
     def _show_history(self):
         from ui.dialogs.history_dialog import HistoryDialog
-        HistoryDialog(self).exec_()
+        HistoryDialog(self).exec()
 
     def _manage_profiles(self):
         from ui.dialogs.profile_dialog import ProfileDialog
-        ProfileDialog(self.config, self).exec_()
+        ProfileDialog(self.config, self).exec()
 
     def _clear_caches(self):
         reply = QMessageBox.question(
@@ -429,5 +429,5 @@ class MainWindow(QMainWindow):
             f"<li><b>Deliver</b> — spec validation + packaging</li>"
             f"<li><b>Archive</b> — LTO / cold storage <i>(coming soon)</i></li>"
             f"</ul>"
-            f"<p style='margin-top:10px;'><i>Built with PyQt5</i></p>"
+            f"<p style='margin-top:10px;'><i>Built with PySide6</i></p>"
         )

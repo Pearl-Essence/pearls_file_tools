@@ -4,8 +4,8 @@ The visual style comes from a Qt dynamic property ``pill`` ("ok", "warn",
 "error", "muted") matched by selectors in pearl_dark.qss.
 """
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QLabel
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QLabel
 
 
 # Canonical kinds — keep in sync with QSS QLabel[pill="..."] selectors.

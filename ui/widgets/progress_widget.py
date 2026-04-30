@@ -1,7 +1,7 @@
 """Progress widget for Pearl's File Tools."""
 
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QProgressBar, QLabel
-from PyQt5.QtCore import Qt
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QProgressBar, QLabel
+from PySide6.QtCore import Qt
 
 
 class ProgressWidget(QWidget):

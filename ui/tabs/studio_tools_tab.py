@@ -20,9 +20,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QBrush, QColor, QPainter
-from PyQt5.QtWidgets import (
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QBrush, QColor, QPainter
+from PySide6.QtWidgets import (
     QAbstractItemView, QApplication, QButtonGroup, QCheckBox, QComboBox,
     QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
     QListWidget, QListWidgetItem, QMessageBox, QProgressBar, QPushButton,
@@ -179,8 +179,8 @@ class StaleFile:
 
 class _NLEBackupWorker(BaseWorker):
     """Backup NLE project files/packages from scan_dir to dest_dir with a timestamp suffix."""
-    finished = pyqtSignal(bool, str, object)  # success, msg, List[dict]|None
-    file_backed = pyqtSignal(str)             # name of each completed item
+    finished = Signal(bool, str, object)  # success, msg, List[dict]|None
+    file_backed = Signal(str)             # name of each completed item
 
     def __init__(self, scan_dir: Path, dest_dir: Path, extensions: set):
         super().__init__()
@@ -276,7 +276,7 @@ class _NLEBackupWorker(BaseWorker):
 
 
 class _StaleWorker(BaseWorker):
-    finished = pyqtSignal(bool, str, object)
+    finished = Signal(bool, str, object)
 
     def __init__(self, directory: Path, max_age_days: int, check_atime: bool):
         super().__init__()
@@ -324,7 +324,7 @@ class _StaleWorker(BaseWorker):
 
 
 class _StorageWorker(BaseWorker):
-    finished = pyqtSignal(bool, str, object)
+    finished = Signal(bool, str, object)
 
     def __init__(self, directory: Path):
         super().__init__()
@@ -363,8 +363,8 @@ class _StorageWorker(BaseWorker):
 
 
 class _ManifestWorker(BaseWorker):
-    finished = pyqtSignal(bool, str, object)
-    file_hashed = pyqtSignal(str, int, int)
+    finished = Signal(bool, str, object)
+    file_hashed = Signal(str, int, int)
 
     def __init__(self, source_dir: Path, dest_dir: Path, include_files: List[Path]):
         super().__init__()
@@ -419,8 +419,8 @@ class _ManifestWorker(BaseWorker):
 
 
 class _CopyWorker(BaseWorker):
-    finished = pyqtSignal(bool, str, object)
-    file_copied = pyqtSignal(str, int, int)
+    finished = Signal(bool, str, object)
+    file_copied = Signal(str, int, int)
 
     def __init__(
         self,
@@ -478,8 +478,8 @@ class _CopyWorker(BaseWorker):
 
 
 class _VerifyWorker(BaseWorker):
-    finished = pyqtSignal(bool, str, object)
-    file_verified = pyqtSignal(str, bool)
+    finished = Signal(bool, str, object)
+    file_verified = Signal(str, bool)
 
     def __init__(self, dest_dir: Path, manifest_data: list):
         super().__init__()
@@ -1376,7 +1376,7 @@ class _ArchivePane(QWidget):
         layout.addStretch()
 
     def _launch(self):
-        ColdStorageWizard(self).exec_()
+        ColdStorageWizard(self).exec()
 
 
 # ─────────────────────────────────────────────────────────────────────────────

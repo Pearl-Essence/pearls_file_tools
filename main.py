@@ -3,18 +3,13 @@
 
 import sys
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QApplication
+from PySide6.QtGui import QIcon
+from PySide6.QtWidgets import QApplication
 
 from branding import APP_NAME, ICONS_DIR, ORG_NAME, QSS_PATH
 from ui.main_window import MainWindow
 
-# High-DPI / Retina before QApplication is constructed
-if hasattr(Qt, 'AA_EnableHighDpiScaling'):
-    QApplication.setAttribute(Qt.AA_EnableHighDpiScaling, True)
-if hasattr(Qt, 'AA_UseHighDpiPixmaps'):
-    QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
+# Qt6 has High-DPI scaling on by default — the AA_* flags are removed/no-ops.
 
 
 def _apply_theme(app: QApplication):
@@ -37,7 +32,7 @@ def main():
 
     window = MainWindow()
     window.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 
 
 if __name__ == "__main__":
