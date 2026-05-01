@@ -9,7 +9,7 @@ from pathlib import Path
 # ── Identity ────────────────────────────────────────────────────────────────
 APP_NAME       = "Pearl Post Suite"
 APP_NAME_SHORT = "Pearl"
-APP_TAGLINE    = "POST SUITE · V0.16"
+APP_TAGLINE    = "POST SUITE · V0.17"
 ORG_NAME       = "Pearl"
 
 # ── Resource paths ──────────────────────────────────────────────────────────

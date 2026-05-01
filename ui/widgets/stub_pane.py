@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 class StubPane(QWidget):
     """Centered "Coming soon" pane for incomplete sidebar destinations."""
 
-    def __init__(self, title: str, blurb: str = "Coming in Pearl 0.17", parent=None):
+    def __init__(self, title: str, blurb: str = "Coming in Pearl 0.18", parent=None):
         super().__init__(parent)
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignCenter)

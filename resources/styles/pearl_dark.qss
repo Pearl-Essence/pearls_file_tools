@@ -1,5 +1,5 @@
 /* ============================================================
-   PEARL · DARK · v0.16
+   PEARL · DARK · v0.17
    Drop-in stylesheet. Load once in main.py:
      with open("resources/styles/pearl_dark.qss") as f:
          app.setStyleSheet(f.read())
@@ -68,6 +68,30 @@ QFrame#panel {
     background-color: #15161A;
     border: 1px solid #2A2C33;
     border-radius: 10px;
+}
+
+/* ---------- QGroupBox auto-styled as Panel ---------- */
+/* Legacy panes built with QGroupBox inherit the v0.17 chrome without
+   touching their construction code. Title sits at the top-left in muted
+   gray, tracking like a small eyebrow label. */
+QGroupBox {
+    background-color: #15161A;
+    border: 1px solid #2A2C33;
+    border-radius: 10px;
+    margin-top: 16px;
+    padding: 14px 14px 14px 14px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    color: #5C5950;
+}
+QGroupBox::title {
+    subcontrol-origin: margin;
+    subcontrol-position: top left;
+    left: 14px;
+    padding: 0 6px;
+    color: #5C5950;
+    background: transparent;
 }
 
 /* ---------- Typography ---------- */

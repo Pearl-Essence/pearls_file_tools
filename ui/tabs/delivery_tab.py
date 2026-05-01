@@ -370,7 +370,7 @@ class _PackagePane(QWidget):
         layout.addLayout(name_row)
 
         self.preview_label = QLabel("")
-        self.preview_label.setStyleSheet("color: #888; font-style: italic; padding: 2px 0;")
+        self.preview_label.setObjectName("cardSub")
         layout.addWidget(self.preview_label)
 
         # ── Log (fills remaining space) ───────────────────────────────────────
@@ -648,7 +648,7 @@ class _HandoffPane(QWidget):
             "show a warning."
         )
         note.setWordWrap(True)
-        note.setStyleSheet("color: #888; font-size: 11px;")
+        note.setObjectName("cardSub")
         note_layout.addWidget(note)
         layout.addWidget(_options_scroll(note_widget))
 
@@ -764,7 +764,7 @@ class _ExportPane(QWidget):
             "duration_secs is populated when ffprobe or pymediainfo is available."
         )
         csv_note.setWordWrap(True)
-        csv_note.setStyleSheet("color: #888; font-size: 11px;")
+        csv_note.setObjectName("cardSub")
         csv_layout.addWidget(csv_note)
 
         # Page 1 — QC Report options

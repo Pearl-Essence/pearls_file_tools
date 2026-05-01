@@ -142,7 +142,7 @@ class SettingsDialog(QDialog):
             "Medium values (0.4-0.6): Balanced grouping (recommended)\n"
             "Higher values (0.7-0.9): Conservative grouping, only groups very similar files"
         )
-        help_label.setStyleSheet("color: #888; font-size: 10px; padding: 5px;")
+        help_label.setObjectName("cardSub")
         help_label.setWordWrap(True)
         pattern_layout.addWidget(help_label)
 
