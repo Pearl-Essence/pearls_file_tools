@@ -1,4 +1,4 @@
-"""Main window for Pearl Post Suite — v0.14 sidebar shell.
+"""Main window for Pearl Post Suite — v0.15 sidebar shell.
 
 Replaces the legacy QTabWidget with a left sidebar (SidebarNav) and a right
 QStackedWidget. Each existing tab class is mounted unchanged into the stack;
@@ -178,7 +178,10 @@ class MainWindow(QMainWindow):
         from ui.tabs.file_organizer_tab import FileOrganizerTab
         from ui.tabs.archive_extractor_tab import ArchiveExtractorTab
         from ui.tabs.image_browser_tab import ImageBrowserTab
-        from ui.tabs.studio_tools_tab import StudioToolsTab
+        from ui.tabs.studio_tabs import (
+            ColdStorageTab, ExportWatcherTab, NLEBackupTab,
+            StaleFilesTab, StorageReportTab, TrashTab,
+        )
         from ui.tabs.delivery_validator_tab import SpecValidatorTab
         from ui.tabs.delivery_package_tab import PackageExportTab
 
@@ -193,25 +196,28 @@ class MainWindow(QMainWindow):
         )
 
         tabs = {
-            "offload":   IngestTab(self.config),
-            "proxy":     ProxyTab(self.config),
-            "rename":    BulkRenamerTab(self.config),
-            "organize":  FileOrganizerTab(self.config),
-            "extract":   ArchiveExtractorTab(self.config),
-            "stills":    ImageBrowserTab(self.config),
-            "studio":    StudioToolsTab(self.config),
-            "validator": validator_tab,
-            "package":   package_tab,
+            "offload":         IngestTab(self.config),
+            "proxy":           ProxyTab(self.config),
+            "rename":          BulkRenamerTab(self.config),
+            "organize":        FileOrganizerTab(self.config),
+            "extract":         ArchiveExtractorTab(self.config),
+            "stills":          ImageBrowserTab(self.config),
+            "stale":           StaleFilesTab(self.config),
+            "storage":         StorageReportTab(self.config),
+            "nle_backup":      NLEBackupTab(self.config),
+            "export_watcher":  ExportWatcherTab(self.config),
+            "trash":           TrashTab(self.config),
+            "validator":       validator_tab,
+            "package":         package_tab,
+            "cold_storage":    ColdStorageTab(self.config),
         }
         for key, tab in tabs.items():
             tab.status_changed.connect(self._update_status)
             self._tab_instances.append(tab)
             self._stack_index_for_key[key] = self.stack.addWidget(tab)
 
-        # Stub panes for not-yet-implemented destinations
-        stub_specs = [
-            ("stub:lto", "LTO / Cold Storage"),
-        ]
+        # Stub panes for not-yet-implemented destinations.
+        stub_specs: list = []
         for key, label in stub_specs:
             pane = StubPane(label)
             self._stack_index_for_key[key] = self.stack.addWidget(pane)
@@ -301,7 +307,7 @@ class MainWindow(QMainWindow):
 
     def _setup_shortcuts(self):
         # Cmd/Ctrl + 1..5 jumps to the first item of each section
-        section_first_keys = ["offload", "rename", "studio", "validator", "stub:lto"]
+        section_first_keys = ["offload", "rename", "stale", "validator", "cold_storage"]
         for i, key in enumerate(section_first_keys):
             sc = QShortcut(QKeySequence(f"Ctrl+{i + 1}"), self)
             sc.activated.connect(lambda k=key: self.sidebar.select_key(k))
