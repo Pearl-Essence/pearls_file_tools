@@ -60,7 +60,7 @@ class ImageViewerDialog(QDialog):
 
         self.counter_label = QLabel()
         self.counter_label.setAlignment(Qt.AlignCenter)
-        self.counter_label.setStyleSheet("font-size: 12px; color: #888;")
+        self.counter_label.setObjectName("cardSub")
 
         self.next_btn = QPushButton("Next →")
         self.next_btn.clicked.connect(self.show_next)

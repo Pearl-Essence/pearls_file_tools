@@ -1,7 +1,7 @@
-"""Archive Extractor tab — v0.16 visual refresh.
+"""Archive Extractor tab — v0.17 visual refresh.
 
 Functional behavior unchanged: same extraction worker, same undo stack, same
-log filter logic. Layout uses the v0.16 chrome (TabHeader + Panel + status
+log filter logic. Layout uses the v0.17 chrome (TabHeader + Panel + status
 pills + sticky footer with progress).
 """
 

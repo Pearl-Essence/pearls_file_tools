@@ -1,7 +1,7 @@
 """Sync Check + Watch Folders embedded as real tab panes.
 
 These two destinations were previously launched as modal QDialogs from the
-sidebar. v0.16 promotes them to first-class panes mounted in the main
+sidebar. v0.17 promotes them to first-class panes mounted in the main
 QStackedWidget, so they live alongside the rest of the MAINTAIN section.
 
 Strategy: instantiate the existing QDialog subclasses with no parent (so
@@ -27,7 +27,7 @@ def _hide_close_button(widget: QWidget) -> None:
 
 def _shell(host: QWidget, eyebrow: str, title: str, subtitle: str,
            inner: QWidget) -> QVBoxLayout:
-    """Standard v0.16 outer layout — same helper used in studio_tabs."""
+    """Standard v0.17 outer layout — same helper used in studio_tabs."""
     root = QVBoxLayout(host)
     root.setContentsMargins(24, 20, 24, 20)
     root.setSpacing(16)

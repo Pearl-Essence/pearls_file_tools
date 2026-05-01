@@ -1,4 +1,4 @@
-"""Main window for Pearl Post Suite — v0.16 sidebar shell.
+"""Main window for Pearl Post Suite — v0.17 sidebar shell.
 
 Replaces the legacy QTabWidget with a left sidebar (SidebarNav) and a right
 QStackedWidget. Each existing tab class is mounted unchanged into the stack;

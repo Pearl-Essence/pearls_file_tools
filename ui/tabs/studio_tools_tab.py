@@ -868,10 +868,7 @@ class _TrashPane(QWidget):
             "list — that's expected.</i>"
         )
         self.help_label.setWordWrap(True)
-        self.help_label.setStyleSheet(
-            "color: #888; padding: 6px 8px; "
-            "background-color: #2b2b2b; border-radius: 4px;"
-        )
+        self.help_label.setObjectName("cardSub")
         layout.addWidget(self.help_label)
 
         self.tree = QTreeWidget()
@@ -1357,7 +1354,7 @@ class _ArchivePane(QWidget):
             "  5. Copy or zip files to the destination\n"
             "  6. Verify destination files against the manifest"
         )
-        steps.setStyleSheet("color: #888; padding: 8px 16px;")
+        steps.setObjectName("cardSub")
         layout.addWidget(steps)
 
         layout.addStretch()
@@ -1425,7 +1422,7 @@ class _NLEBackupPane(QWidget):
         layout.addWidget(self.dest_selector)
 
         self.last_backup_label = QLabel("Last backup: never")
-        self.last_backup_label.setStyleSheet("color: #888; font-size: 11px; padding: 2px 0;")
+        self.last_backup_label.setObjectName("cardSub")
         layout.addWidget(self.last_backup_label)
 
         self.log = QListWidget()

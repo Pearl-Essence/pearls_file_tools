@@ -48,7 +48,7 @@ class HistoryDialog(QDialog):
         layout.addWidget(self.table)
 
         self.status_label = QLabel("")
-        self.status_label.setStyleSheet("color: #888; font-style: italic;")
+        self.status_label.setObjectName("cardSub")
         layout.addWidget(self.status_label)
 
         close_btn = QPushButton("Close")
