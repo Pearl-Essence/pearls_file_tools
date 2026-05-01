@@ -1,8 +1,8 @@
-"""Studio Tools split — v0.15 visual refresh.
+"""Studio Tools split — v0.16 visual refresh.
 
 Six lightweight wrapper tabs that replace the single StudioToolsTab.
 Each wrapper composes the corresponding inner pane class (kept byte-identical
-in studio_tools_tab.py) and adds the v0.15 chrome (TabHeader strip).
+in studio_tools_tab.py) and adds the v0.16 chrome (TabHeader strip).
 
   StaleFilesTab     — wraps _StaleFilesPane
   StorageReportTab  — wraps _StoragePane
@@ -13,7 +13,7 @@ in studio_tools_tab.py) and adds the v0.15 chrome (TabHeader strip).
 
 The inner panes own their own `dir_selector`, settings persistence, and
 worker wiring; this file only adds presentational chrome and mounts the
-panes into the v0.15 layout (24/20 padding, 16 spacing).
+panes into the v0.16 layout (24/20 padding, 16 spacing).
 """
 
 from pathlib import Path
@@ -35,7 +35,7 @@ from ui.widgets.tab_header import TabHeader
 
 def _shell(host: QWidget, eyebrow: str, title: str, subtitle: str,
            inner: QWidget) -> QVBoxLayout:
-    """Standard v0.15 outer layout: 24/20 padding, header strip, then content."""
+    """Standard v0.16 outer layout: 24/20 padding, header strip, then content."""
     root = QVBoxLayout(host)
     root.setContentsMargins(24, 20, 24, 20)
     root.setSpacing(16)

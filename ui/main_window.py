@@ -1,4 +1,4 @@
-"""Main window for Pearl Post Suite — v0.15 sidebar shell.
+"""Main window for Pearl Post Suite — v0.16 sidebar shell.
 
 Replaces the legacy QTabWidget with a left sidebar (SidebarNav) and a right
 QStackedWidget. Each existing tab class is mounted unchanged into the stack;
@@ -30,13 +30,10 @@ class MainWindow(QMainWindow):
         self.config = Config()
         self.config.load_from_file()
 
-        # Holds factory_key -> (mount_index | None for dialogs)
+        # Holds factory_key -> mount_index in self.stack
         self._stack_index_for_key: Dict[str, int] = {}
         # All tab instances we constructed (so we can save_settings on close)
         self._tab_instances: list = []
-        # Persistent dialog instances (None until first opened)
-        self._sync_dialog = None
-        self._watch_dialog = None
 
         self._setup_ui()
         self._setup_menu_bar()
@@ -182,6 +179,7 @@ class MainWindow(QMainWindow):
             ColdStorageTab, ExportWatcherTab, NLEBackupTab,
             StaleFilesTab, StorageReportTab, TrashTab,
         )
+        from ui.tabs.maintain_panes import SyncCheckTab, WatchFoldersTab
         from ui.tabs.delivery_validator_tab import SpecValidatorTab
         from ui.tabs.delivery_package_tab import PackageExportTab
 
@@ -195,6 +193,10 @@ class MainWindow(QMainWindow):
             ) if passed else None
         )
 
+        watch_folders_tab = WatchFoldersTab(self.config)
+        # Wire the watching-dot indicator that lives in the status bar.
+        watch_folders_tab.set_indicator_callback(self._update_watch_indicator)
+
         tabs = {
             "offload":         IngestTab(self.config),
             "proxy":           ProxyTab(self.config),
@@ -207,6 +209,8 @@ class MainWindow(QMainWindow):
             "nle_backup":      NLEBackupTab(self.config),
             "export_watcher":  ExportWatcherTab(self.config),
             "trash":           TrashTab(self.config),
+            "sync_check":      SyncCheckTab(self.config),
+            "watch_folders":   watch_folders_tab,
             "validator":       validator_tab,
             "package":         package_tab,
             "cold_storage":    ColdStorageTab(self.config),
@@ -229,14 +233,7 @@ class MainWindow(QMainWindow):
     # Navigation routing
     # ─────────────────────────────────────────────────────────────────
     def _on_nav_activated(self, factory_key: str):
-        # Dialog-style destinations: open modally, leave current pane intact.
-        if factory_key == "sync_dialog":
-            self._open_sync_dialog()
-            return
-        if factory_key == "watch_dialog":
-            self._open_watch_dialog()
-            return
-
+        # All destinations are now real panes in the QStackedWidget.
         idx = self._stack_index_for_key.get(factory_key)
         if idx is not None:
             self.stack.setCurrentIndex(idx)
@@ -246,20 +243,6 @@ class MainWindow(QMainWindow):
                     if key == factory_key:
                         self._crumb.setText(f"{section_label.split('·')[0].strip()} · {label.upper()}")
                         return
-
-    def _open_sync_dialog(self):
-        from ui.dialogs.sync_dialog import SyncDialog
-        dlg = SyncDialog(self.config, self)
-        dlg.exec()
-
-    def _open_watch_dialog(self):
-        if self._watch_dialog is None:
-            from ui.dialogs.watch_manager_dialog import WatchManagerDialog
-            self._watch_dialog = WatchManagerDialog(self.config, self)
-            self._watch_dialog._update_indicator_cb = self._update_watch_indicator
-        self._watch_dialog.show()
-        self._watch_dialog.raise_()
-        self._watch_dialog.activateWindow()
 
     # ─────────────────────────────────────────────────────────────────
     # Menu bar (slimmer — Sync/Watch are in the sidebar now)

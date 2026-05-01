@@ -1,9 +1,9 @@
-"""Bulk Rename tab — v0.15 visual refresh.
+"""Bulk Rename tab — v0.16 visual refresh.
 
 Functional behavior unchanged: same RenameWorker, same template/sequential/
 standard mode logic, same prefix/suffix transposition, same companion-file
 co-renames, same lint / normalize / undo / CSV / version-bump utilities.
-Only the chrome was rewritten to v0.15 visual language.
+Only the chrome was rewritten to v0.16 visual language.
 """
 
 from pathlib import Path
