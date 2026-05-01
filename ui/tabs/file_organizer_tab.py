@@ -1,17 +1,29 @@
-"""File Organizer tab for Pearl's File Tools."""
+"""Group by Pattern tab — v0.14 visual refresh.
 
-from PySide6.QtWidgets import (QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
-                            QTreeWidget, QTreeWidgetItem, QProgressBar, QInputDialog,
-                            QMenu, QGroupBox, QComboBox, QCheckBox, QListWidget,
-                            QListWidgetItem, QSizePolicy)
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QColor, QBrush
+Functional behavior unchanged: same ScanWorker, same OrganizeWorker, same
+drag-and-drop tree, same context-menu actions, same undo stack. Only the
+chrome was rewritten to v0.14 visual language.
+"""
+
 from pathlib import Path
 from typing import Dict, List, Optional
+
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtWidgets import (
+    QCheckBox, QComboBox, QFrame, QHBoxLayout, QInputDialog, QLabel,
+    QListWidget, QListWidgetItem, QMenu, QProgressBar, QPushButton,
+    QSizePolicy, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
+)
+
+from core.pattern_matching import (
+    ALL_PRESETS, PRESET_STANDARD, SequenceGroup, detect_image_sequences,
+    group_files_by_pattern,
+)
 from ui.tabs.base_tab import BaseTab
-from ui.widgets.directory_selector import DirectorySelectorWidget
-from core.pattern_matching import (group_files_by_pattern, detect_image_sequences,
-                                   SequenceGroup, ALL_PRESETS, PRESET_STANDARD)
+from ui.widgets.panel import Panel
+from ui.widgets.path_card import PathCard
+from ui.widgets.tab_header import TabHeader
 
 
 class FileOrganizerTab(BaseTab):
@@ -30,23 +42,76 @@ class FileOrganizerTab(BaseTab):
         super().__init__(config, parent)
 
     def get_tab_name(self) -> str:
-        """Get the tab name."""
-        return "File Organizer"
+        return "Group by Pattern"
 
+    # ─────────────────────────────────────────────────────────────────────
+    # UI
+    # ─────────────────────────────────────────────────────────────────────
     def setup_ui(self):
-        """Setup the user interface."""
-        layout = QVBoxLayout()
+        root = QVBoxLayout(self)
+        root.setContentsMargins(24, 20, 24, 20)
+        root.setSpacing(16)
 
-        # Directory selection
-        self.dir_selector = DirectorySelectorWidget(label_text="Directory:")
-        self.dir_selector.directory_changed.connect(self.on_directory_changed)
-        layout.addWidget(self.dir_selector)
+        root.addWidget(self._build_header())
+        root.addWidget(self._build_source())
+        root.addWidget(self._build_controls())
+        root.addWidget(self._build_batch_panel())
+        root.addWidget(self._build_tree(), stretch=1)
+        root.addWidget(self._build_footer())
 
-        # ── Scan options row (preset + batch mode toggle) ─────────────────
-        opts_row = QHBoxLayout()
+    # ── header ────────────────────────────────────────────────────────────
+    def _build_header(self) -> QWidget:
+        header = TabHeader(
+            eyebrow="02 · ORGANIZE · GROUP BY PATTERN",
+            title="Group by Pattern",
+            subtitle="Sort files into folders by their naming patterns.",
+        )
+        self.undo_move_btn = header.add_action(
+            "Undo last move",
+            on_click=self.undo_last_move,
+            enabled=False,
+            tooltip="Undo the most recent drag-and-drop or context-menu move",
+        )
+        self.new_group_btn = header.add_action(
+            "Create group",
+            on_click=self.create_new_group,
+            enabled=False,
+        )
+        self.organize_btn = header.add_action(
+            "Organize files",
+            on_click=self.organize_files,
+            primary=True,
+            enabled=False,
+        )
+        return header
 
-        preset_label = QLabel("Grouping preset:")
-        opts_row.addWidget(preset_label)
+    # ── source ────────────────────────────────────────────────────────────
+    def _build_source(self) -> QWidget:
+        # Wrapper so PathCard signal still calls the existing on_directory_changed.
+        self.path_card = PathCard("FOLDER")
+        self.path_card.path_changed.connect(self.on_directory_changed)
+        # Keep a back-compat alias so any future code using dir_selector still works.
+        self.dir_selector = self.path_card
+        return self.path_card
+
+    # ── controls (preset + batch toggle + scan) ──────────────────────────
+    def _build_controls(self) -> QWidget:
+        wrap = Panel()
+        v = QVBoxLayout(wrap)
+        v.setContentsMargins(16, 14, 16, 14)
+        v.setSpacing(10)
+
+        eye = QLabel("CONTROLS")
+        eye.setObjectName("eyebrow")
+        v.addWidget(eye)
+
+        row = QHBoxLayout()
+        row.setSpacing(14)
+
+        preset_lbl = QLabel("Grouping preset")
+        preset_lbl.setObjectName("cardSub")
+        row.addWidget(preset_lbl)
+
         self.preset_combo = QComboBox()
         for p in ALL_PRESETS:
             self.preset_combo.addItem(p.name, userData=p)
@@ -54,111 +119,117 @@ class FileOrganizerTab(BaseTab):
             "Standard: group by underscore prefix\n"
             "AE Render Output: strip trailing _#### frame numbers before grouping"
         )
-        opts_row.addWidget(self.preset_combo)
+        self.preset_combo.setMinimumWidth(200)
+        row.addWidget(self.preset_combo)
 
-        opts_row.addSpacing(24)
-
-        self.batch_mode_chk = QCheckBox("Batch Mode")
+        row.addSpacing(16)
+        self.batch_mode_chk = QCheckBox("Batch mode")
         self.batch_mode_chk.setToolTip(
             "Process multiple first-level subdirectories in one run"
         )
         self.batch_mode_chk.toggled.connect(self._on_batch_mode_toggled)
-        opts_row.addWidget(self.batch_mode_chk)
-        opts_row.addStretch()
-        layout.addLayout(opts_row)
+        row.addWidget(self.batch_mode_chk)
 
-        # ── Batch mode panel (hidden by default) ─────────────────────────
-        self.batch_panel = QGroupBox("Batch Mode — select subdirectories to process")
-        batch_layout = QVBoxLayout()
+        row.addStretch()
 
-        batch_dir_row = QHBoxLayout()
-        batch_dir_row.addWidget(QLabel("Root folder:"))
-        self.batch_root_selector = DirectorySelectorWidget(label_text="")
-        self.batch_root_selector.directory_changed.connect(self._on_batch_root_changed)
-        batch_dir_row.addWidget(self.batch_root_selector, stretch=1)
-        batch_layout.addLayout(batch_dir_row)
+        self.scan_btn = QPushButton("Scan subdirectories")
+        self.scan_btn.setObjectName("ghostBtn")
+        self.scan_btn.clicked.connect(self.scan_directories)
+        row.addWidget(self.scan_btn)
+
+        v.addLayout(row)
+        return wrap
+
+    # ── batch panel (toggleable) ─────────────────────────────────────────
+    def _build_batch_panel(self) -> QWidget:
+        self.batch_panel = Panel()
+        v = QVBoxLayout(self.batch_panel)
+        v.setContentsMargins(16, 14, 16, 14)
+        v.setSpacing(10)
+
+        eye = QLabel("BATCH MODE  ·  SELECT SUBDIRECTORIES TO PROCESS")
+        eye.setObjectName("eyebrow")
+        v.addWidget(eye)
+
+        self.batch_root_selector = PathCard("ROOT FOLDER")
+        self.batch_root_selector.path_changed.connect(self._on_batch_root_changed)
+        v.addWidget(self.batch_root_selector)
 
         self.batch_subdir_list = QListWidget()
-        self.batch_subdir_list.setMaximumHeight(140)
+        self.batch_subdir_list.setMaximumHeight(160)
         self.batch_subdir_list.setToolTip("Check subdirectories to include in the batch")
-        batch_layout.addWidget(self.batch_subdir_list)
+        v.addWidget(self.batch_subdir_list)
 
-        batch_btns = QHBoxLayout()
-        self.batch_check_all_btn = QPushButton("Check All")
+        btns = QHBoxLayout()
+        btns.setSpacing(8)
+        self.batch_check_all_btn = QPushButton("Check all")
+        self.batch_check_all_btn.setObjectName("ghostBtn")
         self.batch_check_all_btn.clicked.connect(self._batch_check_all)
-        batch_btns.addWidget(self.batch_check_all_btn)
-        self.batch_uncheck_all_btn = QPushButton("Uncheck All")
+        btns.addWidget(self.batch_check_all_btn)
+        self.batch_uncheck_all_btn = QPushButton("Uncheck all")
+        self.batch_uncheck_all_btn.setObjectName("ghostBtn")
         self.batch_uncheck_all_btn.clicked.connect(self._batch_uncheck_all)
-        batch_btns.addWidget(self.batch_uncheck_all_btn)
-        self.run_batch_btn = QPushButton("Run Batch")
+        btns.addWidget(self.batch_uncheck_all_btn)
+        btns.addStretch()
+        self.run_batch_btn = QPushButton("Run batch")
+        self.run_batch_btn.setProperty("role", "primary")
         self.run_batch_btn.clicked.connect(self._run_batch)
-        self.run_batch_btn.setStyleSheet("padding: 6px 16px; font-weight: bold;")
-        batch_btns.addWidget(self.run_batch_btn)
-        batch_btns.addStretch()
-        batch_layout.addLayout(batch_btns)
+        btns.addWidget(self.run_batch_btn)
+        v.addLayout(btns)
 
-        self.batch_panel.setLayout(batch_layout)
         self.batch_panel.setVisible(False)
-        layout.addWidget(self.batch_panel)
+        return self.batch_panel
 
-        # Scan button
-        self.scan_btn = QPushButton("Scan Subdirectories")
-        self.scan_btn.clicked.connect(self.scan_directories)
-        self.scan_btn.setStyleSheet("padding: 10px; font-size: 14px;")
-        layout.addWidget(self.scan_btn)
+    # ── tree (file groups) ───────────────────────────────────────────────
+    def _build_tree(self) -> QWidget:
+        wrap = Panel()
+        v = QVBoxLayout(wrap)
+        v.setContentsMargins(16, 14, 16, 14)
+        v.setSpacing(8)
 
-        # Status label
-        self.status_label = QLabel("Ready to scan")
-        self.status_label.setStyleSheet("color: #888; padding: 5px; font-style: italic;")
-        layout.addWidget(self.status_label)
+        head = QHBoxLayout()
+        eye = QLabel("FILE GROUPS")
+        eye.setObjectName("eyebrow")
+        head.addWidget(eye)
+        head.addStretch()
+        hint = QLabel("Right-click a row for options · drag and drop to move files")
+        hint.setObjectName("cardSub")
+        head.addWidget(hint)
+        v.addLayout(head)
 
-        # Progress bar
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setVisible(False)
-        layout.addWidget(self.progress_bar)
-
-        # Tree widget label
-        tree_label = QLabel("File Groups (Right-click for options, Drag & Drop to move files):")
-        tree_label.setStyleSheet("font-weight: bold; margin-top: 10px;")
-        layout.addWidget(tree_label)
-
-        # Tree widget for file groups
         from ui.widgets.draggable_tree import DraggableTreeWidget
         self.tree_widget = DraggableTreeWidget()
-        self.tree_widget.setHeaderLabels(["Group/File", "Count/Size", "Status"])
+        self.tree_widget.setHeaderLabels(["Group / file", "Count / size", "Status"])
         self.tree_widget.setColumnWidth(0, 500)
-        self.tree_widget.setColumnWidth(1, 100)
-        self.tree_widget.setColumnWidth(2, 100)
-        self.tree_widget.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.tree_widget.setColumnWidth(1, 110)
+        self.tree_widget.setColumnWidth(2, 110)
+        self.tree_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.tree_widget.customContextMenuRequested.connect(self.show_context_menu)
         self.tree_widget.files_dropped.connect(self.handle_drop)
-        layout.addWidget(self.tree_widget, stretch=1)
+        v.addWidget(self.tree_widget, stretch=1)
+        return wrap
 
-        # Action buttons
-        button_layout = QHBoxLayout()
+    # ── footer (status + progress) ───────────────────────────────────────
+    def _build_footer(self) -> QWidget:
+        wrap = QFrame()
+        wrap.setObjectName("footer")
+        h = QHBoxLayout(wrap)
+        h.setContentsMargins(16, 12, 16, 12)
+        h.setSpacing(16)
 
-        self.new_group_btn = QPushButton("Create New Group")
-        self.new_group_btn.clicked.connect(self.create_new_group)
-        self.new_group_btn.setEnabled(False)
-        button_layout.addWidget(self.new_group_btn)
+        col = QVBoxLayout()
+        col.setSpacing(4)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setFixedHeight(6)
+        self.progress_bar.setVisible(False)
+        self.status_label = QLabel("Ready to scan.")
+        self.status_label.setObjectName("cardSub")
+        col.addWidget(self.progress_bar)
+        col.addWidget(self.status_label)
+        h.addLayout(col, stretch=1)
 
-        self.undo_move_btn = QPushButton("Undo Last Move")
-        self.undo_move_btn.setToolTip("Undo the most recent drag-and-drop or context-menu move")
-        self.undo_move_btn.clicked.connect(self.undo_last_move)
-        self.undo_move_btn.setEnabled(False)
-        button_layout.addWidget(self.undo_move_btn)
-
-        self.organize_btn = QPushButton("Organize Files")
-        self.organize_btn.clicked.connect(self.organize_files)
-        self.organize_btn.setEnabled(False)
-        self.organize_btn.setStyleSheet("padding: 10px; font-size: 14px; font-weight: bold;")
-        button_layout.addWidget(self.organize_btn)
-
-        button_layout.addStretch()
-
-        layout.addLayout(button_layout)
-
-        self.setLayout(layout)
+        return wrap
 
     def on_directory_changed(self, directory: str):
         """Handle directory change."""
@@ -171,9 +242,9 @@ class FileOrganizerTab(BaseTab):
 
     def _on_batch_mode_toggled(self, checked: bool):
         self.batch_panel.setVisible(checked)
-        # In batch mode the regular dir selector drives the tree; disable scan btn
-        # so the user uses "Run Batch" instead when batch mode is active.
-        self.scan_btn.setText("Scan Subdirectories" if not checked else "Scan Single Directory")
+        # Scan button label hints which scope it operates on; "Run batch" lives
+        # inside the batch panel for the multi-folder case.
+        self.scan_btn.setText("Scan single directory" if checked else "Scan subdirectories")
 
     def _on_batch_root_changed(self, directory: str):
         self._batch_root = Path(directory)
@@ -893,7 +964,7 @@ class FileOrganizerTab(BaseTab):
         """Load tab-specific settings."""
         last_dir = self.config.get_tab_directory('organizer')
         if last_dir:
-            self.dir_selector.set_directory(last_dir)
+            self.path_card.set_path(last_dir)
             self.set_directory(last_dir)
 
         saved_preset = self.config.get_tab_setting('organizer', 'grouping_preset', PRESET_STANDARD.name)

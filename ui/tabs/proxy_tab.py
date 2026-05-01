@@ -1,6 +1,6 @@
 """Proxy Generation tab — pair full-resolution and proxy files by stem.
 
-Lifted out of the legacy IngestTab._ProxyMatchPane and adapted to the v0.11
+Lifted out of the legacy IngestTab._ProxyMatchPane and adapted to the v0.14
 visual language (eyebrow/h1/h2 header, PathCard for each folder, Panel
 around the results tree, primary CTA in the header bar).
 """

@@ -9,7 +9,7 @@ from pathlib import Path
 # ── Identity ────────────────────────────────────────────────────────────────
 APP_NAME       = "Pearl Post Suite"
 APP_NAME_SHORT = "Pearl"
-APP_TAGLINE    = "POST SUITE · V0.11"
+APP_TAGLINE    = "POST SUITE · V0.14"
 ORG_NAME       = "Pearl"
 
 # ── Resource paths ──────────────────────────────────────────────────────────
@@ -63,7 +63,8 @@ NAV_TREE = [
         ("Watch Folders",      "watch.svg",           "watch_dialog"),
     ]),
     ("04 · DELIVER", [
-        ("Delivery",           "validator.svg",       "delivery"),
+        ("Spec Validator",     "validator.svg",       "validator"),
+        ("Package & Export",   "package.svg",         "package"),
     ]),
     ("05 · ARCHIVE", [
         ("LTO / Cold Storage", "archive-cold.svg",    "stub:lto"),

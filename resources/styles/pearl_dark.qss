@@ -1,5 +1,5 @@
 /* ============================================================
-   PEARL · DARK · v0.11
+   PEARL · DARK · v0.14
    Drop-in stylesheet. Load once in main.py:
      with open("resources/styles/pearl_dark.qss") as f:
          app.setStyleSheet(f.read())

@@ -1,4 +1,4 @@
-"""Offload (ingest) tab — Pearl Post Suite v0.11.
+"""Offload (ingest) tab — Pearl Post Suite v0.14.
 
 Single-screen tab. Source/destination cards, options row, live manifest table
 with status pills, sticky footer with progress + cancel.
@@ -78,7 +78,7 @@ class _OffloadPane(QWidget):
         self.btn_preset = header.add_action(
             "Preset · NETFLIX_4K_SDR",
             enabled=False,
-            tooltip="Delivery presets — coming in Pearl v0.12",
+            tooltip="Delivery presets — coming in Pearl v0.15",
         )
         self.btn_analyze = header.add_action("Analyze", on_click=self._analyze)
         self.btn_start = header.add_action(
