@@ -1,8 +1,8 @@
-"""Group by Pattern tab — v0.15 visual refresh.
+"""Group by Pattern tab — v0.16 visual refresh.
 
 Functional behavior unchanged: same ScanWorker, same OrganizeWorker, same
 drag-and-drop tree, same context-menu actions, same undo stack. Only the
-chrome was rewritten to v0.15 visual language.
+chrome was rewritten to v0.16 visual language.
 """
 
 from pathlib import Path
