@@ -1,4 +1,4 @@
-"""Spec Validator tab — v0.14 visual refresh.
+"""Spec Validator tab — v0.15 visual refresh.
 
 Top-level sidebar destination split out of DeliveryTab. Reuses the existing
 _ValidatorPane logic (worker contract, profile builder, results rendering)
@@ -99,7 +99,7 @@ class _ValidatorHero(QWidget):
 # ─────────────────────────────────────────────────────────────────────────────
 
 class SpecValidatorTab(BaseTab):
-    """Spec Validator — v0.14 chrome around the existing validator logic."""
+    """Spec Validator — v0.15 chrome around the existing validator logic."""
 
     # Re-emits the inner pane's pass/fail so PackageExportTab can listen.
     validation_passed = Signal(bool)

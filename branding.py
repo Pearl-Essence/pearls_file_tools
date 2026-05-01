@@ -9,7 +9,7 @@ from pathlib import Path
 # ── Identity ────────────────────────────────────────────────────────────────
 APP_NAME       = "Pearl Post Suite"
 APP_NAME_SHORT = "Pearl"
-APP_TAGLINE    = "POST SUITE · V0.14"
+APP_TAGLINE    = "POST SUITE · V0.15"
 ORG_NAME       = "Pearl"
 
 # ── Resource paths ──────────────────────────────────────────────────────────
@@ -58,7 +58,11 @@ NAV_TREE = [
         ("Browse Stills",      "stills.svg",          "stills"),
     ]),
     ("03 · MAINTAIN", [
-        ("Studio Tools",       "health.svg",          "studio"),
+        ("Stale Files",        "health.svg",          "stale"),
+        ("Storage Report",     "storage.svg",         "storage"),
+        ("NLE Backup",         "nle-backup.svg",      "nle_backup"),
+        ("Export Watcher",     "watch.svg",           "export_watcher"),
+        ("Trash",              "trash.svg",           "trash"),
         ("Sync Check",         "sync.svg",            "sync_dialog"),
         ("Watch Folders",      "watch.svg",           "watch_dialog"),
     ]),
@@ -67,6 +71,6 @@ NAV_TREE = [
         ("Package & Export",   "package.svg",         "package"),
     ]),
     ("05 · ARCHIVE", [
-        ("LTO / Cold Storage", "archive-cold.svg",    "stub:lto"),
+        ("Cold Storage",       "archive-cold.svg",    "cold_storage"),
     ]),
 ]

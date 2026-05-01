@@ -1,4 +1,4 @@
-"""Package & Export tab — v0.14 visual refresh.
+"""Package & Export tab — v0.15 visual refresh.
 
 Top-level sidebar destination split out of DeliveryTab. Wraps the four
 non-validator panes (Package, Duplicates, Handoff, Export) in an inner

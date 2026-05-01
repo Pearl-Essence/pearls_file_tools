@@ -1,4 +1,4 @@
-"""Browse Stills tab — v0.14 visual refresh.
+"""Browse Stills tab — v0.15 visual refresh.
 
 Functional behavior unchanged: same ImageScanWorker, same sequence detection,
 same context menu actions. Layout uses TabHeader + PathCard + a Panel for

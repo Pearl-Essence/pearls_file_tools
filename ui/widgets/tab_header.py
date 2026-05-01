@@ -1,4 +1,4 @@
-"""TabHeader — standard top strip for v0.14 tabs.
+"""TabHeader — standard top strip for v0.15 tabs.
 
 Layout:
 
