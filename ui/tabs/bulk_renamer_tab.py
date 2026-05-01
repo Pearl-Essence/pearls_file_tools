@@ -1,24 +1,51 @@
-"""Bulk File Renamer tab for Pearl's File Tools."""
+"""Bulk Rename tab — v0.14 visual refresh.
 
-from PySide6.QtWidgets import (QVBoxLayout, QHBoxLayout, QGroupBox, QLabel, QLineEdit,
-                            QPushButton, QRadioButton, QCheckBox, QScrollArea, QWidget,
-                            QButtonGroup, QSpinBox, QStackedWidget, QFormLayout, QComboBox,
-                            QListWidget, QListWidgetItem, QApplication)
-from PySide6.QtCore import Qt
+Functional behavior unchanged: same RenameWorker, same template/sequential/
+standard mode logic, same prefix/suffix transposition, same companion-file
+co-renames, same lint / normalize / undo / CSV / version-bump utilities.
+Only the chrome was rewritten to v0.14 visual language.
+"""
+
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple
-from ui.tabs.base_tab import BaseTab
-from ui.widgets.directory_selector import DirectorySelectorWidget
-from ui.widgets.file_list_widget import FileListWidget
-from constants import (ALL_EXTENSION_CATEGORIES, CASE_NONE, CASE_UPPER, CASE_LOWER,
-                      CASE_TITLE, OP_TYPE_RENAME)
+from typing import Dict, List, Optional, Tuple
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QApplication, QButtonGroup, QCheckBox, QComboBox, QFormLayout, QFrame,
+    QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QPushButton,
+    QRadioButton, QScrollArea, QSpinBox, QStackedWidget, QVBoxLayout, QWidget,
+)
+
+from constants import (
+    ALL_EXTENSION_CATEGORIES, CASE_LOWER, CASE_NONE, CASE_TITLE, CASE_UPPER,
+    OP_TYPE_RENAME,
+)
 from core.file_utils import get_files_in_directory
-from core.pattern_matching import (detect_common_prefixes, match_prefix,
-                                   detect_common_suffixes, match_suffix)
-from core.name_transform import (generate_new_filename, generate_sequential_filenames,
-                                  bump_version, move_suffix_to_prefix,
-                                  ProductionTemplate, DEFAULT_TEMPLATE)
+from core.name_transform import (
+    DEFAULT_TEMPLATE, ProductionTemplate, bump_version,
+    generate_new_filename, generate_sequential_filenames, move_suffix_to_prefix,
+)
+from core.pattern_matching import (
+    detect_common_prefixes, detect_common_suffixes, match_prefix, match_suffix,
+)
 from models.operation_record import OperationRecord
+from ui.tabs.base_tab import BaseTab
+from ui.widgets.file_list_widget import FileListWidget
+from ui.widgets.panel import Panel
+from ui.widgets.path_card import PathCard
+from ui.widgets.tab_header import TabHeader
+
+
+def _make_section(eyebrow: str) -> Tuple[Panel, QVBoxLayout]:
+    """Return (panel, content-layout) — panel has an eyebrow header at top."""
+    panel = Panel()
+    v = QVBoxLayout(panel)
+    v.setContentsMargins(16, 14, 16, 14)
+    v.setSpacing(10)
+    eye = QLabel(eyebrow)
+    eye.setObjectName("eyebrow")
+    v.addWidget(eye)
+    return panel, v
 
 
 class BulkRenamerTab(BaseTab):
@@ -38,209 +65,263 @@ class BulkRenamerTab(BaseTab):
         super().__init__(config, parent)
 
     def get_tab_name(self) -> str:
-        """Get the tab name."""
-        return "Bulk Renamer"
+        return "Bulk Rename"
 
+    # ─────────────────────────────────────────────────────────────────────
+    # UI
+    # ─────────────────────────────────────────────────────────────────────
     def setup_ui(self):
-        """Setup the user interface."""
-        layout = QVBoxLayout()
+        root = QVBoxLayout(self)
+        root.setContentsMargins(24, 20, 24, 20)
+        root.setSpacing(16)
 
-        # Directory selection — pinned at top
-        self.dir_selector = DirectorySelectorWidget(
-            label_text="Directory:",
-            show_recursive=True
+        root.addWidget(self._build_header())
+        root.addWidget(self._build_source())
+
+        # Most config sections live in a scrollable host so the file list and
+        # footer stay pinned. Each section is its own Panel.
+        root.addWidget(self._build_options_scroll(), stretch=1)
+
+        # File list and footer live below the scroll, always visible.
+        root.addWidget(self._build_file_list_panel(), stretch=1)
+        root.addWidget(self._build_footer())
+
+    # ── header ────────────────────────────────────────────────────────────
+    def _build_header(self) -> QWidget:
+        header = TabHeader(
+            eyebrow="02 · ORGANIZE · BULK RENAME",
+            title="Bulk Rename",
+            subtitle="Rename many files at once with detection, templates, sequencing, and transposition.",
         )
-        self.dir_selector.directory_changed.connect(self.on_directory_changed)
-        layout.addWidget(self.dir_selector)
+        self.preview_btn = header.add_action(
+            "Preview changes", on_click=self.preview_changes,
+        )
+        self.apply_btn = header.add_action(
+            "Apply rename", on_click=self.apply_rename, primary=True,
+        )
+        return header
 
-        # ── All options in a single scrollable container ───────────────────
-        opts_container = QWidget()
-        opts_layout = QVBoxLayout(opts_container)
-        opts_layout.setContentsMargins(0, 0, 0, 0)
-        opts_layout.setSpacing(4)
+    # ── source ────────────────────────────────────────────────────────────
+    def _build_source(self) -> QWidget:
+        wrap = Panel()
+        v = QVBoxLayout(wrap)
+        v.setContentsMargins(16, 14, 16, 14)
+        v.setSpacing(10)
 
-        # ── Multi-directory queue ──────────────────────────────────────────
-        queue_group = QGroupBox("Directory Queue (optional — files from all queued dirs are merged)")
-        queue_layout = QVBoxLayout()
+        self.path_card = PathCard("FOLDER")
+        self.path_card.path_changed.connect(self.on_directory_changed)
+        # Compatibility alias for any caller that used the old attribute name.
+        self.dir_selector = self.path_card
+        v.addWidget(self.path_card)
 
-        queue_btn_row = QHBoxLayout()
-        self.add_dir_btn = QPushButton("Add Current Directory to Queue")
+        opts_row = QHBoxLayout()
+        opts_row.setSpacing(12)
+        self.recursive_check = QCheckBox("Recursive scan")
+        self.recursive_check.setChecked(False)
+        self.recursive_check.stateChanged.connect(lambda _s: self.refresh_file_list())
+        opts_row.addWidget(self.recursive_check)
+        opts_row.addStretch()
+        v.addLayout(opts_row)
+        return wrap
+
+    # ── options scroll area ──────────────────────────────────────────────
+    def _build_options_scroll(self) -> QWidget:
+        scroll = QScrollArea()
+        scroll.setObjectName("optsScroll")
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+
+        host = QWidget()
+        v = QVBoxLayout(host)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(12)
+
+        v.addWidget(self._build_queue_panel())
+        v.addWidget(self._build_batch_section())
+        v.addWidget(self.create_profile_bar())
+        v.addWidget(self.create_extension_filter_group())
+        v.addWidget(self._build_mode_panel())
+
+        # Stacked rename options — one Panel per mode.
+        self.rename_stack = QStackedWidget()
+        self.rename_stack.addWidget(self.create_rename_options_group())      # 0 — standard
+        self.rename_stack.addWidget(self.create_sequential_options_group())  # 1 — sequential
+        self.rename_stack.addWidget(self.create_template_options_group())    # 2 — template
+        v.addWidget(self.rename_stack)
+
+        v.addWidget(self.create_companion_options_group())
+        self.prefix_group_widget = self.create_transposition_group()
+        v.addWidget(self.prefix_group_widget)
+        v.addStretch()
+
+        scroll.setWidget(host)
+        return scroll
+
+    # ── queue panel (sub-section of options scroll) ──────────────────────
+    def _build_queue_panel(self) -> QWidget:
+        panel, v = _make_section(
+            "DIRECTORY QUEUE  ·  OPTIONAL — FILES FROM ALL QUEUED DIRS ARE MERGED"
+        )
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
+        self.add_dir_btn = QPushButton("Add current to queue")
+        self.add_dir_btn.setObjectName("ghostBtn")
         self.add_dir_btn.setToolTip("Add the directory shown above to the multi-directory queue")
         self.add_dir_btn.clicked.connect(self._add_dir_to_queue)
-        queue_btn_row.addWidget(self.add_dir_btn)
-        self.remove_dir_btn = QPushButton("Remove Selected")
+        btn_row.addWidget(self.add_dir_btn)
+        self.remove_dir_btn = QPushButton("Remove selected")
+        self.remove_dir_btn.setObjectName("ghostBtn")
         self.remove_dir_btn.clicked.connect(self._remove_queued_dir)
-        queue_btn_row.addWidget(self.remove_dir_btn)
-        self.clear_queue_btn = QPushButton("Clear Queue")
+        btn_row.addWidget(self.remove_dir_btn)
+        self.clear_queue_btn = QPushButton("Clear queue")
+        self.clear_queue_btn.setObjectName("ghostBtn")
         self.clear_queue_btn.clicked.connect(self._clear_queue)
-        queue_btn_row.addWidget(self.clear_queue_btn)
-        queue_btn_row.addStretch()
-        queue_layout.addLayout(queue_btn_row)
+        btn_row.addWidget(self.clear_queue_btn)
+        btn_row.addStretch()
+        v.addLayout(btn_row)
 
         self.queue_list = QListWidget()
         self.queue_list.setMaximumHeight(90)
         self.queue_list.setToolTip("Files from all directories below are merged into the file list")
-        queue_layout.addWidget(self.queue_list)
+        v.addWidget(self.queue_list)
+        return panel
 
-        queue_group.setLayout(queue_layout)
-        opts_layout.addWidget(queue_group)
+    # ── batch mode section ───────────────────────────────────────────────
+    def _build_batch_section(self) -> QWidget:
+        host = QWidget()
+        v = QVBoxLayout(host)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(8)
 
-        # ── Batch mode ─────────────────────────────────────────────────────
-        self.batch_mode_chk = QCheckBox("Batch Mode — process first-level subdirectories")
+        self.batch_mode_chk = QCheckBox("Batch mode — process first-level subdirectories")
         self.batch_mode_chk.setToolTip(
             "Select a root folder and check which subdirectories to process in one run"
         )
         self.batch_mode_chk.toggled.connect(self._on_batch_mode_toggled)
-        opts_layout.addWidget(self.batch_mode_chk)
+        v.addWidget(self.batch_mode_chk)
 
-        self.batch_panel = QGroupBox("Batch Mode Options")
-        batch_layout = QVBoxLayout()
-
-        batch_dir_row = QHBoxLayout()
-        batch_dir_row.addWidget(QLabel("Root folder:"))
-        self.batch_root_selector = DirectorySelectorWidget(label_text="")
-        self.batch_root_selector.directory_changed.connect(self._on_batch_root_changed)
-        batch_dir_row.addWidget(self.batch_root_selector, stretch=1)
-        batch_layout.addLayout(batch_dir_row)
+        self.batch_panel, bp_layout = _make_section("BATCH MODE OPTIONS")
+        self.batch_root_selector = PathCard("ROOT FOLDER")
+        self.batch_root_selector.path_changed.connect(self._on_batch_root_changed)
+        bp_layout.addWidget(self.batch_root_selector)
 
         self.batch_subdir_list = QListWidget()
-        self.batch_subdir_list.setMaximumHeight(120)
-        batch_layout.addWidget(self.batch_subdir_list)
+        self.batch_subdir_list.setMaximumHeight(140)
+        bp_layout.addWidget(self.batch_subdir_list)
 
-        batch_ctrl_row = QHBoxLayout()
-        self.batch_check_all_btn = QPushButton("Check All")
+        ctrl_row = QHBoxLayout()
+        ctrl_row.setSpacing(8)
+        self.batch_check_all_btn = QPushButton("Check all")
+        self.batch_check_all_btn.setObjectName("ghostBtn")
         self.batch_check_all_btn.clicked.connect(self._batch_check_all)
-        batch_ctrl_row.addWidget(self.batch_check_all_btn)
-        self.batch_uncheck_all_btn = QPushButton("Uncheck All")
+        ctrl_row.addWidget(self.batch_check_all_btn)
+        self.batch_uncheck_all_btn = QPushButton("Uncheck all")
+        self.batch_uncheck_all_btn.setObjectName("ghostBtn")
         self.batch_uncheck_all_btn.clicked.connect(self._batch_uncheck_all)
-        batch_ctrl_row.addWidget(self.batch_uncheck_all_btn)
-        self.run_batch_btn = QPushButton("Run Batch Rename")
-        self.run_batch_btn.setStyleSheet("padding: 6px 16px; font-weight: bold;")
+        ctrl_row.addWidget(self.batch_uncheck_all_btn)
+        ctrl_row.addStretch()
+        self.run_batch_btn = QPushButton("Run batch rename")
+        self.run_batch_btn.setProperty("role", "primary")
         self.run_batch_btn.clicked.connect(self._run_batch)
-        batch_ctrl_row.addWidget(self.run_batch_btn)
-        batch_ctrl_row.addStretch()
-        batch_layout.addLayout(batch_ctrl_row)
+        ctrl_row.addWidget(self.run_batch_btn)
+        bp_layout.addLayout(ctrl_row)
 
-        self.batch_panel.setLayout(batch_layout)
         self.batch_panel.setVisible(False)
-        opts_layout.addWidget(self.batch_panel)
+        v.addWidget(self.batch_panel)
+        return host
 
-        # Naming profile bar
-        opts_layout.addWidget(self.create_profile_bar())
-
-        # Extension filters
-        filter_group = self.create_extension_filter_group()
-        opts_layout.addWidget(filter_group)
-
-        # ── Rename mode selector ───────────────────────────────────────────
-        mode_group = QGroupBox("Rename Mode")
-        mode_layout = QHBoxLayout()
+    # ── rename mode panel ────────────────────────────────────────────────
+    def _build_mode_panel(self) -> QWidget:
+        panel, v = _make_section("RENAME MODE")
+        row = QHBoxLayout()
+        row.setSpacing(20)
         self.mode_btn_group = QButtonGroup()
         self.mode_standard_radio = QRadioButton("Standard")
-        self.mode_sequential_radio = QRadioButton("Number Files")
+        self.mode_sequential_radio = QRadioButton("Number files")
         self.mode_template_radio = QRadioButton("Template")
         self.mode_btn_group.addButton(self.mode_standard_radio, 0)
         self.mode_btn_group.addButton(self.mode_sequential_radio, 1)
         self.mode_btn_group.addButton(self.mode_template_radio, 2)
         self.mode_standard_radio.setChecked(True)
-        self.mode_standard_radio.toggled.connect(self._on_mode_changed)
-        self.mode_sequential_radio.toggled.connect(self._on_mode_changed)
-        self.mode_template_radio.toggled.connect(self._on_mode_changed)
-        mode_layout.addWidget(self.mode_standard_radio)
-        mode_layout.addWidget(self.mode_sequential_radio)
-        mode_layout.addWidget(self.mode_template_radio)
-        mode_layout.addStretch()
-        mode_group.setLayout(mode_layout)
-        opts_layout.addWidget(mode_group)
+        for r in (self.mode_standard_radio, self.mode_sequential_radio, self.mode_template_radio):
+            r.toggled.connect(self._on_mode_changed)
+            row.addWidget(r)
+        row.addStretch()
+        v.addLayout(row)
+        return panel
 
-        # ── Stacked rename options ─────────────────────────────────────────
-        self.rename_stack = QStackedWidget()
-        self.rename_stack.addWidget(self.create_rename_options_group())      # 0 — standard
-        self.rename_stack.addWidget(self.create_sequential_options_group())  # 1 — sequential
-        self.rename_stack.addWidget(self.create_template_options_group())    # 2 — template
-        opts_layout.addWidget(self.rename_stack)
-
-        # Companion file options (visible in all modes)
-        companion_group = self.create_companion_options_group()
-        opts_layout.addWidget(companion_group)
-
-        # Prefix/suffix transposition (standard mode only)
-        self.prefix_group_widget = self.create_transposition_group()
-        opts_layout.addWidget(self.prefix_group_widget)
-
-        opts_layout.addStretch()
-
-        opts_scroll = QScrollArea()
-        opts_scroll.setWidget(opts_container)
-        opts_scroll.setWidgetResizable(True)
-        opts_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        opts_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        opts_scroll.setFrameShape(QScrollArea.NoFrame)
-        layout.addWidget(opts_scroll, stretch=1)
-
-        # File list — below the options scroll area, pinned above the buttons
+    # ── file list panel ──────────────────────────────────────────────────
+    def _build_file_list_panel(self) -> QWidget:
+        panel, v = _make_section("FILES")
         self.file_list = FileListWidget()
-        self.file_list.setMinimumHeight(100)
-        layout.addWidget(self.file_list, stretch=1)
+        self.file_list.setMinimumHeight(120)
+        v.addWidget(self.file_list)
+        return panel
 
-        # Action buttons — pinned at bottom
-        button_layout = QHBoxLayout()
+    # ── footer (utility buttons) ─────────────────────────────────────────
+    def _build_footer(self) -> QWidget:
+        wrap = QFrame()
+        wrap.setObjectName("footer")
+        h = QHBoxLayout(wrap)
+        h.setContentsMargins(16, 12, 16, 12)
+        h.setSpacing(8)
 
-        self.preview_btn = QPushButton("Preview Changes")
-        self.preview_btn.clicked.connect(self.preview_changes)
-        button_layout.addWidget(self.preview_btn)
-
-        self.apply_btn = QPushButton("Apply Rename")
-        self.apply_btn.clicked.connect(self.apply_rename)
-        button_layout.addWidget(self.apply_btn)
-
-        self.bump_version_btn = QPushButton("Bump Version")
+        self.bump_version_btn = QPushButton("Bump version")
+        self.bump_version_btn.setObjectName("ghostBtn")
         self.bump_version_btn.setToolTip(
             "Increment the trailing version token on all selected files.\n"
-            "Recognises _v##, -v##, ' v##', _V##, .v##, etc. Preserves the\n"
-            "user's original separator, case, and zero-padding width."
+            "Recognises _v##, -v##, ' v##', _V##, .v##, etc."
         )
         self.bump_version_btn.clicked.connect(self.apply_bump_version)
-        button_layout.addWidget(self.bump_version_btn)
+        h.addWidget(self.bump_version_btn)
 
-        self.undo_btn = QPushButton("Undo Last Operation")
+        self.undo_btn = QPushButton("Undo")
+        self.undo_btn.setObjectName("ghostBtn")
         self.undo_btn.clicked.connect(self.undo_last_operation)
         self.undo_btn.setEnabled(False)
-        button_layout.addWidget(self.undo_btn)
+        h.addWidget(self.undo_btn)
 
-        self.open_csv_btn = QPushButton("Open Latest CSV Log")
+        self.open_csv_btn = QPushButton("Open latest CSV")
+        self.open_csv_btn.setObjectName("ghostBtn")
         self.open_csv_btn.setToolTip("Open the most recent rename log CSV in this directory")
         self.open_csv_btn.clicked.connect(self.open_latest_csv)
-        button_layout.addWidget(self.open_csv_btn)
+        h.addWidget(self.open_csv_btn)
 
-        self.normalize_btn = QPushButton("Normalize Incoming")
+        self.normalize_btn = QPushButton("Normalize incoming")
+        self.normalize_btn.setObjectName("ghostBtn")
         self.normalize_btn.setToolTip(
             "Strip common bad prefixes/suffixes from selected files "
             "(e.g. '_COPY', 'Copy of ')"
         )
         self.normalize_btn.clicked.connect(self.normalize_incoming)
-        button_layout.addWidget(self.normalize_btn)
+        h.addWidget(self.normalize_btn)
 
-        self.lint_btn = QPushButton("Lint Folder")
+        self.lint_btn = QPushButton("Lint folder")
+        self.lint_btn.setObjectName("ghostBtn")
         self.lint_btn.setToolTip("Check filenames in the current directory for issues")
         self.lint_btn.clicked.connect(self.lint_folder)
-        button_layout.addWidget(self.lint_btn)
+        h.addWidget(self.lint_btn)
 
-        button_layout.addStretch()
-        layout.addLayout(button_layout)
-
-        self.setLayout(layout)
+        h.addStretch()
+        return wrap
 
     # ── profile bar ───────────────────────────────────────────────────────
 
-    def create_profile_bar(self) -> QGroupBox:
+    def create_profile_bar(self) -> Panel:
         """Naming profile selector + management buttons."""
-        group = QGroupBox("Naming Profile")
+        panel, v = _make_section("NAMING PROFILE")
         row = QHBoxLayout()
-        row.addWidget(QLabel("Active:"))
+        row.setSpacing(10)
+
+        active_lbl = QLabel("Active")
+        active_lbl.setObjectName("cardSub")
+        row.addWidget(active_lbl)
 
         self.profile_combo = QComboBox()
-        self.profile_combo.setMinimumWidth(180)
+        self.profile_combo.setMinimumWidth(200)
         self.profile_combo.setToolTip(
             "The active profile drives the Template rename mode and "
             "the conformance check in Lint Folder."
@@ -249,18 +330,21 @@ class BulkRenamerTab(BaseTab):
         self.profile_combo.currentTextChanged.connect(self._on_profile_changed)
         row.addWidget(self.profile_combo)
 
-        save_btn = QPushButton("Save as Profile\u2026")
+        row.addStretch()
+
+        save_btn = QPushButton("Save as profile\u2026")
+        save_btn.setObjectName("ghostBtn")
         save_btn.setToolTip("Save the current template settings as a new named profile")
         save_btn.clicked.connect(self._save_as_profile)
         row.addWidget(save_btn)
 
-        manage_btn = QPushButton("Manage Profiles\u2026")
+        manage_btn = QPushButton("Manage profiles\u2026")
+        manage_btn.setObjectName("ghostBtn")
         manage_btn.clicked.connect(self._manage_profiles)
         row.addWidget(manage_btn)
 
-        row.addStretch()
-        group.setLayout(row)
-        return group
+        v.addLayout(row)
+        return panel
 
     def _load_profile_combo(self):
         """Re-populate the profile combo from config without firing callbacks."""
@@ -328,10 +412,9 @@ class BulkRenamerTab(BaseTab):
 
     # ── template mode panel ───────────────────────────────────────────────
 
-    def create_template_options_group(self) -> QGroupBox:
+    def create_template_options_group(self) -> Panel:
         """Token-field panel that composes filenames from the active profile."""
-        group = QGroupBox("Template Options")
-        layout = QVBoxLayout()
+        panel, layout = _make_section("TEMPLATE TOKENS")
 
         # Scrollable token input area — rebuilt when profile changes
         scroll = QScrollArea()
@@ -339,18 +422,19 @@ class BulkRenamerTab(BaseTab):
         scroll.setMaximumHeight(165)
         self.template_tokens_widget = QWidget()
         self.template_tokens_layout = QFormLayout()
-        self.template_tokens_layout.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
+        self.template_tokens_layout.setFieldGrowthPolicy(
+            QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow
+        )
         self.template_tokens_widget.setLayout(self.template_tokens_layout)
         scroll.setWidget(self.template_tokens_widget)
         layout.addWidget(scroll)
 
         self.template_preview_label = QLabel("Preview: \u2014")
-        self.template_preview_label.setStyleSheet("color: #888; font-style: italic;")
+        self.template_preview_label.setObjectName("cardSub")
         layout.addWidget(self.template_preview_label)
 
-        group.setLayout(layout)
         self._rebuild_template_panel(None)
-        return group
+        return panel
 
     def _rebuild_template_panel(self, profile: Optional[ProductionTemplate] = None):
         """Rebuild token QLineEdits for *profile* (or DEFAULT_TEMPLATE)."""
@@ -418,61 +502,69 @@ class BulkRenamerTab(BaseTab):
 
     # ── extension filters ─────────────────────────────────────────────────
 
-    def create_extension_filter_group(self) -> QGroupBox:
-        """Create the extension filter group."""
-        group = QGroupBox("File Type Filters")
-        layout = QVBoxLayout()
+    def create_extension_filter_group(self) -> Panel:
+        """Create the extension filter panel."""
+        panel, v = _make_section("FILE TYPE FILTERS")
 
         preset_layout = QHBoxLayout()
+        preset_layout.setSpacing(14)
         for category in ['images', 'documents', 'videos', 'audio', 'archives']:
             checkbox = QCheckBox(category.capitalize())
             checkbox.stateChanged.connect(self.refresh_file_list)
             self.extension_checkboxes[category] = checkbox
             preset_layout.addWidget(checkbox)
         preset_layout.addStretch()
-        layout.addLayout(preset_layout)
+        v.addLayout(preset_layout)
 
         custom_layout = QHBoxLayout()
-        custom_layout.addWidget(QLabel("Custom extensions:"))
+        custom_layout.setSpacing(8)
+        custom_lbl = QLabel("Custom extensions")
+        custom_lbl.setObjectName("cardSub")
+        custom_layout.addWidget(custom_lbl)
         self.custom_ext_input = QLineEdit()
         self.custom_ext_input.setPlaceholderText("e.g., .txt, .py, .md")
         custom_layout.addWidget(self.custom_ext_input, stretch=1)
         apply_btn = QPushButton("Apply")
+        apply_btn.setObjectName("ghostBtn")
         apply_btn.clicked.connect(self.refresh_file_list)
         custom_layout.addWidget(apply_btn)
-        layout.addLayout(custom_layout)
+        v.addLayout(custom_layout)
 
-        group.setLayout(layout)
-        return group
+        return panel
 
     # ── standard rename panel ─────────────────────────────────────────────
 
-    def create_rename_options_group(self) -> QGroupBox:
-        """Create the rename options group."""
-        group = QGroupBox("Rename Options")
-        layout = QVBoxLayout()
+    def create_rename_options_group(self) -> Panel:
+        """Create the standard rename options panel."""
+        panel, v = _make_section("STANDARD RENAME")
 
-        rename_layout = QHBoxLayout()
-        rename_layout.addWidget(QLabel("Rename to:"))
+        def _row(label: str, w):
+            row = QHBoxLayout()
+            row.setSpacing(8)
+            lbl = QLabel(label)
+            lbl.setObjectName("cardSub")
+            lbl.setFixedWidth(60)
+            row.addWidget(lbl)
+            row.addWidget(w, stretch=1)
+            return row
+
         self.rename_input = QLineEdit()
-        self.rename_input.setPlaceholderText("Replace entire base name (prefix/suffix still applied)")
-        rename_layout.addWidget(self.rename_input, stretch=1)
-        layout.addLayout(rename_layout)
+        self.rename_input.setPlaceholderText(
+            "Replace entire base name (prefix/suffix still applied)"
+        )
+        v.addLayout(_row("Rename to", self.rename_input))
 
-        prefix_layout = QHBoxLayout()
-        prefix_layout.addWidget(QLabel("Prefix:"))
         self.prefix_input = QLineEdit()
-        prefix_layout.addWidget(self.prefix_input, stretch=1)
-        layout.addLayout(prefix_layout)
+        v.addLayout(_row("Prefix", self.prefix_input))
 
-        suffix_layout = QHBoxLayout()
-        suffix_layout.addWidget(QLabel("Suffix:"))
         self.suffix_input = QLineEdit()
-        suffix_layout.addWidget(self.suffix_input, stretch=1)
-        layout.addLayout(suffix_layout)
+        v.addLayout(_row("Suffix", self.suffix_input))
 
         case_layout = QHBoxLayout()
-        case_layout.addWidget(QLabel("Case:"))
+        case_lbl = QLabel("Case")
+        case_lbl.setObjectName("cardSub")
+        case_lbl.setFixedWidth(60)
+        case_layout.addWidget(case_lbl)
         self.case_group = QButtonGroup()
         self.case_none_radio = QRadioButton("No change")
         self.case_upper_radio = QRadioButton("UPPERCASE")
@@ -483,52 +575,60 @@ class BulkRenamerTab(BaseTab):
         self.case_group.addButton(self.case_lower_radio, 2)
         self.case_group.addButton(self.case_title_radio, 3)
         self.case_none_radio.setChecked(True)
-        case_layout.addWidget(self.case_none_radio)
-        case_layout.addWidget(self.case_upper_radio)
-        case_layout.addWidget(self.case_lower_radio)
-        case_layout.addWidget(self.case_title_radio)
+        for r in (self.case_none_radio, self.case_upper_radio,
+                  self.case_lower_radio, self.case_title_radio):
+            case_layout.addWidget(r)
         case_layout.addStretch()
-        layout.addLayout(case_layout)
-
-        group.setLayout(layout)
-        return group
+        v.addLayout(case_layout)
+        return panel
 
     # ── sequential numbering panel ────────────────────────────────────────
 
-    def create_sequential_options_group(self) -> QGroupBox:
+    def create_sequential_options_group(self) -> Panel:
         """Create the sequential-numbering options panel."""
-        group = QGroupBox("Sequential Numbering Options")
-        layout = QVBoxLayout()
+        panel, layout = _make_section("NUMBER FILES")
 
         row1 = QHBoxLayout()
-        row1.addWidget(QLabel("Base name:"))
+        row1.setSpacing(8)
+        base_lbl = QLabel("Base name")
+        base_lbl.setObjectName("cardSub")
+        base_lbl.setFixedWidth(70)
+        row1.addWidget(base_lbl)
         self.seq_base_input = QLineEdit()
         self.seq_base_input.setPlaceholderText("e.g. HERO or SCENE_01")
         row1.addWidget(self.seq_base_input, stretch=1)
         layout.addLayout(row1)
 
         row2 = QHBoxLayout()
-        row2.addWidget(QLabel("Start at:"))
+        row2.setSpacing(8)
+        start_lbl = QLabel("Start at")
+        start_lbl.setObjectName("cardSub")
+        start_lbl.setFixedWidth(70)
+        row2.addWidget(start_lbl)
         self.seq_start_spin = QSpinBox()
         self.seq_start_spin.setRange(0, 99999)
         self.seq_start_spin.setValue(1)
         row2.addWidget(self.seq_start_spin)
         row2.addSpacing(20)
-        row2.addWidget(QLabel("Padding (digits):"))
+        pad_lbl = QLabel("Padding")
+        pad_lbl.setObjectName("cardSub")
+        row2.addWidget(pad_lbl)
         self.seq_padding_spin = QSpinBox()
         self.seq_padding_spin.setRange(1, 8)
         self.seq_padding_spin.setValue(3)
         row2.addWidget(self.seq_padding_spin)
         row2.addSpacing(20)
-        row2.addWidget(QLabel("Separator:"))
+        sep_lbl = QLabel("Separator")
+        sep_lbl.setObjectName("cardSub")
+        row2.addWidget(sep_lbl)
         self.seq_separator_input = QLineEdit("_")
-        self.seq_separator_input.setMaximumWidth(40)
+        self.seq_separator_input.setMaximumWidth(60)
         row2.addWidget(self.seq_separator_input)
         row2.addStretch()
         layout.addLayout(row2)
 
         preview_label = QLabel("Preview: HERO_001.mov, HERO_002.mov, \u2026")
-        preview_label.setStyleSheet("color: #888; font-style: italic;")
+        preview_label.setObjectName("cardSub")
         self.seq_preview_label = preview_label
         layout.addWidget(preview_label)
 
@@ -537,8 +637,7 @@ class BulkRenamerTab(BaseTab):
         for widget in (self.seq_start_spin, self.seq_padding_spin):
             widget.valueChanged.connect(self._update_seq_preview)
 
-        group.setLayout(layout)
-        return group
+        return panel
 
     def _update_seq_preview(self):
         base = self.seq_base_input.text() or "BASE"
@@ -553,11 +652,10 @@ class BulkRenamerTab(BaseTab):
 
     # ── companion file options ────────────────────────────────────────────
 
-    def create_companion_options_group(self) -> QGroupBox:
+    def create_companion_options_group(self) -> Panel:
         """Checkboxes to control sidecar / caption co-rename, hidden-file inclusion,
         and the prefix/suffix delimiter override."""
-        group = QGroupBox("Rename Behaviour")
-        layout = QVBoxLayout()
+        panel, layout = _make_section("RENAME BEHAVIOUR")
 
         # Row 1 \u2014 sidecar / caption companion renaming
         comp_row = QHBoxLayout()
@@ -590,7 +688,9 @@ class BulkRenamerTab(BaseTab):
         opts_row.addWidget(self.include_hidden_chk)
 
         opts_row.addSpacing(20)
-        opts_row.addWidget(QLabel("Delimiter for prefix/suffix detection:"))
+        delim_lbl = QLabel("Delimiter for prefix/suffix detection")
+        delim_lbl.setObjectName("cardSub")
+        opts_row.addWidget(delim_lbl)
         self.delimiter_combo = QComboBox()
         # Order matters \u2014 first item is the default. 'auto' uses the
         # dataset's most-common delimiter via detect_dominant_delimiter.
@@ -608,15 +708,13 @@ class BulkRenamerTab(BaseTab):
         opts_row.addStretch()
         layout.addLayout(opts_row)
 
-        group.setLayout(layout)
-        return group
+        return panel
 
     # ── transposition panel ───────────────────────────────────────────────
 
-    def create_transposition_group(self) -> QGroupBox:
+    def create_transposition_group(self) -> Panel:
         """Bidirectional prefix ↔ suffix transposition panel."""
-        group = QGroupBox("Prefix / Suffix Transposition")
-        layout = QVBoxLayout()
+        panel, layout = _make_section("PREFIX / SUFFIX TRANSPOSITION")
 
         dir_row = QHBoxLayout()
         self.transpose_btn_group = QButtonGroup()
@@ -645,26 +743,26 @@ class BulkRenamerTab(BaseTab):
         scroll = QScrollArea()
         scroll.setMaximumHeight(90)
         scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
         self.prefix_widget = QWidget()
         self.prefix_layout = QVBoxLayout()
-        self.prefix_layout.setAlignment(Qt.AlignTop)
+        self.prefix_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.prefix_widget.setLayout(self.prefix_layout)
         scroll.setWidget(self.prefix_widget)
         layout.addWidget(scroll)
 
-        # No standalone apply button anymore \u2014 tokens checked here ride
-        # along with the next "Apply Rename" so the user can compose
-        # transposition with prefix / suffix / case changes in one click.
+        # No standalone apply button \u2014 tokens checked here ride along with the
+        # next "Apply Rename" so the user can compose transposition with
+        # prefix / suffix / case changes in one click.
         hint = QLabel(
-            "Selected tokens will be moved as part of the next Apply Rename "
+            "Selected tokens will be moved as part of the next Apply rename "
             "(combined with Prefix / Suffix / Rename / Case settings above)."
         )
         hint.setWordWrap(True)
-        hint.setStyleSheet("color: #888; font-size: 11px;")
+        hint.setObjectName("cardSub")
         layout.addWidget(hint)
 
-        group.setLayout(layout)
-        return group
+        return panel
 
     def _on_transpose_direction_changed(self):
         if self.transpose_p2s_radio.isChecked():
@@ -705,7 +803,7 @@ class BulkRenamerTab(BaseTab):
 
         active_extensions = self.get_active_extensions()
         extensions = active_extensions if active_extensions else None
-        recursive = self.dir_selector.is_recursive()
+        recursive = self.recursive_check.isChecked()
 
         # Primary directory
         all_dirs = [directory] + [d for d in self._queued_dirs if d != directory]
@@ -1320,11 +1418,11 @@ class BulkRenamerTab(BaseTab):
         """Load tab-specific settings."""
         last_dir = self.config.get_tab_directory('bulk_renamer')
         if last_dir:
-            self.dir_selector.set_directory(last_dir)
+            self.path_card.set_path(last_dir)
             self.set_directory(last_dir)
 
         recursive = self.config.get_tab_setting('bulk_renamer', 'recursive_default', False)
-        self.dir_selector.set_recursive(recursive)
+        self.recursive_check.setChecked(recursive)
 
         filters = self.config.get_tab_setting('bulk_renamer', 'extension_filters', {})
         for category, enabled in filters.items():
@@ -1351,7 +1449,7 @@ class BulkRenamerTab(BaseTab):
     def save_settings(self):
         """Save tab-specific settings."""
         self.config.set_tab_setting('bulk_renamer', 'recursive_default',
-                                    self.dir_selector.is_recursive())
+                                    self.recursive_check.isChecked())
         filters = {
             category: checkbox.isChecked()
             for category, checkbox in self.extension_checkboxes.items()

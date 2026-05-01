@@ -1,4 +1,4 @@
-"""Main window for Pearl Post Suite — v0.11 sidebar shell.
+"""Main window for Pearl Post Suite — v0.14 sidebar shell.
 
 Replaces the legacy QTabWidget with a left sidebar (SidebarNav) and a right
 QStackedWidget. Each existing tab class is mounted unchanged into the stack;
@@ -179,18 +179,29 @@ class MainWindow(QMainWindow):
         from ui.tabs.archive_extractor_tab import ArchiveExtractorTab
         from ui.tabs.image_browser_tab import ImageBrowserTab
         from ui.tabs.studio_tools_tab import StudioToolsTab
-        from ui.tabs.delivery_tab import DeliveryTab
+        from ui.tabs.delivery_validator_tab import SpecValidatorTab
+        from ui.tabs.delivery_package_tab import PackageExportTab
 
         # factory_key -> tab instance
+        validator_tab = SpecValidatorTab(self.config)
+        package_tab   = PackageExportTab(self.config)
+        # Cross-tab wire: when validator emits pass, pre-fill the package tab.
+        validator_tab.validation_passed.connect(
+            lambda passed: package_tab.set_source_from_validator(
+                validator_tab.get_directory()
+            ) if passed else None
+        )
+
         tabs = {
-            "offload":  IngestTab(self.config),
-            "proxy":    ProxyTab(self.config),
-            "rename":   BulkRenamerTab(self.config),
-            "organize": FileOrganizerTab(self.config),
-            "extract":  ArchiveExtractorTab(self.config),
-            "stills":   ImageBrowserTab(self.config),
-            "studio":   StudioToolsTab(self.config),
-            "delivery": DeliveryTab(self.config),
+            "offload":   IngestTab(self.config),
+            "proxy":     ProxyTab(self.config),
+            "rename":    BulkRenamerTab(self.config),
+            "organize":  FileOrganizerTab(self.config),
+            "extract":   ArchiveExtractorTab(self.config),
+            "stills":    ImageBrowserTab(self.config),
+            "studio":    StudioToolsTab(self.config),
+            "validator": validator_tab,
+            "package":   package_tab,
         }
         for key, tab in tabs.items():
             tab.status_changed.connect(self._update_status)
@@ -290,7 +301,7 @@ class MainWindow(QMainWindow):
 
     def _setup_shortcuts(self):
         # Cmd/Ctrl + 1..5 jumps to the first item of each section
-        section_first_keys = ["offload", "rename", "studio", "delivery", "stub:lto"]
+        section_first_keys = ["offload", "rename", "studio", "validator", "stub:lto"]
         for i, key in enumerate(section_first_keys):
             sc = QShortcut(QKeySequence(f"Ctrl+{i + 1}"), self)
             sc.activated.connect(lambda k=key: self.sidebar.select_key(k))
