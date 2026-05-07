@@ -136,7 +136,7 @@ class SpecValidatorTab(BaseTab):
         header = TabHeader(
             eyebrow="04 · DELIVER · SPEC VALIDATOR",
             title="Spec Validator",
-            subtitle="Test the offering before it leaves the threshold.",
+            subtitle="Verify specs before delivery — codec, resolution, naming, and duplicates.",
         )
         self.btn_run = header.add_action(
             "Run validation",
