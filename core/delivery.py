@@ -339,9 +339,10 @@ def create_delivery_zip(
                 try:
                     arcname = fp.relative_to(source_dir)
                     zf.write(_long_path(fp), str(arcname))
-                except (OSError, RuntimeError) as exc:
+                except (OSError, RuntimeError, ValueError) as exc:
                     # OSError → permission denied / file gone
                     # RuntimeError → "File size unexpectedly increased during write"
+                    # ValueError → "ZIP does not support timestamps before 1980"
                     if progress_cb is not None:
                         progress_cb(f"Skipping {fp.name}: {exc}", idx + 1, total)
                     continue
