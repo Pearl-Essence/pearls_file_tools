@@ -9,17 +9,34 @@ qDirStat cache format (.cache.gz):
 import gzip
 import os
 import shutil
+import sys
 import time
 from pathlib import Path
 from typing import Dict, Optional
 
 
 def detect_qdirstat() -> Optional[str]:
-    """Return the path to qDirStat or WinDirStat if installed, else None."""
+    """Return the path to qDirStat or WinDirStat if installed, else None.
+
+    Checks the system PATH first, then falls back to well-known macOS
+    .app bundle locations (``shutil.which`` cannot find binaries inside
+    /Applications/*.app/Contents/MacOS/).
+    """
     for name in ('qdirstat', 'windirstat', 'WinDirStat'):
         path = shutil.which(name)
         if path:
             return path
+
+    # macOS .app bundles are not on PATH — check common install locations.
+    if sys.platform == 'darwin':
+        for app_path in (
+            Path('/Applications/QDirStat.app/Contents/MacOS/qdirstat'),
+            Path('/Applications/WinDirStat.app/Contents/MacOS/windirstat'),
+            Path.home() / 'Applications/QDirStat.app/Contents/MacOS/qdirstat',
+        ):
+            if app_path.is_file():
+                return str(app_path)
+
     return None
 
 

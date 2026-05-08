@@ -53,7 +53,6 @@ class Config:
             'window': {
                 'geometry': [100, 100, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT],
                 'maximized': False,
-                'last_active_tab': 0
             },
             'directories': {
                 'last_browse_directory': str(Path.home()),
@@ -66,13 +65,25 @@ class Config:
             },
             'preferences': {
                 'theme': THEME_DARK,
-                'confirm_before_operations': True,
-                'auto_refresh_after_operation': True
             },
             'naming': {
                 'profiles': [],
                 'active_profile': None,
                 'bad_patterns': ['_COPY', '_BACKUP', '_OLD', 'Copy of ', 'copy_of_'],
+            },
+            'projects': [],
+            'active_project': None,
+            'settings': {
+                'remember_window_size': True,
+                'remember_last_tab': True,
+                'cache_image_scans': True,
+            },
+            'email': {
+                'smtp_server': '',
+                'smtp_port': 587,
+                'use_tls': True,
+                'from_address': '',
+                'to_address': '',
             },
             'tab_settings': {
                 'bulk_renamer': {
@@ -88,7 +99,6 @@ class Config:
                 },
                 'organizer': {
                     'confidence_threshold': 0.4,
-                    'auto_merge_conflicts': False
                 },
                 'extractor': {
                     'delete_after_extraction': False,
@@ -101,9 +111,6 @@ class Config:
                 },
                 'image_browser': {
                     'thumbnail_size': 200,
-                    'columns': 5,
-                    'cache_enabled': True,
-                    'hierarchy_depth': 2
                 }
             }
         }
