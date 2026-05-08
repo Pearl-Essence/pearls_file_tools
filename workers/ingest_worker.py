@@ -23,6 +23,7 @@ class IngestResult:
     dst: Path
     verified: bool
     error: str = ""
+    md5: str = ""
 
 
 class IngestWorker(BaseWorker):
@@ -48,13 +49,16 @@ class IngestWorker(BaseWorker):
     SETTLE_PASSES = 3
     SETTLE_TIMEOUT_SECS = 3600
 
-    def __init__(self, pairs: List[Tuple[Path, Path]]):
+    def __init__(self, pairs: List[Tuple[Path, Path]], verify: bool = True):
         """
         Args:
             pairs: List of (source_path, destination_path) tuples.
+            verify: If True, compute and compare MD5 hashes after copy.
+                    If False, trust the OS copy and skip hashing.
         """
         super().__init__()
         self.pairs = pairs
+        self.verify = verify
         self._results: List[IngestResult] = []
 
     def emit_finished(self, success: bool, message: str):
@@ -155,18 +159,27 @@ class IngestWorker(BaseWorker):
                         f"({pre_size:,} → {post_size:,}); writer not finished"
                     )
 
-                src_md5 = self._md5(src)
-                dst_md5 = self._md5(dst)
-                verified = src_md5 == dst_md5
+                if self.verify:
+                    src_md5 = self._md5(src)
+                    dst_md5 = self._md5(dst)
+                    verified = src_md5 == dst_md5
 
-                result = IngestResult(src=src, dst=dst, verified=verified)
-                if verified:
-                    success_count += 1
-                    self.file_status.emit(src.name, True, f"✓ Verified → {dst}")
+                    result = IngestResult(src=src, dst=dst, verified=verified, md5=dst_md5)
+                    if verified:
+                        success_count += 1
+                        self.file_status.emit(
+                            src.name, True,
+                            f"✓ Verified → {dst} hash={dst_md5}",
+                        )
+                    else:
+                        fail_count += 1
+                        result.error = "Checksum mismatch (source likely still being written)"
+                        self.file_status.emit(src.name, False, f"✗ Checksum mismatch: {src.name}")
                 else:
-                    fail_count += 1
-                    result.error = "Checksum mismatch (source likely still being written)"
-                    self.file_status.emit(src.name, False, f"✗ Checksum mismatch: {src.name}")
+                    # Skip hash verification — trust the copy
+                    success_count += 1
+                    result = IngestResult(src=src, dst=dst, verified=True)
+                    self.file_status.emit(src.name, True, f"✓ Copied → {dst}")
 
             except Exception as exc:
                 fail_count += 1

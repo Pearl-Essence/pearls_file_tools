@@ -17,7 +17,6 @@ class BaseTab(QWidget, metaclass=QABCMeta):
 
     # Signals
     status_changed = Signal(str)  # Status message
-    operation_completed = Signal(str, bool)  # (message, success)
 
     def __init__(self, config, parent=None):
         """

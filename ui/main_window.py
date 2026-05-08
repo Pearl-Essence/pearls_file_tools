@@ -1,4 +1,4 @@
-"""Main window for Pearl Post Suite — v0.17 sidebar shell.
+"""Main window for Pearl Post Suite — v0.20 sidebar shell.
 
 Replaces the legacy QTabWidget with a left sidebar (SidebarNav) and a right
 QStackedWidget. Each existing tab class is mounted unchanged into the stack;
@@ -6,20 +6,20 @@ sidebar items that point to dialogs (Sync Check, Watch Folders) intercept
 the activation and open the dialog without changing the current pane.
 """
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
 from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QAction, QIcon, QKeySequence, QShortcut
+from PySide6.QtGui import QAction, QCursor, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox,
-    QSplitter, QStackedWidget, QVBoxLayout, QWidget,
+    QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow, QMenu,
+    QMessageBox, QPushButton, QSplitter, QStackedWidget, QVBoxLayout,
+    QWidget,
 )
 
 from branding import APP_NAME, APP_TAGLINE, ICONS_DIR, NAV_TREE
 from config import Config
 from constants import DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT
 from ui.widgets.sidebar_nav import SidebarNav
-from ui.widgets.stub_pane import StubPane
 
 
 class MainWindow(QMainWindow):
@@ -127,13 +127,33 @@ class MainWindow(QMainWindow):
         v = QVBoxLayout(wrap)
         v.setContentsMargins(18, 8, 18, 14)
         v.setSpacing(2)
-        # Phase A1: static decorative strip. Wired to a real project model in Phase C.
-        proj = QLabel(self.config.get('project.name', 'No project loaded'))
-        proj.setStyleSheet("color: #E8E6DF; font-size: 12px; font-weight: 600;")
-        meta = QLabel(self.config.get('project.meta', '—'))
-        meta.setObjectName("cardMetrics")
-        v.addWidget(proj)
-        v.addWidget(meta)
+
+        self._proj_label = QLabel("No project loaded")
+        self._proj_label.setStyleSheet(
+            "color: #E8E6DF; font-size: 12px; font-weight: 600;"
+        )
+        self._proj_meta = QLabel("—")
+        self._proj_meta.setObjectName("cardMetrics")
+
+        btn = QPushButton()
+        btn.setFlat(True)
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setStyleSheet(
+            "QPushButton { text-align: left; border: none; padding: 0; }"
+            "QPushButton:hover { background: transparent; }"
+        )
+        btn_layout = QVBoxLayout(btn)
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        btn_layout.setSpacing(2)
+        btn_layout.addWidget(self._proj_label)
+        btn_layout.addWidget(self._proj_meta)
+        btn.setToolTip("Click to switch project or create a new one")
+        btn.clicked.connect(self._show_project_menu)
+
+        v.addWidget(btn)
+
+        # Apply active project on start
+        self._refresh_project_strip()
         return wrap
 
     def _build_user_footer(self) -> QWidget:
@@ -145,6 +165,21 @@ class MainWindow(QMainWindow):
         h = QHBoxLayout(wrap)
         h.setContentsMargins(18, 12, 18, 12)
         h.setSpacing(10)
+
+        # Clickable user area — opens a quick-access menu
+        user_btn = QPushButton()
+        user_btn.setFlat(True)
+        user_btn.setCursor(Qt.PointingHandCursor)
+        user_btn.setStyleSheet(
+            "QPushButton { border: none; padding: 0; text-align: left; }"
+            "QPushButton:hover { background: transparent; }"
+        )
+        user_btn.setToolTip("Settings, profiles, and more")
+        user_btn.clicked.connect(self._show_user_menu)
+
+        btn_h = QHBoxLayout(user_btn)
+        btn_h.setContentsMargins(0, 0, 0, 0)
+        btn_h.setSpacing(10)
 
         avatar = QLabel("LK")
         avatar.setFixedSize(22, 22)
@@ -161,8 +196,11 @@ class MainWindow(QMainWindow):
         self._crumb.setObjectName("eyebrow")
         col.addWidget(name)
         col.addWidget(self._crumb)
-        h.addWidget(avatar)
-        h.addLayout(col)
+        btn_h.addWidget(avatar)
+        btn_h.addLayout(col)
+        btn_h.addStretch()
+
+        h.addWidget(user_btn)
         h.addStretch()
         return wrap
 
@@ -219,12 +257,6 @@ class MainWindow(QMainWindow):
             tab.status_changed.connect(self._update_status)
             self._tab_instances.append(tab)
             self._stack_index_for_key[key] = self.stack.addWidget(tab)
-
-        # Stub panes for not-yet-implemented destinations.
-        stub_specs: list = []
-        for key, label in stub_specs:
-            pane = StubPane(label)
-            self._stack_index_for_key[key] = self.stack.addWidget(pane)
 
         # Default to Offload
         self.sidebar.select_key("offload")
@@ -301,7 +333,9 @@ class MainWindow(QMainWindow):
     # ─────────────────────────────────────────────────────────────────
     def _load_window_state(self):
         screen = QApplication.primaryScreen().availableGeometry()
-        geo = self.config.get('window.geometry')
+        remember_size = self.config.get('settings.remember_window_size', True)
+
+        geo = self.config.get('window.geometry') if remember_size else None
         if geo and len(geo) == 4:
             x, y, w, h = geo
         else:
@@ -315,10 +349,11 @@ class MainWindow(QMainWindow):
         x = max(screen.x(), min(x, screen.x() + screen.width() - w))
         y = max(screen.y(), min(y, screen.y() + screen.height() - h))
         self.setGeometry(x, y, w, h)
-        if self.config.get('window.maximized', False):
+        if remember_size and self.config.get('window.maximized', False):
             self.showMaximized()
 
-        last_key = self.config.get('window.last_nav', 'offload')
+        remember_tab = self.config.get('settings.remember_last_tab', True)
+        last_key = self.config.get('window.last_nav', 'offload') if remember_tab else 'offload'
         self.sidebar.select_key(last_key)
 
     def _save_window_state(self):
@@ -425,7 +460,149 @@ class MainWindow(QMainWindow):
             f"<li><b>Organize</b> — rename, group, extract, browse stills</li>"
             f"<li><b>Maintain</b> — studio tools, sync check, watch folders</li>"
             f"<li><b>Deliver</b> — spec validation + packaging</li>"
-            f"<li><b>Archive</b> — LTO / cold storage <i>(coming soon)</i></li>"
+            f"<li><b>Archive</b> — LTO / cold storage <i>(planned)</i></li>"
             f"</ul>"
             f"<p style='margin-top:10px;'><i>Built with PySide6</i></p>"
         )
+
+    # ─────────────────────────────────────────────────────────────────
+    # User footer context menu
+    # ─────────────────────────────────────────────────────────────────
+    def _show_user_menu(self):
+        menu = QMenu(self)
+        menu.addAction("Settings…", self._show_settings)
+        menu.addAction("Naming Profiles…", self._manage_profiles)
+        menu.addAction("Rename History…", self._show_history)
+        menu.addSeparator()
+        menu.addAction("About Pearl Post Suite", self._show_about)
+        menu.exec(QCursor.pos())
+
+    # ─────────────────────────────────────────────────────────────────
+    # Project management
+    # ─────────────────────────────────────────────────────────────────
+    def _get_projects(self) -> list:
+        """Return list of Project dicts from config."""
+        return self.config.get('projects', [])
+
+    def _save_projects(self, projects: list):
+        self.config.set('projects', projects)
+        self.config.save_to_file()
+
+    def _get_active_project_name(self) -> Optional[str]:
+        return self.config.get('active_project', None)
+
+    def _set_active_project(self, name: Optional[str]):
+        self.config.set('active_project', name)
+        self.config.save_to_file()
+        self._refresh_project_strip()
+        self._apply_project_defaults()
+
+    def _refresh_project_strip(self):
+        name = self._get_active_project_name()
+        if name:
+            self._proj_label.setText(name)
+            # Find description
+            for p in self._get_projects():
+                if p.get('name') == name:
+                    desc = p.get('description', '')
+                    self._proj_meta.setText(desc if desc else "Active project")
+                    return
+            self._proj_meta.setText("Active project")
+        else:
+            self._proj_label.setText("No project loaded")
+            self._proj_meta.setText("Click to create or select a project")
+
+    def _show_project_menu(self):
+        menu = QMenu(self)
+        projects = self._get_projects()
+        active = self._get_active_project_name()
+
+        if projects:
+            for p in projects:
+                name = p.get('name', 'Untitled')
+                act = menu.addAction(
+                    f"{'★ ' if name == active else ''}{name}"
+                )
+                act.triggered.connect(
+                    lambda checked, n=name: self._set_active_project(n)
+                )
+            menu.addSeparator()
+
+        menu.addAction("No Project", lambda: self._set_active_project(None))
+        menu.addSeparator()
+        menu.addAction("New Project…", self._new_project)
+        if active:
+            menu.addAction("Edit Current Project…", self._edit_current_project)
+            menu.addAction("Delete Current Project", self._delete_current_project)
+
+        menu.exec(QCursor.pos())
+
+    def _new_project(self):
+        from ui.dialogs.project_dialog import ProjectDialog
+        dlg = ProjectDialog(parent=self)
+        if dlg.exec() == ProjectDialog.Accepted and dlg.result_project:
+            projects = self._get_projects()
+            projects.append(dlg.result_project.to_dict())
+            self._save_projects(projects)
+            self._set_active_project(dlg.result_project.name)
+
+    def _edit_current_project(self):
+        from models.project import Project
+        from ui.dialogs.project_dialog import ProjectDialog
+
+        active = self._get_active_project_name()
+        if not active:
+            return
+
+        projects = self._get_projects()
+        for i, p in enumerate(projects):
+            if p.get('name') == active:
+                proj = Project.from_dict(p)
+                dlg = ProjectDialog(project=proj, parent=self)
+                if dlg.exec() == ProjectDialog.Accepted and dlg.result_project:
+                    projects[i] = dlg.result_project.to_dict()
+                    self._save_projects(projects)
+                    self._set_active_project(dlg.result_project.name)
+                return
+
+    def _delete_current_project(self):
+        active = self._get_active_project_name()
+        if not active:
+            return
+        reply = QMessageBox.question(
+            self, "Delete project",
+            f"Delete project '{active}'?\n\n"
+            "This removes the project definition only — no files are deleted.",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        projects = [p for p in self._get_projects() if p.get('name') != active]
+        self._save_projects(projects)
+        self._set_active_project(None)
+
+    def _apply_project_defaults(self):
+        """Auto-populate PathCards in tabs from the active project's default_paths."""
+        from models.project import Project
+
+        active = self._get_active_project_name()
+        if not active:
+            return
+
+        for p in self._get_projects():
+            if p.get('name') == active:
+                proj = Project.from_dict(p)
+                paths = proj.default_paths
+
+                # Find tabs by factory key and apply defaults
+                for tab in self._tab_instances:
+                    tab_name = getattr(tab, 'get_tab_name', lambda: '')()
+                    if tab_name == "Offload" and hasattr(tab, '_pane'):
+                        pane = tab._pane
+                        if paths.get('ingest_source') and not pane.card_src.get_path():
+                            pane.card_src.set_path(paths['ingest_source'])
+                        if paths.get('ingest_dest') and not pane.card_dst.get_path():
+                            pane.card_dst.set_path(paths['ingest_dest'])
+                        if paths.get('mirror_dest') and not pane.card_mirror.get_path():
+                            pane.card_mirror.set_path(paths['mirror_dest'])
+                return

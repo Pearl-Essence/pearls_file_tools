@@ -187,11 +187,14 @@ class ImageBrowserTab(BaseTab):
         self.refresh_btn.setEnabled(False)
         self.status_label.setText(msg)
 
+        # Respect the global "cache scans" setting
+        cache_enabled = self.config.get('settings.cache_image_scans', True)
+
         from workers.image_scan_worker import ImageScanWorker
         self.worker_thread = ImageScanWorker(
             self.current_directory,
             recursive=self.recursive_check.isChecked(),
-            use_cache=use_cache,
+            use_cache=use_cache and cache_enabled,
             include_video=self.include_video_check.isChecked(),
         )
         self.worker_thread.progress.connect(self.update_scan_status)
