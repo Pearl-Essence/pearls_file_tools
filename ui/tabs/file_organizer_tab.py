@@ -76,12 +76,14 @@ class FileOrganizerTab(BaseTab):
             "Create group",
             on_click=self.create_new_group,
             enabled=False,
+            tooltip="Create an empty group to drag files into",
         )
         self.organize_btn = header.add_action(
             "Organize files",
             on_click=self.organize_files,
             primary=True,
             enabled=False,
+            tooltip="Move files into their assigned group folders on disk",
         )
         return header
 
@@ -134,6 +136,7 @@ class FileOrganizerTab(BaseTab):
 
         self.scan_btn = QPushButton("Scan subdirectories")
         self.scan_btn.setObjectName("ghostBtn")
+        self.scan_btn.setToolTip("Analyze files in the selected folder and group them by naming pattern")
         self.scan_btn.clicked.connect(self.scan_directories)
         row.addWidget(self.scan_btn)
 
@@ -164,15 +167,18 @@ class FileOrganizerTab(BaseTab):
         btns.setSpacing(8)
         self.batch_check_all_btn = QPushButton("Check all")
         self.batch_check_all_btn.setObjectName("ghostBtn")
+        self.batch_check_all_btn.setToolTip("Select all subdirectories for batch processing")
         self.batch_check_all_btn.clicked.connect(self._batch_check_all)
         btns.addWidget(self.batch_check_all_btn)
         self.batch_uncheck_all_btn = QPushButton("Uncheck all")
         self.batch_uncheck_all_btn.setObjectName("ghostBtn")
+        self.batch_uncheck_all_btn.setToolTip("Deselect all subdirectories")
         self.batch_uncheck_all_btn.clicked.connect(self._batch_uncheck_all)
         btns.addWidget(self.batch_uncheck_all_btn)
         btns.addStretch()
         self.run_batch_btn = QPushButton("Run batch")
         self.run_batch_btn.setProperty("role", "primary")
+        self.run_batch_btn.setToolTip("Organize files in each checked subdirectory")
         self.run_batch_btn.clicked.connect(self._run_batch)
         btns.addWidget(self.run_batch_btn)
         v.addLayout(btns)

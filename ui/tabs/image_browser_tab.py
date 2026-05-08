@@ -1,8 +1,7 @@
-"""Browse Stills tab — v0.17 visual refresh.
+"""File Browser tab — v0.17 visual refresh.
 
-Functional behavior unchanged: same ImageScanWorker, same sequence detection,
-same context menu actions. Layout uses TabHeader + PathCard + a Panel for
-filters and a scrollable grid below.
+Browses images and video files in a thumbnail grid. Sequence detection applies
+to images only; videos get thumbnails via ffmpeg and open in the system player.
 """
 
 from pathlib import Path
@@ -14,6 +13,7 @@ from PySide6.QtWidgets import (
     QPushButton, QScrollArea, QSpinBox, QVBoxLayout, QWidget,
 )
 
+from constants import VIDEO_EXTENSIONS
 from ui.tabs.base_tab import BaseTab
 from ui.widgets.panel import Panel
 from ui.widgets.path_card import PathCard
@@ -21,7 +21,7 @@ from ui.widgets.tab_header import TabHeader
 
 
 class ImageBrowserTab(BaseTab):
-    """Tab for browsing image folders and stepping through sequences."""
+    """Tab for browsing image and video folders."""
 
     def __init__(self, config, parent=None):
         self.all_images: List[Dict] = []
@@ -30,7 +30,7 @@ class ImageBrowserTab(BaseTab):
         super().__init__(config, parent)
 
     def get_tab_name(self) -> str:
-        return "Browse Stills"
+        return "File Browser"
 
     # ─────────────────────────────────────────────────────────────────────
     # UI
@@ -48,22 +48,24 @@ class ImageBrowserTab(BaseTab):
 
     def _build_header(self) -> QWidget:
         header = TabHeader(
-            eyebrow="02 · ORGANIZE · BROWSE STILLS",
-            title="Browse Stills",
-            subtitle="Scan a folder for images and step through sequences.",
+            eyebrow="02 · ORGANIZE · FILE BROWSER",
+            title="File Browser",
+            subtitle="Scan a folder for images and videos, step through sequences.",
         )
         self.refresh_btn = header.add_action(
             "Refresh (ignore cache)",
             on_click=self.refresh_directory,
             enabled=False,
+            tooltip="Re-scan the folder from scratch, ignoring any cached results",
         )
         self.scan_btn = header.add_action(
             "Scan", on_click=self.scan_directory, primary=True,
+            tooltip="Scan the selected folder for media files (uses cache when available)",
         )
         return header
 
     def _build_source(self) -> QWidget:
-        self.path_card = PathCard("IMAGE FOLDER")
+        self.path_card = PathCard("MEDIA FOLDER")
         self.path_card.path_changed.connect(self._on_path_changed)
         return self.path_card
 
@@ -81,6 +83,7 @@ class ImageBrowserTab(BaseTab):
         row1.setSpacing(12)
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("Search by filename…")
+        self.search_box.setToolTip("Filter images by filename (case-insensitive)")
         self.search_box.textChanged.connect(self.apply_filters)
         row1.addWidget(self.search_box, stretch=1)
 
@@ -89,6 +92,7 @@ class ImageBrowserTab(BaseTab):
         row1.addWidget(folder_lbl)
         self.folder_combo = QComboBox()
         self.folder_combo.addItem("All folders")
+        self.folder_combo.setToolTip("Show images from a specific subfolder only")
         self.folder_combo.currentTextChanged.connect(self.apply_filters)
         self.folder_combo.setMinimumWidth(180)
         row1.addWidget(self.folder_combo)
@@ -103,12 +107,22 @@ class ImageBrowserTab(BaseTab):
         self.size_spin.setRange(100, 400)
         self.size_spin.setValue(200)
         self.size_spin.setSuffix(" px")
+        self.size_spin.setToolTip("Size of each thumbnail card in pixels")
         self.size_spin.valueChanged.connect(self.on_thumbnail_size_changed)
         row2.addWidget(self.size_spin)
 
         self.recursive_check = QCheckBox("Recursive scan")
         self.recursive_check.setChecked(True)
+        self.recursive_check.setToolTip("Include files in all subfolders, not just the top level")
         row2.addWidget(self.recursive_check)
+
+        self.include_video_check = QCheckBox("Include video files")
+        self.include_video_check.setChecked(True)
+        self.include_video_check.setToolTip(
+            "Also scan for video files (.mp4, .mov, .mkv, etc.)\n"
+            "Videos get thumbnails via ffmpeg and open in the system player"
+        )
+        row2.addWidget(self.include_video_check)
         row2.addStretch()
         v.addLayout(row2)
 
@@ -178,6 +192,7 @@ class ImageBrowserTab(BaseTab):
             self.current_directory,
             recursive=self.recursive_check.isChecked(),
             use_cache=use_cache,
+            include_video=self.include_video_check.isChecked(),
         )
         self.worker_thread.progress.connect(self.update_scan_status)
         self.worker_thread.finished.connect(self.on_scan_finished)
@@ -197,8 +212,8 @@ class ImageBrowserTab(BaseTab):
 
         self.all_images = images or []
         if not self.all_images:
-            self.show_info("No images", "No images found in the selected folder.")
-            self.status_label.setText("No images found.")
+            self.show_info("No files", "No images or videos found in the selected folder.")
+            self.status_label.setText("No files found.")
             return
 
         self.folders = {}
@@ -275,6 +290,10 @@ class ImageBrowserTab(BaseTab):
             self.display_images()
 
     def open_image_viewer(self, img_data: Dict):
+        if img_data.get('is_video'):
+            self._open_video_externally(img_data['path'])
+            return
+
         from ui.dialogs.image_viewer_dialog import ImageViewerDialog
         if img_data.get('is_sequence_rep') and img_data.get('sequence_files'):
             folder = img_data.get('folder', '')
@@ -289,11 +308,24 @@ class ImageBrowserTab(BaseTab):
         else:
             folder_images = [
                 img for img in self.filtered_images
-                if img['folder'] == img_data['folder']
+                if img['folder'] == img_data['folder'] and not img.get('is_video')
             ]
             current_index = folder_images.index(img_data) if img_data in folder_images else 0
             dialog = ImageViewerDialog(folder_images, current_index, self)
         dialog.exec()
+
+    def _open_video_externally(self, path: str):
+        import subprocess, sys
+        try:
+            if sys.platform == 'darwin':
+                subprocess.Popen(['open', path])
+            elif sys.platform == 'win32':
+                subprocess.Popen(['start', '', path], shell=True)
+            else:
+                subprocess.Popen(['xdg-open', path])
+            self.emit_status(f"Opened: {Path(path).name}")
+        except Exception as e:
+            self.show_error("Playback Error", f"Could not open video: {e}")
 
     # ── sequence reclassification ────────────────────────────────────────
     def show_image_context_menu(self, img_data: Dict, global_pos):
@@ -379,7 +411,10 @@ class ImageBrowserTab(BaseTab):
         self.size_spin.setValue(thumbnail_size)
         recursive = self.config.get_tab_setting('image_browser', 'recursive', True)
         self.recursive_check.setChecked(recursive)
+        include_video = self.config.get_tab_setting('image_browser', 'include_video', True)
+        self.include_video_check.setChecked(include_video)
 
     def save_settings(self):
         self.config.set_tab_setting('image_browser', 'thumbnail_size', self.size_spin.value())
         self.config.set_tab_setting('image_browser', 'recursive', self.recursive_check.isChecked())
+        self.config.set_tab_setting('image_browser', 'include_video', self.include_video_check.isChecked())

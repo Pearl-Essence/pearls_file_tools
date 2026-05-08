@@ -24,6 +24,7 @@ from core.file_utils import get_files_in_directory
 from core.name_transform import (
     DEFAULT_TEMPLATE, ProductionTemplate, bump_version,
     generate_new_filename, generate_sequential_filenames, move_suffix_to_prefix,
+    replace_prefix, replace_suffix,
 )
 from core.pattern_matching import (
     detect_common_prefixes, detect_common_suffixes, match_prefix, match_suffix,
@@ -118,6 +119,7 @@ class BulkRenamerTab(BaseTab):
         opts_row.setSpacing(12)
         self.recursive_check = QCheckBox("Recursive scan")
         self.recursive_check.setChecked(False)
+        self.recursive_check.setToolTip("Include files from all subfolders, not just the top level")
         self.recursive_check.stateChanged.connect(lambda _s: self.refresh_file_list())
         opts_row.addWidget(self.recursive_check)
         opts_row.addStretch()
@@ -152,6 +154,7 @@ class BulkRenamerTab(BaseTab):
         v.addWidget(self.rename_stack)
 
         v.addWidget(self.create_companion_options_group())
+        v.addWidget(self._build_copy_mode_section())
         self.prefix_group_widget = self.create_transposition_group()
         v.addWidget(self.prefix_group_widget)
         v.addStretch()
@@ -174,10 +177,12 @@ class BulkRenamerTab(BaseTab):
         btn_row.addWidget(self.add_dir_btn)
         self.remove_dir_btn = QPushButton("Remove selected")
         self.remove_dir_btn.setObjectName("ghostBtn")
+        self.remove_dir_btn.setToolTip("Remove the selected directory from the queue")
         self.remove_dir_btn.clicked.connect(self._remove_queued_dir)
         btn_row.addWidget(self.remove_dir_btn)
         self.clear_queue_btn = QPushButton("Clear queue")
         self.clear_queue_btn.setObjectName("ghostBtn")
+        self.clear_queue_btn.setToolTip("Remove all directories from the queue")
         self.clear_queue_btn.clicked.connect(self._clear_queue)
         btn_row.addWidget(self.clear_queue_btn)
         btn_row.addStretch()
@@ -216,15 +221,18 @@ class BulkRenamerTab(BaseTab):
         ctrl_row.setSpacing(8)
         self.batch_check_all_btn = QPushButton("Check all")
         self.batch_check_all_btn.setObjectName("ghostBtn")
+        self.batch_check_all_btn.setToolTip("Select all subdirectories for batch renaming")
         self.batch_check_all_btn.clicked.connect(self._batch_check_all)
         ctrl_row.addWidget(self.batch_check_all_btn)
         self.batch_uncheck_all_btn = QPushButton("Uncheck all")
         self.batch_uncheck_all_btn.setObjectName("ghostBtn")
+        self.batch_uncheck_all_btn.setToolTip("Deselect all subdirectories")
         self.batch_uncheck_all_btn.clicked.connect(self._batch_uncheck_all)
         ctrl_row.addWidget(self.batch_uncheck_all_btn)
         ctrl_row.addStretch()
         self.run_batch_btn = QPushButton("Run batch rename")
         self.run_batch_btn.setProperty("role", "primary")
+        self.run_batch_btn.setToolTip("Apply the current rename settings to each checked subdirectory")
         self.run_batch_btn.clicked.connect(self._run_batch)
         ctrl_row.addWidget(self.run_batch_btn)
         bp_layout.addLayout(ctrl_row)
@@ -240,8 +248,11 @@ class BulkRenamerTab(BaseTab):
         row.setSpacing(20)
         self.mode_btn_group = QButtonGroup()
         self.mode_standard_radio = QRadioButton("Standard")
+        self.mode_standard_radio.setToolTip("Add/remove prefix, suffix, case changes, and replace operations")
         self.mode_sequential_radio = QRadioButton("Number files")
+        self.mode_sequential_radio.setToolTip("Replace filenames with a base name plus sequential numbers")
         self.mode_template_radio = QRadioButton("Template")
+        self.mode_template_radio.setToolTip("Build filenames from production tokens (project, episode, shot, etc.)")
         self.mode_btn_group.addButton(self.mode_standard_radio, 0)
         self.mode_btn_group.addButton(self.mode_sequential_radio, 1)
         self.mode_btn_group.addButton(self.mode_template_radio, 2)
@@ -280,6 +291,7 @@ class BulkRenamerTab(BaseTab):
 
         self.undo_btn = QPushButton("Undo")
         self.undo_btn.setObjectName("ghostBtn")
+        self.undo_btn.setToolTip("Reverse the most recent rename operation")
         self.undo_btn.clicked.connect(self.undo_last_operation)
         self.undo_btn.setEnabled(False)
         h.addWidget(self.undo_btn)
@@ -580,6 +592,53 @@ class BulkRenamerTab(BaseTab):
             case_layout.addWidget(r)
         case_layout.addStretch()
         v.addLayout(case_layout)
+
+        # Replace prefix
+        rp_eye = QLabel("REPLACE PREFIX")
+        rp_eye.setObjectName("eyebrow")
+        v.addWidget(rp_eye)
+        rp_row = QHBoxLayout()
+        rp_row.setSpacing(8)
+        rp_find_lbl = QLabel("Find")
+        rp_find_lbl.setObjectName("cardSub")
+        rp_find_lbl.setFixedWidth(60)
+        rp_row.addWidget(rp_find_lbl)
+        self.replace_prefix_find = QLineEdit()
+        self.replace_prefix_find.setPlaceholderText("e.g. OLD_")
+        self.replace_prefix_find.setToolTip("Text at the start of the stem to find and replace")
+        rp_row.addWidget(self.replace_prefix_find, stretch=1)
+        rp_repl_lbl = QLabel("Replace")
+        rp_repl_lbl.setObjectName("cardSub")
+        rp_row.addWidget(rp_repl_lbl)
+        self.replace_prefix_with = QLineEdit()
+        self.replace_prefix_with.setPlaceholderText("e.g. NEW_")
+        self.replace_prefix_with.setToolTip("Replacement text (leave empty to remove the prefix)")
+        rp_row.addWidget(self.replace_prefix_with, stretch=1)
+        v.addLayout(rp_row)
+
+        # Replace suffix
+        rs_eye = QLabel("REPLACE SUFFIX")
+        rs_eye.setObjectName("eyebrow")
+        v.addWidget(rs_eye)
+        rs_row = QHBoxLayout()
+        rs_row.setSpacing(8)
+        rs_find_lbl = QLabel("Find")
+        rs_find_lbl.setObjectName("cardSub")
+        rs_find_lbl.setFixedWidth(60)
+        rs_row.addWidget(rs_find_lbl)
+        self.replace_suffix_find = QLineEdit()
+        self.replace_suffix_find.setPlaceholderText("e.g. _v01")
+        self.replace_suffix_find.setToolTip("Text at the end of the stem to find and replace")
+        rs_row.addWidget(self.replace_suffix_find, stretch=1)
+        rs_repl_lbl = QLabel("Replace")
+        rs_repl_lbl.setObjectName("cardSub")
+        rs_row.addWidget(rs_repl_lbl)
+        self.replace_suffix_with = QLineEdit()
+        self.replace_suffix_with.setPlaceholderText("e.g. _v02")
+        self.replace_suffix_with.setToolTip("Replacement text (leave empty to remove the suffix)")
+        rs_row.addWidget(self.replace_suffix_with, stretch=1)
+        v.addLayout(rs_row)
+
         return panel
 
     # ── sequential numbering panel ────────────────────────────────────────
@@ -709,6 +768,30 @@ class BulkRenamerTab(BaseTab):
         layout.addLayout(opts_row)
 
         return panel
+
+    # ── copy mode section ────────────────────────────────────────────────
+
+    def _build_copy_mode_section(self) -> QWidget:
+        host = QWidget()
+        v = QVBoxLayout(host)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(8)
+
+        self.copy_mode_chk = QCheckBox("Copy files with new names instead of renaming")
+        self.copy_mode_chk.setToolTip(
+            "Instead of renaming in place, copy each file to a destination\n"
+            "folder with the new name. Originals stay untouched."
+        )
+        self.copy_mode_chk.toggled.connect(self._on_copy_mode_toggled)
+        v.addWidget(self.copy_mode_chk)
+
+        self.copy_dest_card = PathCard("COPY DESTINATION")
+        self.copy_dest_card.setVisible(False)
+        v.addWidget(self.copy_dest_card)
+        return host
+
+    def _on_copy_mode_toggled(self, checked: bool):
+        self.copy_dest_card.setVisible(checked)
 
     # ── transposition panel ───────────────────────────────────────────────
 
@@ -967,6 +1050,10 @@ class BulkRenamerTab(BaseTab):
                         suffix=self.suffix_input.text(),
                         rename_to=self.rename_input.text(),
                         case_transform=self.get_case_transform(),
+                        find_prefix=self.replace_prefix_find.text(),
+                        replace_prefix_with=self.replace_prefix_with.text(),
+                        find_suffix=self.replace_suffix_find.text(),
+                        replace_suffix_with=self.replace_suffix_with.text(),
                         rename_sidecars=self.rename_sidecars_chk.isChecked(),
                         rename_captions=self.rename_captions_chk.isChecked(),
                     )
@@ -1128,6 +1215,10 @@ class BulkRenamerTab(BaseTab):
             from core.pattern_matching import match_prefix, match_suffix
             tokens = self.get_selected_prefixes()
             is_p2s = self.transpose_p2s_radio.isChecked()
+            fp_find = self.replace_prefix_find.text()
+            fp_repl = self.replace_prefix_with.text()
+            fs_find = self.replace_suffix_find.text()
+            fs_repl = self.replace_suffix_with.text()
             for filepath in selected_files:
                 current = filepath.name
                 if tokens:
@@ -1139,6 +1230,10 @@ class BulkRenamerTab(BaseTab):
                         m = match_suffix(current, tokens)
                         if m:
                             current = move_suffix_to_prefix(current, m)
+                if fp_find:
+                    current = replace_prefix(current, fp_find, fp_repl)
+                if fs_find:
+                    current = replace_suffix(current, fs_find, fs_repl)
                 new_name = generate_new_filename(
                     current,
                     prefix=self.prefix_input.text(),
@@ -1161,6 +1256,19 @@ class BulkRenamerTab(BaseTab):
             return
 
         from workers.rename_worker import RenameWorker
+
+        copy_mode = self.copy_mode_chk.isChecked()
+        copy_dest = None
+        if copy_mode:
+            dest_text = self.copy_dest_card.get_path()
+            if not dest_text or not Path(dest_text).is_dir():
+                self.show_warning(
+                    "No destination",
+                    "Choose a valid destination folder for the copies.",
+                )
+                return
+            copy_dest = Path(dest_text)
+
         mode = self.mode_btn_group.checkedId()
 
         if mode == 1:
@@ -1190,6 +1298,8 @@ class BulkRenamerTab(BaseTab):
             self.worker_thread = RenameWorker(
                 selected_files,
                 direct_renames=direct,
+                copy_mode=copy_mode,
+                copy_dest=copy_dest,
                 rename_sidecars=self.rename_sidecars_chk.isChecked(),
                 rename_captions=self.rename_captions_chk.isChecked(),
             )
@@ -1224,6 +1334,8 @@ class BulkRenamerTab(BaseTab):
             self.worker_thread = RenameWorker(
                 selected_files,
                 direct_renames=direct,
+                copy_mode=copy_mode,
+                copy_dest=copy_dest,
                 rename_sidecars=self.rename_sidecars_chk.isChecked(),
                 rename_captions=self.rename_captions_chk.isChecked(),
             )
@@ -1252,6 +1364,12 @@ class BulkRenamerTab(BaseTab):
                 case_transform=self.get_case_transform(),
                 prefix_to_suffix=prefix_to_suffix,
                 suffix_to_prefix=suffix_to_prefix,
+                find_prefix=self.replace_prefix_find.text(),
+                replace_prefix_with=self.replace_prefix_with.text(),
+                find_suffix=self.replace_suffix_find.text(),
+                replace_suffix_with=self.replace_suffix_with.text(),
+                copy_mode=copy_mode,
+                copy_dest=copy_dest,
                 include_hidden=self.include_hidden_chk.isChecked(),
                 rename_sidecars=self.rename_sidecars_chk.isChecked(),
                 rename_captions=self.rename_captions_chk.isChecked(),

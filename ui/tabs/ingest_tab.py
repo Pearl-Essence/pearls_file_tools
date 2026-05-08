@@ -80,9 +80,13 @@ class _OffloadPane(QWidget):
             enabled=False,
             tooltip="Delivery presets — coming in Pearl v0.18",
         )
-        self.btn_analyze = header.add_action("Analyze", on_click=self._analyze)
+        self.btn_analyze = header.add_action(
+            "Analyze", on_click=self._analyze,
+            tooltip="Scan the source folder and populate the manifest table",
+        )
         self.btn_start = header.add_action(
             "Start ingest", on_click=self._start, primary=True, enabled=False,
+            tooltip="Copy all files from source to destination and verify by hash",
         )
         return header
 
@@ -111,11 +115,16 @@ class _OffloadPane(QWidget):
         row.setSpacing(20)
         self.opt_verify = QCheckBox("Verify by hash (xxHash3-128)")
         self.opt_verify.setChecked(True)
+        self.opt_verify.setToolTip("Compute and compare hashes after copy to ensure data integrity")
         self.opt_mirror = QCheckBox("Mirror to secondary destination")
+        self.opt_mirror.setToolTip("Copy files to a second destination in parallel as a backup")
         self.opt_mhl    = QCheckBox("Generate MHL")
         self.opt_mhl.setChecked(True)
+        self.opt_mhl.setToolTip("Write an MHL (Media Hash List) sidecar for third-party verification")
         self.opt_eject  = QCheckBox("Eject source on completion")
+        self.opt_eject.setToolTip("Unmount the source volume once all files are copied and verified")
         self.opt_email  = QCheckBox("Email completion report")
+        self.opt_email.setToolTip("Send a summary email when the offload finishes")
         for c in (self.opt_verify, self.opt_mirror, self.opt_mhl,
                   self.opt_eject, self.opt_email):
             row.addWidget(c)
@@ -197,6 +206,7 @@ class _OffloadPane(QWidget):
         self.btn_cancel = QPushButton("Cancel")
         self.btn_cancel.setProperty("role", "danger")
         self.btn_cancel.setEnabled(False)
+        self.btn_cancel.setToolTip("Stop the current offload (files already copied are kept)")
         self.btn_cancel.clicked.connect(self._cancel)
         h.addWidget(self.btn_cancel)
         return wrap

@@ -50,6 +50,7 @@ class _ProxyPane(QWidget):
         )
         self.btn_match = header.add_action(
             "Match files", on_click=self._run_match, primary=True,
+            tooltip="Pair full-resolution and proxy files by matching stems",
         )
         return header
 

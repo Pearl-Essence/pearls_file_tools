@@ -62,6 +62,7 @@ DEFAULT_GRID_COLUMNS = 5
 OP_TYPE_RENAME = 'rename'
 OP_TYPE_ORGANIZE = 'organize'
 OP_TYPE_EXTRACT = 'extract'
+OP_TYPE_COPY = 'copy'
 
 # Case transform types
 CASE_NONE = 'none'

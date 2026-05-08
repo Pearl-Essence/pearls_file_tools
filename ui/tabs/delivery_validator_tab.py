@@ -80,6 +80,7 @@ class _ValidatorHero(QWidget):
         cta = QPushButton("Choose folder…")
         cta.setProperty("role", "primary")
         cta.setMinimumHeight(34)
+        cta.setToolTip("Select a delivery folder to validate")
         cta.clicked.connect(self._on_choose)
         btn_row.addWidget(cta)
         btn_row.addStretch()
@@ -143,6 +144,7 @@ class SpecValidatorTab(BaseTab):
             on_click=self._run_validation,
             primary=True,
             enabled=False,
+            tooltip="Check all files against the delivery spec (codec, resolution, naming)",
         )
         return header
 

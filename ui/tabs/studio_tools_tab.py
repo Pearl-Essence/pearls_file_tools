@@ -600,10 +600,12 @@ class _StaleFilesPane(QWidget):
         btn_row = QHBoxLayout()
         self.scan_btn = QPushButton("Scan for Stale Files")
         self.scan_btn.setStyleSheet("padding: 8px 20px;")
+        self.scan_btn.setToolTip("Search the folder for stale, temporary, zero-byte, and empty items")
         self.scan_btn.clicked.connect(self._scan)
         btn_row.addWidget(self.scan_btn)
         self.trash_btn = QPushButton("Send Checked to Trash")
         self.trash_btn.setEnabled(False)
+        self.trash_btn.setToolTip("Move all checked items to .pearls_trash/ (can be restored later)")
         self.trash_btn.clicked.connect(self._trash_selected)
         btn_row.addWidget(self.trash_btn)
         self.status_label = QLabel("")
@@ -735,12 +737,37 @@ class _StoragePane(QWidget):
         btn_row = QHBoxLayout()
         self.scan_btn = QPushButton("Scan Storage Usage")
         self.scan_btn.setStyleSheet("padding: 8px 20px;")
+        self.scan_btn.setToolTip("Recursively scan the folder and categorize files by type and subfolder")
         self.scan_btn.clicked.connect(self._scan)
         btn_row.addWidget(self.scan_btn)
         self.export_btn = QPushButton("Export CSV")
         self.export_btn.setEnabled(False)
+        self.export_btn.setToolTip("Save the storage breakdown as a CSV file")
         self.export_btn.clicked.connect(self._export_csv)
         btn_row.addWidget(self.export_btn)
+
+        self.import_qds_btn = QPushButton("Import qDirStat Cache")
+        self.import_qds_btn.setToolTip("Load a .cache.gz file exported by qDirStat")
+        self.import_qds_btn.clicked.connect(self._import_qdirstat)
+        btn_row.addWidget(self.import_qds_btn)
+
+        self.export_qds_btn = QPushButton("Export qDirStat Cache")
+        self.export_qds_btn.setEnabled(False)
+        self.export_qds_btn.setToolTip("Save current scan data as a qDirStat-compatible .cache.gz file")
+        self.export_qds_btn.clicked.connect(self._export_qdirstat)
+        btn_row.addWidget(self.export_qds_btn)
+
+        from core.qdirstat_cache import detect_qdirstat
+        self._qdirstat_path = detect_qdirstat()
+        self.open_qds_btn = QPushButton("Open in qDirStat")
+        if self._qdirstat_path:
+            self.open_qds_btn.setToolTip(f"Launch {Path(self._qdirstat_path).name} with the current folder")
+        else:
+            self.open_qds_btn.setEnabled(False)
+            self.open_qds_btn.setToolTip("qDirStat / WinDirStat not found on this system")
+        self.open_qds_btn.clicked.connect(self._open_qdirstat)
+        btn_row.addWidget(self.open_qds_btn)
+
         self.status_label = QLabel("")
         btn_row.addWidget(self.status_label)
         btn_row.addStretch()
@@ -774,6 +801,7 @@ class _StoragePane(QWidget):
         self._data = data
         self._populate(data)
         self.export_btn.setEnabled(bool(data))
+        self.export_qds_btn.setEnabled(bool(data))
 
     def _populate(self, data: Dict):
         self.tree.clear()
@@ -837,6 +865,58 @@ class _StoragePane(QWidget):
         except Exception as exc:
             QMessageBox.critical(self, "Export Failed", str(exc))
 
+    def _import_qdirstat(self):
+        path_str, _ = QFileDialog.getOpenFileName(
+            self, "Import qDirStat Cache", "",
+            "qDirStat Cache (*.cache.gz);;All Files (*)",
+        )
+        if not path_str:
+            return
+        try:
+            from core.qdirstat_cache import parse_qdirstat_cache
+            data = parse_qdirstat_cache(Path(path_str))
+            self._data = data
+            self._populate(data)
+            self.export_btn.setEnabled(bool(data))
+            self.export_qds_btn.setEnabled(bool(data))
+            QMessageBox.information(
+                self, "Imported",
+                f"Loaded {len(data)} folder(s) from qDirStat cache.",
+            )
+        except Exception as exc:
+            QMessageBox.critical(self, "Import Failed", str(exc))
+
+    def _export_qdirstat(self):
+        if not self._data:
+            return
+        dest_str, _ = QFileDialog.getSaveFileName(
+            self, "Export qDirStat Cache",
+            str(Path(self.dir_selector.get_directory()) / "storage.cache.gz"),
+            "qDirStat Cache (*.cache.gz)",
+        )
+        if not dest_str:
+            return
+        try:
+            from core.qdirstat_cache import write_qdirstat_cache
+            root = Path(self.dir_selector.get_directory())
+            write_qdirstat_cache(self._data, root, Path(dest_str))
+            QMessageBox.information(self, "Exported", f"Cache saved:\n{dest_str}")
+        except Exception as exc:
+            QMessageBox.critical(self, "Export Failed", str(exc))
+
+    def _open_qdirstat(self):
+        if not self._qdirstat_path:
+            return
+        directory = self.dir_selector.get_directory()
+        if not directory or not Path(directory).is_dir():
+            QMessageBox.warning(self, "No Folder", "Select a valid folder first.")
+            return
+        import subprocess
+        try:
+            subprocess.Popen([self._qdirstat_path, directory])
+        except Exception as exc:
+            QMessageBox.critical(self, "Launch Failed", str(exc))
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Trash pane
@@ -887,13 +967,16 @@ class _TrashPane(QWidget):
 
         btn_row = QHBoxLayout()
         self.restore_btn = QPushButton("Restore Selected")
+        self.restore_btn.setToolTip("Move selected items back to their original locations")
         self.restore_btn.clicked.connect(self._restore_selected)
         btn_row.addWidget(self.restore_btn)
         self.purge_btn = QPushButton("Delete Selected Permanently")
+        self.purge_btn.setToolTip("Permanently delete selected items (cannot be undone)")
         self.purge_btn.clicked.connect(self._purge_selected)
         btn_row.addWidget(self.purge_btn)
         self.empty_btn = QPushButton("Empty Trash")
         self.empty_btn.setStyleSheet("color: #ff5370;")
+        self.empty_btn.setToolTip("Permanently delete all items in the trash")
         self.empty_btn.clicked.connect(self._empty_trash)
         btn_row.addWidget(self.empty_btn)
         btn_row.addStretch()
@@ -1085,7 +1168,9 @@ class _ConfigurePage(QWizardPage):
         fmt_grp = QGroupBox("Output format")
         fmt_layout = QHBoxLayout(fmt_grp)
         self.radio_folder = QRadioButton("Folder copy")
+        self.radio_folder.setToolTip("Copy files to the destination preserving the folder structure")
         self.radio_zip = QRadioButton("ZIP archive")
+        self.radio_zip.setToolTip("Bundle all files into a single compressed ZIP archive")
         self.radio_folder.setChecked(True)
         grp = QButtonGroup(self)
         grp.addButton(self.radio_folder, 0)
@@ -1096,10 +1181,12 @@ class _ConfigurePage(QWizardPage):
         layout.addRow(fmt_grp)
 
         self.chk_flatten = QCheckBox("Flatten structure (all files in one folder)")
+        self.chk_flatten.setToolTip("Place all files in a single flat directory instead of preserving subfolders")
         layout.addRow(self.chk_flatten)
 
         self.exclude_edit = QLineEdit()
         self.exclude_edit.setPlaceholderText("e.g. *.tmp *.log (space-separated)")
+        self.exclude_edit.setToolTip("Space-separated glob patterns for additional files to exclude from the archive")
         layout.addRow("Additional exclude patterns:", self.exclude_edit)
 
     def as_zip(self) -> bool:
@@ -1365,6 +1452,7 @@ class _ArchivePane(QWidget):
         self.start_btn.setStyleSheet(
             "padding: 10px 28px; font-weight: bold; font-size: 13px;"
         )
+        self.start_btn.setToolTip("Open the step-by-step archiving wizard")
         self.start_btn.clicked.connect(self._launch)
         btn_row.addWidget(self.start_btn)
         btn_row.addStretch()
@@ -1433,6 +1521,7 @@ class _NLEBackupPane(QWidget):
         btn_row = QHBoxLayout()
         self.backup_btn = QPushButton("Backup Now")
         self.backup_btn.setStyleSheet("padding: 8px 20px;")
+        self.backup_btn.setToolTip("Scan for project files and copy them to the backup destination")
         self.backup_btn.clicked.connect(self._backup)
         btn_row.addWidget(self.backup_btn)
         self.status_label = QLabel("")
@@ -1570,12 +1659,17 @@ class _ExportWatcherPane(QWidget):
         self.chk_validate = QCheckBox(
             "Run delivery validation on watch folder after each arrival"
         )
+        self.chk_validate.setToolTip(
+            "Automatically run the spec validator on the entire watch folder\n"
+            "each time a new media file is detected"
+        )
         opts_layout.addRow(self.chk_validate)
 
         self.interval_spin = QSpinBox()
         self.interval_spin.setRange(5, 3600)
         self.interval_spin.setValue(30)
         self.interval_spin.setSuffix(" seconds")
+        self.interval_spin.setToolTip("How often to check the folder for new files")
         opts_layout.addRow("Poll interval:", self.interval_spin)
         layout.addWidget(opts)
 
@@ -1589,6 +1683,7 @@ class _ExportWatcherPane(QWidget):
         btn_row.addWidget(self.status_label, stretch=1)
         self.toggle_btn = QPushButton("Start Watching")
         self.toggle_btn.setStyleSheet("padding: 8px 20px;")
+        self.toggle_btn.setToolTip("Begin polling the watch folder for new media file arrivals")
         self.toggle_btn.clicked.connect(self._toggle)
         btn_row.addWidget(self.toggle_btn)
         layout.addLayout(btn_row)
