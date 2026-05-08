@@ -3,7 +3,7 @@
 from datetime import datetime
 from pathlib import Path
 from typing import List, Tuple, Dict, Any, Optional
-from constants import OP_TYPE_RENAME, OP_TYPE_ORGANIZE, OP_TYPE_EXTRACT
+from constants import OP_TYPE_RENAME, OP_TYPE_ORGANIZE, OP_TYPE_EXTRACT, OP_TYPE_COPY
 
 
 class OperationRecord:
@@ -26,20 +26,42 @@ class OperationRecord:
         self.metadata = metadata or {}
 
     def undo(self) -> Tuple[int, int, List[str]]:
-        """Undo the operation by reversing each file rename in turn.
+        """Undo the operation.
+
+        For rename/organize: reverse each file rename.
+        For copy: delete each copied file (originals are untouched).
 
         ``files_affected`` is stored as ``[(new_path, old_path), ...]`` by the
         rename and organize workers — see core/history.py which documents
-        and relies on the same convention. Earlier versions of this method
-        unpacked the tuple in the opposite order, which made every undo
-        either a no-op (existence guard tripped) or, worse, a silent re-do of
-        the original rename. This implementation matches the storage order
-        and routes the rename through :func:`core.file_utils.safe_rename` so
-        case-only renames on case-insensitive filesystems also undo cleanly.
+        and relies on the same convention.
 
         Returns:
             Tuple of (success_count, error_count, error_messages)
         """
+        if self.operation_type == OP_TYPE_COPY:
+            return self._undo_copy()
+        return self._undo_rename()
+
+    def _undo_copy(self) -> Tuple[int, int, List[str]]:
+        success_count = 0
+        error_count = 0
+        errors: List[str] = []
+
+        for copied_path, _original_path in reversed(self.files_affected):
+            try:
+                if not copied_path.exists():
+                    errors.append(f"{copied_path.name}: copied file no longer exists")
+                    error_count += 1
+                    continue
+                copied_path.unlink()
+                success_count += 1
+            except Exception as e:
+                errors.append(f"{copied_path.name}: {e}")
+                error_count += 1
+
+        return success_count, error_count, errors
+
+    def _undo_rename(self) -> Tuple[int, int, List[str]]:
         from core.file_utils import safe_rename, same_inode
 
         success_count = 0
@@ -53,8 +75,6 @@ class OperationRecord:
                     error_count += 1
                     continue
 
-                # An unrelated file genuinely occupying the original path blocks undo.
-                # A same-inode hit is the case-flip case and is OK — safe_rename handles it.
                 if old_path.exists() and not same_inode(new_path, old_path):
                     errors.append(
                         f"{old_path.name}: original location occupied by a different file"
@@ -132,5 +152,7 @@ class OperationRecord:
             return f"Organized {file_count} file(s) at {time_str}"
         elif self.operation_type == OP_TYPE_EXTRACT:
             return f"Extracted {file_count} file(s) at {time_str}"
+        elif self.operation_type == OP_TYPE_COPY:
+            return f"Copied {file_count} file(s) at {time_str}"
         else:
             return f"Operation on {file_count} file(s) at {time_str}"

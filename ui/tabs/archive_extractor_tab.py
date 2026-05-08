@@ -11,14 +11,15 @@ from typing import Dict
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QCheckBox, QFrame, QHBoxLayout, QLabel, QProgressBar, QPushButton,
-    QTextEdit, QVBoxLayout, QWidget,
+    QCheckBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QProgressBar,
+    QPushButton, QTextEdit, QVBoxLayout, QWidget,
 )
 
 from ui.tabs.base_tab import BaseTab
 from ui.widgets.panel import Panel
 from ui.widgets.path_card import PathCard
 from ui.widgets.tab_header import TabHeader
+from constants import PHOTO_KEYWORDS
 
 
 # Optional libraries — same probes as before
@@ -81,6 +82,7 @@ class ArchiveExtractorTab(BaseTab):
         )
         self.start_btn = self._header.add_action(
             "Start extraction", on_click=self.start_extraction, primary=True,
+            tooltip="Find and extract all matching archives in the selected folder",
         )
         return self._header
 
@@ -110,8 +112,10 @@ class ArchiveExtractorTab(BaseTab):
         formats_row.setSpacing(14)
         self.zip_check = QCheckBox("ZIP")
         self.zip_check.setChecked(True)
+        self.zip_check.setToolTip("Process .zip archives")
         self.tar_check = QCheckBox("TAR / TGZ / TBZ2")
         self.tar_check.setChecked(True)
+        self.tar_check.setToolTip("Process .tar, .tar.gz, .tgz, .tar.bz2, and .tbz2 archives")
         self.rar_check = QCheckBox("RAR")
         self.rar_check.setChecked(HAS_RARFILE)
         self.rar_check.setEnabled(HAS_RARFILE)
@@ -134,16 +138,24 @@ class ArchiveExtractorTab(BaseTab):
         oc_eye = QLabel("OPTIONS")
         oc_eye.setObjectName("eyebrow")
         oc.addWidget(oc_eye)
-        self.keyword_check = QCheckBox("Only extract archives with photo/image keywords in filename")
+        self.keyword_check = QCheckBox("Only extract archives with matching keywords in filename")
         self.keyword_check.setChecked(True)
-        self.keyword_check.setToolTip("Keywords: photo, photos, image, images (case-insensitive)")
+        self.keyword_check.setToolTip("Skip archives whose filename doesn't contain at least one keyword")
+        self.keyword_edit = QLineEdit(", ".join(PHOTO_KEYWORDS))
+        self.keyword_edit.setToolTip("Comma-separated keywords to match against archive filenames (case-insensitive)")
+        self.keyword_edit.setEnabled(self.keyword_check.isChecked())
+        self.keyword_check.toggled.connect(self.keyword_edit.setEnabled)
         self.delete_check = QCheckBox("Delete archives after successful extraction (creates backup)")
+        self.delete_check.setToolTip(
+            "After extracting, move the archive to a timestamped backup folder\n"
+            "in .archive_extractor_backups/ and then delete the original"
+        )
         self.smart_extract_check = QCheckBox("Smart extraction (remove intermediate folders)")
         self.smart_extract_check.setChecked(True)
         self.smart_extract_check.setToolTip(
             "If archive contains only one folder, extract its contents directly"
         )
-        for c in (self.keyword_check, self.delete_check, self.smart_extract_check):
+        for c in (self.keyword_check, self.keyword_edit, self.delete_check, self.smart_extract_check):
             oc.addWidget(c)
         cols.addLayout(oc, stretch=1)
 
@@ -169,14 +181,18 @@ class ArchiveExtractorTab(BaseTab):
         head.addWidget(filt_label)
         self.filter_all_check = QCheckBox("All")
         self.filter_all_check.setChecked(True)
+        self.filter_all_check.setToolTip("Show all log entries")
         self.filter_failed_check = QCheckBox("Failed")
+        self.filter_failed_check.setToolTip("Show only failed extraction entries")
         self.filter_success_check = QCheckBox("Success")
+        self.filter_success_check.setToolTip("Show only successful extraction entries")
         for c in (self.filter_all_check, self.filter_failed_check, self.filter_success_check):
             c.clicked.connect(self.apply_log_filter)
             head.addWidget(c)
 
         clear_btn = QPushButton("Clear")
         clear_btn.setObjectName("ghostBtn")
+        clear_btn.setToolTip("Clear the extraction log")
         clear_btn.clicked.connect(self.clear_log)
         head.addWidget(clear_btn)
         v.addLayout(head)
@@ -213,12 +229,14 @@ class ArchiveExtractorTab(BaseTab):
         self.undo_btn = QPushButton("Undo last extraction")
         self.undo_btn.setObjectName("ghostBtn")
         self.undo_btn.setEnabled(False)
+        self.undo_btn.setToolTip("Delete extracted files and restore backed-up archives from the last batch")
         self.undo_btn.clicked.connect(self.undo_extraction)
         h.addWidget(self.undo_btn)
 
         self.cancel_btn = QPushButton("Cancel")
         self.cancel_btn.setProperty("role", "danger")
         self.cancel_btn.setEnabled(False)
+        self.cancel_btn.setToolTip("Stop the current extraction (already-extracted files are kept)")
         self.cancel_btn.clicked.connect(self.cancel_extraction)
         h.addWidget(self.cancel_btn)
 
@@ -238,12 +256,14 @@ class ArchiveExtractorTab(BaseTab):
             self.show_error("Invalid folder", "The selected folder does not exist.")
             return
 
+        keywords = [k.strip() for k in self.keyword_edit.text().split(',') if k.strip()]
         settings = {
             'zip':            self.zip_check.isChecked(),
             'tar':            self.tar_check.isChecked(),
             'rar':            self.rar_check.isChecked(),
             '7z':             self.sevenz_check.isChecked(),
             'keyword_filter': self.keyword_check.isChecked(),
+            'keywords':       keywords,
             'delete_after':   self.delete_check.isChecked(),
             'smart_extract':  self.smart_extract_check.isChecked(),
         }
@@ -425,6 +445,9 @@ class ArchiveExtractorTab(BaseTab):
         self.rar_check.setChecked(s('archive_extractor', 'rar_enabled', HAS_RARFILE))
         self.sevenz_check.setChecked(s('archive_extractor', '7z_enabled', HAS_PY7ZR))
         self.keyword_check.setChecked(s('archive_extractor', 'keyword_filter', True))
+        saved_keywords = s('archive_extractor', 'custom_keywords', '')
+        if saved_keywords:
+            self.keyword_edit.setText(saved_keywords)
         self.delete_check.setChecked(s('archive_extractor', 'delete_after', False))
         self.smart_extract_check.setChecked(s('archive_extractor', 'smart_extract', True))
 
@@ -435,5 +458,6 @@ class ArchiveExtractorTab(BaseTab):
         s('archive_extractor', 'rar_enabled',    self.rar_check.isChecked())
         s('archive_extractor', '7z_enabled',     self.sevenz_check.isChecked())
         s('archive_extractor', 'keyword_filter', self.keyword_check.isChecked())
+        s('archive_extractor', 'custom_keywords', self.keyword_edit.text())
         s('archive_extractor', 'delete_after',   self.delete_check.isChecked())
         s('archive_extractor', 'smart_extract',  self.smart_extract_check.isChecked())

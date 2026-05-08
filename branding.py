@@ -55,7 +55,7 @@ NAV_TREE = [
         ("Bulk Rename",        "rename.svg",          "rename"),
         ("Group by Pattern",   "group.svg",           "organize"),
         ("Extract Archives",   "archive-extract.svg", "extract"),
-        ("Browse Stills",      "stills.svg",          "stills"),
+        ("File Browser",       "stills.svg",          "stills"),
     ]),
     ("03 · MAINTAIN", [
         ("Stale Files",        "health.svg",          "stale"),

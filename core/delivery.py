@@ -469,11 +469,20 @@ def export_manifest(directory: Path, output_path: Path) -> int:
         except OSError:
             continue
 
+        codec = ''
+        resolution = ''
+        fps = ''
+        audio_channels = ''
         duration_secs = ''
         try:
             info = get_media_info(fp)
-            if info and info.duration_secs is not None:
-                duration_secs = f"{info.duration_secs:.3f}"
+            if info:
+                if info.duration_secs is not None:
+                    duration_secs = f"{info.duration_secs:.3f}"
+                codec = info.codec or ''
+                resolution = info.resolution_str or ''
+                fps = info.fps_str or ''
+                audio_channels = str(info.audio_channels) if info.audio_channels else ''
         except Exception:
             pass
 
@@ -482,6 +491,10 @@ def export_manifest(directory: Path, output_path: Path) -> int:
             'folder': str(fp.parent.relative_to(directory)),
             'size_bytes': stat.st_size,
             'extension': fp.suffix.lower(),
+            'codec': codec,
+            'resolution': resolution,
+            'fps': fps,
+            'audio_channels': audio_channels,
             'duration_secs': duration_secs,
             'date_modified': datetime.datetime.fromtimestamp(stat.st_mtime).isoformat(),
         })
@@ -489,7 +502,11 @@ def export_manifest(directory: Path, output_path: Path) -> int:
     with open(output_path, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(
             f,
-            fieldnames=['filename', 'folder', 'size_bytes', 'extension', 'duration_secs', 'date_modified'],
+            fieldnames=[
+                'filename', 'folder', 'size_bytes', 'extension',
+                'codec', 'resolution', 'fps', 'audio_channels',
+                'duration_secs', 'date_modified',
+            ],
         )
         writer.writeheader()
         writer.writerows(rows)

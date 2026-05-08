@@ -760,8 +760,9 @@ class _ExportPane(QWidget):
         csv_layout = QVBoxLayout(csv_page)
         csv_layout.setContentsMargins(4, 4, 4, 4)
         csv_note = QLabel(
-            "Writes filename, folder, size_bytes, extension, duration_secs, date_modified.\n"
-            "duration_secs is populated when ffprobe or pymediainfo is available."
+            "Writes filename, folder, size, extension, codec, resolution, fps, "
+            "audio channels, duration, and date modified.\n"
+            "Media metadata columns are populated when ffprobe or pymediainfo is available."
         )
         csv_note.setWordWrap(True)
         csv_note.setObjectName("cardSub")

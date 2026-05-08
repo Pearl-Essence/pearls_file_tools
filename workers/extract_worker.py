@@ -9,6 +9,7 @@ from workers.base_worker import BaseWorker
 from core.file_utils import has_keyword
 from core.archive_utils import extract_archive
 from constants import PHOTO_KEYWORDS
+from typing import List
 
 BACKUP_DIR_NAME = ".archive_extractor_backups"
 
@@ -32,6 +33,7 @@ class ExtractWorker(BaseWorker):
         super().__init__()
         self.root_dir = Path(root_dir)
         self.settings = settings
+        self.keywords: List[str] = settings.get('keywords', list(PHOTO_KEYWORDS))
         self.extraction_record = {
             'timestamp': datetime.datetime.now().isoformat(),
             'root_dir': str(root_dir),
@@ -79,7 +81,7 @@ class ExtractWorker(BaseWorker):
             self.log_message.emit(f"Searching in: {self.root_dir}")
 
             if self.settings['keyword_filter']:
-                self.log_message.emit(f"Keywords (case-insensitive): {', '.join(PHOTO_KEYWORDS)}")
+                self.log_message.emit(f"Keywords (case-insensitive): {', '.join(self.keywords)}")
 
             if self.settings['smart_extract']:
                 self.log_message.emit("Smart extraction: Removing intermediate folders when possible")
@@ -98,7 +100,7 @@ class ExtractWorker(BaseWorker):
 
                     # Check keyword filter
                     if self.settings['keyword_filter']:
-                        if not has_keyword(filename, PHOTO_KEYWORDS):
+                        if not has_keyword(filename, self.keywords):
                             continue
 
                     # Check if it's a supported archive type

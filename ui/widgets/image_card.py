@@ -1,8 +1,9 @@
-"""Image card widget for displaying image thumbnails."""
+"""Image/video card widget for displaying thumbnails."""
 
+import base64
 from PySide6.QtWidgets import QFrame, QVBoxLayout, QLabel
-from PySide6.QtCore import Qt, QRectF, Signal
-from PySide6.QtGui import QBrush, QPixmap, QColor, QPainter, QFont
+from PySide6.QtCore import Qt, QRectF, QPointF, Signal
+from PySide6.QtGui import QBrush, QPixmap, QColor, QPainter, QFont, QPolygonF
 from pathlib import Path
 from typing import Dict
 
@@ -64,31 +65,116 @@ class ImageCard(QFrame):
         self.setLayout(layout)
 
     def _load_thumbnail(self):
-        """Load and display the thumbnail image."""
+        """Load and display the thumbnail."""
         try:
-            image_path = Path(self.image_data['path'])
+            is_video = self.image_data.get('is_video', False)
 
-            if not image_path.exists():
-                pixmap = self._create_error_placeholder()
+            if is_video:
+                pixmap = self._load_video_thumbnail()
             else:
-                pixmap = QPixmap(str(image_path))
-                if pixmap.isNull():
+                image_path = Path(self.image_data['path'])
+                if not image_path.exists():
                     pixmap = self._create_error_placeholder()
                 else:
-                    pixmap = pixmap.scaled(
-                        self.thumbnail_size, self.thumbnail_size,
-                        Qt.KeepAspectRatio, Qt.SmoothTransformation
-                    )
+                    pixmap = QPixmap(str(image_path))
+                    if pixmap.isNull():
+                        pixmap = self._create_error_placeholder()
+                    else:
+                        pixmap = pixmap.scaled(
+                            self.thumbnail_size, self.thumbnail_size,
+                            Qt.KeepAspectRatio, Qt.SmoothTransformation
+                        )
 
-            # Overlay a sequence badge if this card represents a frame sequence
+            # Overlay badges
             total = self.image_data.get('sequence_total')
             if total:
                 pixmap = self._add_sequence_badge(pixmap, total)
+
+            if is_video:
+                pixmap = self._add_play_overlay(pixmap)
+                dur = self.image_data.get('duration_secs')
+                if dur is not None:
+                    pixmap = self._add_duration_badge(pixmap, dur)
 
             self.thumbnail_label.setPixmap(pixmap)
 
         except Exception:
             self.thumbnail_label.setPixmap(self._create_error_placeholder())
+
+    def _load_video_thumbnail(self) -> QPixmap:
+        """Load video thumbnail from base64 data or create a placeholder."""
+        b64 = self.image_data.get('thumbnail_b64')
+        if b64:
+            raw = base64.b64decode(b64)
+            pixmap = QPixmap()
+            pixmap.loadFromData(raw, 'PNG')
+            if not pixmap.isNull():
+                return pixmap.scaled(
+                    self.thumbnail_size, self.thumbnail_size,
+                    Qt.KeepAspectRatio, Qt.SmoothTransformation,
+                )
+        return self._create_video_placeholder()
+
+    def _create_video_placeholder(self) -> QPixmap:
+        """Dark rect with a centered play triangle."""
+        pixmap = QPixmap(self.thumbnail_size, self.thumbnail_size)
+        pixmap.fill(QColor("#1a1a2e"))
+        return pixmap
+
+    def _add_play_overlay(self, base_pixmap: QPixmap) -> QPixmap:
+        """Add a semi-transparent play icon in the centre."""
+        result = QPixmap(base_pixmap)
+        painter = QPainter(result)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        cx = result.width() / 2
+        cy = result.height() / 2
+        r = min(result.width(), result.height()) * 0.15
+
+        # Circle background
+        painter.setBrush(QBrush(QColor(0, 0, 0, 140)))
+        painter.setPen(Qt.NoPen)
+        painter.drawEllipse(QPointF(cx, cy), r * 1.4, r * 1.4)
+
+        # Play triangle
+        painter.setBrush(QBrush(QColor(255, 255, 255, 220)))
+        tri = QPolygonF([
+            QPointF(cx - r * 0.5, cy - r),
+            QPointF(cx - r * 0.5, cy + r),
+            QPointF(cx + r, cy),
+        ])
+        painter.drawPolygon(tri)
+        painter.end()
+        return result
+
+    def _add_duration_badge(self, base_pixmap: QPixmap, secs: float) -> QPixmap:
+        """Overlay a duration label in the bottom-right corner."""
+        mins = int(secs) // 60
+        remaining = int(secs) % 60
+        text = f"{mins}:{remaining:02d}"
+        result = QPixmap(base_pixmap)
+        painter = QPainter(result)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        font = QFont("Arial", max(7, self.thumbnail_size // 22), QFont.Bold)
+        painter.setFont(font)
+        fm = painter.fontMetrics()
+        tw = fm.horizontalAdvance(text) if hasattr(fm, 'horizontalAdvance') else fm.width(text)
+        th = fm.height()
+        pad = 4
+        bw = tw + pad * 2
+        bh = th + pad
+        x = result.width() - bw - 4
+        y = result.height() - bh - 4
+
+        painter.setBrush(QBrush(QColor(0, 0, 0, 180)))
+        painter.setPen(Qt.NoPen)
+        painter.drawRoundedRect(QRectF(x, y, bw, bh), 4, 4)
+
+        painter.setPen(QColor(255, 255, 255))
+        painter.drawText(x + pad, y + th - fm.descent(), text)
+        painter.end()
+        return result
 
     def _add_sequence_badge(self, base_pixmap: QPixmap, total: int) -> QPixmap:
         """Overlay a '▶ N frames' badge in the bottom-right of the pixmap."""

@@ -194,6 +194,30 @@ def rename_file(filename: str, new_name: str) -> str:
     return f"{new_name}{suffix}"
 
 
+def replace_prefix(filename: str, find: str, replace_with: str) -> str:
+    """Replace a prefix on the stem. Extension is preserved."""
+    if not find:
+        return filename
+    path = Path(filename)
+    stem = path.stem
+    ext = path.suffix
+    if stem.startswith(find):
+        stem = replace_with + stem[len(find):]
+    return f"{stem}{ext}"
+
+
+def replace_suffix(filename: str, find: str, replace_with: str) -> str:
+    """Replace a suffix on the stem. Extension is preserved."""
+    if not find:
+        return filename
+    path = Path(filename)
+    stem = path.stem
+    ext = path.suffix
+    if stem.endswith(find):
+        stem = stem[:len(stem) - len(find)] + replace_with
+    return f"{stem}{ext}"
+
+
 def generate_new_filename(original_filename: str,
                          prefix: str = "",
                          suffix: str = "",

@@ -6,14 +6,14 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 from PySide6.QtCore import Signal
 from workers.base_worker import BaseWorker
-from core.name_transform import generate_new_filename, move_prefix_to_suffix, move_suffix_to_prefix
+from core.name_transform import generate_new_filename, move_prefix_to_suffix, move_suffix_to_prefix, replace_prefix, replace_suffix
 from core.file_utils import (
     resolve_name_conflict, safe_rename, same_inode,
     split_compound_suffix, is_hidden_file,
 )
 from core.pattern_matching import match_prefix, match_suffix
 from models.operation_record import OperationRecord
-from constants import OP_TYPE_RENAME, SIDECAR_EXTENSIONS, CAPTION_EXTENSIONS
+from constants import OP_TYPE_RENAME, OP_TYPE_COPY, SIDECAR_EXTENSIONS, CAPTION_EXTENSIONS
 
 
 class RenameWorker(BaseWorker):
@@ -33,7 +33,13 @@ class RenameWorker(BaseWorker):
         case_transform: str = "none",
         prefix_to_suffix: Optional[List[str]] = None,
         suffix_to_prefix: Optional[List[str]] = None,
+        find_prefix: str = "",
+        replace_prefix_with: str = "",
+        find_suffix: str = "",
+        replace_suffix_with: str = "",
         direct_renames: Optional[List[Tuple[Path, str]]] = None,
+        copy_mode: bool = False,
+        copy_dest: Optional[Path] = None,
         rename_sidecars: bool = True,
         rename_captions: bool = True,
         write_manifest: bool = True,
@@ -68,7 +74,13 @@ class RenameWorker(BaseWorker):
         self.case_transform = case_transform
         self.prefix_to_suffix = prefix_to_suffix
         self.suffix_to_prefix = suffix_to_prefix
+        self.find_prefix = find_prefix
+        self.replace_prefix_with = replace_prefix_with
+        self.find_suffix = find_suffix
+        self.replace_suffix_with = replace_suffix_with
         self.direct_renames = direct_renames
+        self.copy_mode = copy_mode
+        self.copy_dest = copy_dest
         self.rename_sidecars = rename_sidecars
         self.rename_captions = rename_captions
         self.write_manifest = write_manifest
@@ -134,6 +146,77 @@ class RenameWorker(BaseWorker):
     # ── main run ─────────────────────────────────────────────────────────────
 
     def run(self):
+        """Execute the rename or copy operation."""
+        if self.copy_mode:
+            self._run_copy()
+        else:
+            self._run_rename()
+
+    def _run_copy(self):
+        """Copy files with new names to copy_dest."""
+        import shutil
+
+        success_count = 0
+        error_count = 0
+        errors = []
+        copy_operations = []   # (copied_path, original_path) for OperationRecord
+        manifest_rows = []
+
+        if self.direct_renames is not None:
+            work = list(self.direct_renames)
+        else:
+            work = self._build_work_list()
+
+        total = len(work)
+        dest = self.copy_dest
+
+        for idx, (filepath, new_name) in enumerate(work):
+            if self.is_cancelled:
+                self.emit_finished(False, "Operation cancelled by user", None)
+                return
+            try:
+                dest_path = dest / new_name
+                if dest_path.exists():
+                    dest_path = resolve_name_conflict(dest_path)
+                    if dest_path is None:
+                        errors.append(f"{filepath.name}: target already exists in destination")
+                        error_count += 1
+                        continue
+
+                shutil.copy2(filepath, dest_path)
+                ts_str = datetime.datetime.now().isoformat(timespec='seconds')
+                copy_operations.append((dest_path, filepath))
+                manifest_rows.append((filepath.name, dest_path.name, ts_str))
+                success_count += 1
+                self.emit_progress(f"Copied: {filepath.name} → {dest_path.name}")
+            except Exception as e:
+                errors.append(f"{filepath.name}: {e}")
+                error_count += 1
+
+            if total > 0:
+                pct = int(((idx + 1) / total) * 100)
+                self.emit_progress(f"Processing… {idx + 1}/{total} ({pct}%)")
+
+        if self.write_manifest and manifest_rows:
+            self._write_manifest(manifest_rows, dest)
+
+        operation_record = None
+        if copy_operations:
+            operation_record = OperationRecord(
+                operation_type=OP_TYPE_COPY,
+                files_affected=copy_operations,
+                metadata={'copy_dest': str(dest)},
+            )
+
+        message = f"Successfully copied {success_count} file(s)."
+        if error_count:
+            message += f"\n{error_count} error(s):\n" + "\n".join(errors[:5])
+            if len(errors) > 5:
+                message += f"\n… and {len(errors) - 5} more"
+
+        self.emit_finished(error_count == 0, message, operation_record)
+
+    def _run_rename(self):
         """Execute the rename operation."""
         success_count = 0
         error_count = 0
@@ -269,6 +352,12 @@ class RenameWorker(BaseWorker):
                 matched = match_suffix(current_name, self.suffix_to_prefix)
                 if matched:
                     current_name = move_suffix_to_prefix(current_name, matched)
+
+            # Replace prefix/suffix pass
+            if self.find_prefix:
+                current_name = replace_prefix(current_name, self.find_prefix, self.replace_prefix_with)
+            if self.find_suffix:
+                current_name = replace_suffix(current_name, self.find_suffix, self.replace_suffix_with)
 
             # Standard transform pass — runs even after a transposition so
             # users can chain "remove DRAFT_" and "add HERO_" in one click.
