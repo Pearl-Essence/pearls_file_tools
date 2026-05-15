@@ -11,14 +11,15 @@ already pre-filled.
 """
 
 from pathlib import Path
-from typing import Optional
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QTabWidget, QVBoxLayout, QWidget
 
 from ui.tabs.base_tab import BaseTab
 from ui.tabs.delivery_tab import (
-    _DuplicatesPane, _ExportPane, _HandoffPane, _PackagePane,
+    _DuplicatesPane,
+    _ExportPane,
+    _HandoffPane,
+    _PackagePane,
 )
 from ui.widgets.tab_header import TabHeader
 
@@ -48,9 +49,9 @@ class PackageExportTab(BaseTab):
         self._export_pane = _ExportPane(self.config)
 
         self._inner_tabs.addTab(self._package_pane, "Package")
-        self._inner_tabs.addTab(self._dupes_pane,   "Duplicates")
+        self._inner_tabs.addTab(self._dupes_pane, "Duplicates")
         self._inner_tabs.addTab(self._handoff_pane, "Handoff")
-        self._inner_tabs.addTab(self._export_pane,  "Export")
+        self._inner_tabs.addTab(self._export_pane, "Export")
 
         root.addWidget(self._inner_tabs, stretch=1)
 
@@ -80,7 +81,7 @@ class PackageExportTab(BaseTab):
     # Persistence
     # ─────────────────────────────────────────────────────────────────────
     def load_settings(self):
-        directory = self.config.get_tab_directory('delivery')
+        directory = self.config.get_tab_directory("delivery")
         if directory and Path(directory).is_dir():
             self._dupes_pane.dir_selector.set_directory(directory)
             self._handoff_pane.dir_selector.set_directory(directory)

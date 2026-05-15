@@ -8,7 +8,7 @@ Source files are NEVER deleted — ingest is always copy-only.
 import hashlib
 import shutil
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Tuple
 
@@ -69,8 +69,8 @@ class IngestWorker(BaseWorker):
     @staticmethod
     def _md5(path: Path) -> str:
         h = hashlib.md5()
-        with open(path, 'rb') as f:
-            for chunk in iter(lambda: f.read(65536), b''):
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
                 h.update(chunk)
         return h.hexdigest()
 
@@ -131,13 +131,8 @@ class IngestWorker(BaseWorker):
                 if self.is_cancelled:
                     break
                 fail_count += 1
-                err = (
-                    "Source still growing — settle timeout"
-                    if src.exists() else "Source vanished before ingest"
-                )
-                self._results.append(
-                    IngestResult(src=src, dst=dst, verified=False, error=err)
-                )
+                err = "Source still growing — settle timeout" if src.exists() else "Source vanished before ingest"
+                self._results.append(IngestResult(src=src, dst=dst, verified=False, error=err))
                 self.file_status.emit(src.name, False, f"✗ {src.name}: {err}")
                 continue
 
@@ -155,8 +150,7 @@ class IngestWorker(BaseWorker):
                 post_size = src.stat().st_size
                 if post_size != pre_size or post_size != dst.stat().st_size:
                     raise IOError(
-                        "Source size changed during copy "
-                        f"({pre_size:,} → {post_size:,}); writer not finished"
+                        "Source size changed during copy " f"({pre_size:,} → {post_size:,}); writer not finished"
                     )
 
                 if self.verify:
@@ -168,7 +162,8 @@ class IngestWorker(BaseWorker):
                     if verified:
                         success_count += 1
                         self.file_status.emit(
-                            src.name, True,
+                            src.name,
+                            True,
                             f"✓ Verified → {dst} hash={dst_md5}",
                         )
                     else:

@@ -2,14 +2,17 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import List, Tuple, Dict, Any, Optional
-from constants import OP_TYPE_RENAME, OP_TYPE_ORGANIZE, OP_TYPE_EXTRACT, OP_TYPE_COPY
+from typing import Any, Dict, List, Optional, Tuple
+
+from constants import OP_TYPE_COPY, OP_TYPE_EXTRACT, OP_TYPE_ORGANIZE, OP_TYPE_RENAME
 
 
 class OperationRecord:
     """Records an operation for undo functionality."""
 
-    def __init__(self, operation_type: str, files_affected: List[Tuple[Path, Path]], metadata: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self, operation_type: str, files_affected: List[Tuple[Path, Path]], metadata: Optional[Dict[str, Any]] = None
+    ):
         """
         Initialize operation record.
 
@@ -76,9 +79,7 @@ class OperationRecord:
                     continue
 
                 if old_path.exists() and not same_inode(new_path, old_path):
-                    errors.append(
-                        f"{old_path.name}: original location occupied by a different file"
-                    )
+                    errors.append(f"{old_path.name}: original location occupied by a different file")
                     error_count += 1
                     continue
 
@@ -101,18 +102,15 @@ class OperationRecord:
             Dictionary representation of the operation record
         """
         return {
-            'timestamp': self.timestamp.isoformat(),
-            'operation_type': self.operation_type,
+            "timestamp": self.timestamp.isoformat(),
+            "operation_type": self.operation_type,
             # Stored as (new_path, old_path) — see __init__ docstring.
-            'files_affected': [
-                (str(new_path), str(old_path))
-                for new_path, old_path in self.files_affected
-            ],
-            'metadata': self.metadata
+            "files_affected": [(str(new_path), str(old_path)) for new_path, old_path in self.files_affected],
+            "metadata": self.metadata,
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'OperationRecord':
+    def from_dict(cls, data: Dict[str, Any]) -> "OperationRecord":
         """
         Create OperationRecord from dictionary.
 
@@ -123,16 +121,13 @@ class OperationRecord:
             OperationRecord instance
         """
         record = cls(
-            operation_type=data['operation_type'],
-            files_affected=[
-                (Path(new_path), Path(old_path))
-                for new_path, old_path in data['files_affected']
-            ],
-            metadata=data.get('metadata', {})
+            operation_type=data["operation_type"],
+            files_affected=[(Path(new_path), Path(old_path)) for new_path, old_path in data["files_affected"]],
+            metadata=data.get("metadata", {}),
         )
 
         # Restore timestamp
-        record.timestamp = datetime.fromisoformat(data['timestamp'])
+        record.timestamp = datetime.fromisoformat(data["timestamp"])
 
         return record
 

@@ -1,10 +1,10 @@
 """Comprehensive tests for models/operation_record.py."""
 
-import pytest
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+
+from constants import OP_TYPE_COPY, OP_TYPE_EXTRACT, OP_TYPE_ORGANIZE, OP_TYPE_RENAME
 from models.operation_record import OperationRecord
-from constants import OP_TYPE_RENAME, OP_TYPE_COPY, OP_TYPE_ORGANIZE, OP_TYPE_EXTRACT
 
 
 class TestOperationRecordInit:

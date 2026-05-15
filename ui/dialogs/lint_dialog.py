@@ -5,15 +5,25 @@ from typing import List
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QHeaderView,
+    QDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
 )
 
-from core.linter import LintIssue, ISSUE_LABELS
+from core.linter import ISSUE_LABELS, LintIssue
 
 _SEVERITY_ORDER = [
-    'illegal_char', 'reserved_name', 'too_long',
-    'case_duplicate', 'wip_flag', 'profile_mismatch',
+    "illegal_char",
+    "reserved_name",
+    "too_long",
+    "case_duplicate",
+    "wip_flag",
+    "profile_mismatch",
 ]
 
 
@@ -31,10 +41,7 @@ class LintDialog(QDialog):
         layout = QVBoxLayout()
 
         count = len(issues)
-        summary_text = (
-            f"<b>{count} issue{'s' if count != 1 else ''}</b> found in "
-            f"<code>{directory}</code>"
-        )
+        summary_text = f"<b>{count} issue{'s' if count != 1 else ''}</b> found in " f"<code>{directory}</code>"
         summary = QLabel(summary_text)
         summary.setWordWrap(True)
         layout.addWidget(summary)
@@ -44,9 +51,10 @@ class LintDialog(QDialog):
         else:
             sorted_issues = sorted(
                 issues,
-                key=lambda x: (_SEVERITY_ORDER.index(x.issue_type)
-                               if x.issue_type in _SEVERITY_ORDER else 99,
-                               x.filename),
+                key=lambda x: (
+                    _SEVERITY_ORDER.index(x.issue_type) if x.issue_type in _SEVERITY_ORDER else 99,
+                    x.filename,
+                ),
             )
             table = QTableWidget(len(sorted_issues), 3)
             table.setHorizontalHeaderLabels(["Filename", "Issue", "Description"])

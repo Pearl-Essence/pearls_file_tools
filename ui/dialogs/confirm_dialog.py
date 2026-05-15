@@ -1,9 +1,8 @@
 """Confirmation dialog for file organization conflicts."""
 
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                            QPushButton, QCheckBox, QListWidget)
-from PySide6.QtCore import Qt
 from typing import List
+
+from PySide6.QtWidgets import QCheckBox, QDialog, QHBoxLayout, QLabel, QListWidget, QPushButton, QVBoxLayout
 
 
 class ConfirmDialog(QDialog):

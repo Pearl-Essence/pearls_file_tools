@@ -1,26 +1,24 @@
 """Comprehensive tests for core/archive_utils.py."""
 
-import os
-import zipfile
 import tarfile
-import struct
-import pytest
+import zipfile
 from pathlib import Path
+
 from core.archive_utils import (
     _is_unsafe_archive_path,
     _safe_path_under,
-    _validate_zip_entries,
-    _validate_tar_entries,
     _scrub_extracted,
+    _validate_tar_entries,
+    _validate_zip_entries,
+    extract_archive,
+    extract_tar,
+    extract_zip,
     get_archive_type,
     smart_extract,
-    extract_zip,
-    extract_tar,
-    extract_archive,
 )
 
-
 # ── _is_unsafe_archive_path ─────────────────────────────────────────────────
+
 
 class TestIsUnsafeArchivePath:
     def test_safe_path(self):
@@ -65,6 +63,7 @@ class TestIsUnsafeArchivePath:
 
 # ── _safe_path_under ────────────────────────────────────────────────────────
 
+
 class TestSafePathUnder:
     def test_child_is_safe(self, tmp_path):
         child = tmp_path / "sub" / "file.txt"
@@ -82,6 +81,7 @@ class TestSafePathUnder:
 
 
 # ── _validate_zip_entries ───────────────────────────────────────────────────
+
 
 class TestValidateZipEntries:
     def test_safe_zip(self, tmp_path):
@@ -126,6 +126,7 @@ class TestValidateZipEntries:
 
 # ── _validate_tar_entries ───────────────────────────────────────────────────
 
+
 class TestValidateTarEntries:
     def test_safe_tar(self, tmp_path):
         tar_path = tmp_path / "safe.tar"
@@ -143,6 +144,7 @@ class TestValidateTarEntries:
             info = tarfile.TarInfo(name="../../../etc/passwd")
             info.size = 5
             import io
+
             tf.addfile(info, io.BytesIO(b"hello"))
         result = _validate_tar_entries(tar_path)
         assert result is not None
@@ -156,6 +158,7 @@ class TestValidateTarEntries:
 
 
 # ── _scrub_extracted ────────────────────────────────────────────────────────
+
 
 class TestScrubExtracted:
     def test_safe_files_kept(self, tmp_path):
@@ -172,6 +175,7 @@ class TestScrubExtracted:
 
 
 # ── get_archive_type ────────────────────────────────────────────────────────
+
 
 class TestGetArchiveType:
     def test_zip(self):
@@ -209,6 +213,7 @@ class TestGetArchiveType:
 
 
 # ── smart_extract ───────────────────────────────────────────────────────────
+
 
 class TestSmartExtract:
     def test_collapses_single_folder(self, tmp_path):
@@ -268,6 +273,7 @@ class TestSmartExtract:
 
 # ── extract_zip ─────────────────────────────────────────────────────────────
 
+
 class TestExtractZip:
     def test_basic_extract(self, tmp_path):
         zip_path = tmp_path / "test.zip"
@@ -307,6 +313,7 @@ class TestExtractZip:
 
 # ── extract_tar ─────────────────────────────────────────────────────────────
 
+
 class TestExtractTar:
     def test_basic_extract(self, tmp_path):
         tar_path = tmp_path / "test.tar"
@@ -339,6 +346,7 @@ class TestExtractTar:
 
 
 # ── extract_archive (dispatcher) ────────────────────────────────────────────
+
 
 class TestExtractArchive:
     def test_dispatches_zip(self, tmp_path):

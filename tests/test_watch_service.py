@@ -1,10 +1,11 @@
 """Comprehensive tests for core/watch_service.py."""
 
-import time
-import pytest
 from pathlib import Path
 from unittest.mock import MagicMock
-from core.watch_service import WatchService, WatchRule
+
+import pytest
+
+from core.watch_service import WatchRule, WatchService
 
 
 class TestWatchRule:

@@ -22,17 +22,17 @@ def detect_qdirstat() -> Optional[str]:
     .app bundle locations (``shutil.which`` cannot find binaries inside
     /Applications/*.app/Contents/MacOS/).
     """
-    for name in ('qdirstat', 'windirstat', 'WinDirStat'):
+    for name in ("qdirstat", "windirstat", "WinDirStat"):
         path = shutil.which(name)
         if path:
             return path
 
     # macOS .app bundles are not on PATH — check common install locations.
-    if sys.platform == 'darwin':
+    if sys.platform == "darwin":
         for app_path in (
-            Path('/Applications/QDirStat.app/Contents/MacOS/qdirstat'),
-            Path('/Applications/WinDirStat.app/Contents/MacOS/windirstat'),
-            Path.home() / 'Applications/QDirStat.app/Contents/MacOS/qdirstat',
+            Path("/Applications/QDirStat.app/Contents/MacOS/qdirstat"),
+            Path("/Applications/WinDirStat.app/Contents/MacOS/windirstat"),
+            Path.home() / "Applications/QDirStat.app/Contents/MacOS/qdirstat",
         ):
             if app_path.is_file():
                 return str(app_path)
@@ -40,8 +40,7 @@ def detect_qdirstat() -> Optional[str]:
     return None
 
 
-def write_qdirstat_cache(data: Dict[str, Dict[str, int]], root_dir: Path,
-                         output_path: Path) -> None:
+def write_qdirstat_cache(data: Dict[str, Dict[str, int]], root_dir: Path, output_path: Path) -> None:
     """Write a storage scan result as a qDirStat .cache.gz file.
 
     Args:
@@ -51,23 +50,23 @@ def write_qdirstat_cache(data: Dict[str, Dict[str, int]], root_dir: Path,
         root_dir: The scanned root directory (used as the base path in the cache).
         output_path: Where to write the .cache.gz file.
     """
-    lines = ['[qdirstat 1.0 cache file]\n']
+    lines = ["[qdirstat 1.0 cache file]\n"]
     now_epoch = int(time.time())
 
     for folder_name, cats in sorted(data.items()):
-        if folder_name == '__root__':
+        if folder_name == "__root__":
             dir_path = str(root_dir)
         else:
             dir_path = str(root_dir / folder_name)
-        lines.append(f'D {dir_path}\n')
+        lines.append(f"D {dir_path}\n")
         for cat, size in sorted(cats.items()):
             if size <= 0:
                 continue
             blocks = (size + 511) // 512
-            lines.append(f'F\t{cat}\t{size}\t0x{now_epoch:x}\t{blocks}\t1\n')
+            lines.append(f"F\t{cat}\t{size}\t0x{now_epoch:x}\t{blocks}\t1\n")
 
-    raw = ''.join(lines).encode('utf-8')
-    with gzip.open(output_path, 'wb') as f:
+    raw = "".join(lines).encode("utf-8")
+    with gzip.open(output_path, "wb") as f:
         f.write(raw)
 
 
@@ -78,10 +77,10 @@ def parse_qdirstat_cache(cache_path: Path) -> Dict[str, Dict[str, int]]:
         {folder_name: {category: size_bytes}} — folder_name is relative to the
         first D-line encountered, or '__root__' for files in the top directory.
     """
-    with gzip.open(cache_path, 'rt', encoding='utf-8') as f:
+    with gzip.open(cache_path, "rt", encoding="utf-8") as f:
         lines = f.readlines()
 
-    if not lines or not lines[0].startswith('[qdirstat'):
+    if not lines or not lines[0].startswith("[qdirstat"):
         raise ValueError("Not a valid qDirStat cache file")
 
     from constants import ALL_EXTENSION_CATEGORIES
@@ -93,23 +92,23 @@ def parse_qdirstat_cache(cache_path: Path) -> Dict[str, Dict[str, int]]:
 
     data: Dict[str, Dict[str, int]] = {}
     root_path: Optional[str] = None
-    current_folder = '__root__'
+    current_folder = "__root__"
 
     for line in lines[1:]:
-        line = line.rstrip('\n')
-        if line.startswith('D '):
+        line = line.rstrip("\n")
+        if line.startswith("D "):
             dir_path = line[2:].strip()
             if root_path is None:
                 root_path = dir_path
-                current_folder = '__root__'
+                current_folder = "__root__"
             else:
                 try:
                     rel = os.path.relpath(dir_path, root_path)
-                    current_folder = rel if rel != '.' else '__root__'
+                    current_folder = rel if rel != "." else "__root__"
                 except ValueError:
                     current_folder = dir_path
-        elif line.startswith('F\t'):
-            parts = line.split('\t')
+        elif line.startswith("F\t"):
+            parts = line.split("\t")
             if len(parts) >= 3:
                 fname = parts[1]
                 try:
@@ -117,7 +116,7 @@ def parse_qdirstat_cache(cache_path: Path) -> Dict[str, Dict[str, int]]:
                 except ValueError:
                     continue
                 ext = os.path.splitext(fname)[1].lower()
-                cat = ext_to_cat.get(ext, 'other')
+                cat = ext_to_cat.get(ext, "other")
                 data.setdefault(current_folder, {})
                 data[current_folder][cat] = data[current_folder].get(cat, 0) + size
 

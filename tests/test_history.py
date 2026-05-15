@@ -1,12 +1,13 @@
 """Comprehensive tests for core/history.py."""
 
-import pytest
 from pathlib import Path
-from datetime import datetime
 from unittest.mock import patch
+
+import pytest
+
+from constants import OP_TYPE_COPY, OP_TYPE_RENAME
 from core.history import RenameHistory, get_history_db_path
 from models.operation_record import OperationRecord
-from constants import OP_TYPE_RENAME, OP_TYPE_COPY
 
 
 @pytest.fixture
@@ -26,7 +27,7 @@ def sample_record(tmp_path):
         files_affected=[
             (Path("/dest/new1.mov"), Path("/src/old1.mov")),
             (Path("/dest/new2.mov"), Path("/src/old2.mov")),
-        ]
+        ],
     )
 
 

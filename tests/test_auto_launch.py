@@ -1,13 +1,14 @@
 """Comprehensive tests for core/auto_launch.py."""
 
 import sys
+from unittest.mock import patch
+
 import pytest
-from pathlib import Path
-from unittest.mock import patch, MagicMock
+
 from core.auto_launch import (
     _get_launch_command,
-    set_auto_launch,
     get_auto_launch,
+    set_auto_launch,
 )
 
 

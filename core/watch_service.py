@@ -4,13 +4,14 @@ Wraps watchdog (real-time) with a polling fallback when watchdog is not installe
 """
 
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
 try:
-    from watchdog.observers import Observer
     from watchdog.events import FileSystemEventHandler
+    from watchdog.observers import Observer
+
     HAS_WATCHDOG = True
 except ImportError:
     HAS_WATCHDOG = False
@@ -21,11 +22,12 @@ except ImportError:
 @dataclass
 class WatchRule:
     watch_dir: str
-    profile_name: str = ''
+    profile_name: str = ""
     enabled: bool = True
 
 
 if HAS_WATCHDOG:
+
     class _SettleHandler(FileSystemEventHandler):
         """Debounce file-system events with a 2-second settle timer."""
 
@@ -73,8 +75,8 @@ class WatchService:
     POLL_SETTLE_PASSES = 2
 
     def __init__(self):
-        self._observers: List = []          # watchdog Observer instances
-        self._handlers: List = []           # _SettleHandler instances
+        self._observers: List = []  # watchdog Observer instances
+        self._handlers: List = []  # _SettleHandler instances
         self._rules: List[WatchRule] = []
         self._callback: Optional[Callable[[Path, str], None]] = None
         self._snapshot: Dict[str, set] = {}
@@ -105,6 +107,7 @@ class WatchService:
                 def make_cb(pname: str) -> Callable[[Path], None]:
                     def cb(path: Path):
                         callback(path, pname)
+
                     return cb
 
                 handler = _SettleHandler(make_cb(profile_name))

@@ -1,11 +1,11 @@
 """Image viewer dialog for full-size image viewing."""
 
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                            QPushButton)
+from pathlib import Path
+from typing import Dict, List
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
-from pathlib import Path
-from typing import List, Dict
+from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
 
 class ImageViewerDialog(QDialog):
@@ -90,12 +90,12 @@ class ImageViewerDialog(QDialog):
         image_data = self.images[self.current_index]
 
         # Update header
-        folder = image_data.get('folder', 'Unknown')
-        name = image_data.get('name', 'Unknown')
+        folder = image_data.get("folder", "Unknown")
+        name = image_data.get("name", "Unknown")
         self.header_label.setText(f"{folder} / {name}")
 
         # Load and display image
-        image_path = Path(image_data['path'])
+        image_path = Path(image_data["path"])
 
         if not image_path.exists():
             self.image_label.setText(f"Image not found:\n{image_path}")
@@ -107,11 +107,7 @@ class ImageViewerDialog(QDialog):
             self.image_label.setText(f"Failed to load image:\n{name}")
         else:
             # Scale to fit while maintaining aspect ratio
-            scaled_pixmap = pixmap.scaled(
-                self.image_label.size(),
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation
-            )
+            scaled_pixmap = pixmap.scaled(self.image_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.image_label.setPixmap(scaled_pixmap)
 
         # Update counter
