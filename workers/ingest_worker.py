@@ -68,7 +68,7 @@ class IngestWorker(BaseWorker):
 
     @staticmethod
     def _md5(path: Path) -> str:
-        h = hashlib.md5()
+        h = hashlib.sha256()
         with open(path, "rb") as f:
             for chunk in iter(lambda: f.read(65536), b""):
                 h.update(chunk)

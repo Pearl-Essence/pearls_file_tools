@@ -103,7 +103,7 @@ def _fmt_size(n: int) -> str:
 
 
 def _md5(path: Path, chunk: int = 1 << 20) -> str:
-    h = hashlib.md5()
+    h = hashlib.sha256()
     with path.open("rb") as f:
         while True:
             buf = f.read(chunk)

@@ -188,7 +188,7 @@ def calculate_directory_hash(directory: Path) -> str:
                 except (PermissionError, OSError):
                     folders.append(f"{item.name}:0")
         folder_string = "|".join(sorted(folders))
-        return hashlib.md5(folder_string.encode()).hexdigest()
+        return hashlib.sha256(folder_string.encode()).hexdigest()
     except Exception:
         return ""
 

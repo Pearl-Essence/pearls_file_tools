@@ -30,9 +30,9 @@ class SyncReport:
         return [e for e in self.entries if e.status == status]
 
 
-def _md5(path: Path) -> str:
-    """Return hex MD5 of the file at *path*."""
-    h = hashlib.md5()
+def _file_hash(path: Path) -> str:
+    """Return hex SHA-256 of the file at *path*."""
+    h = hashlib.sha256()
     try:
         with open(path, "rb") as fh:
             for chunk in iter(lambda: fh.read(65536), b""):
@@ -106,8 +106,8 @@ def compare_directories(
             continue
 
         if in_a and in_b:
-            md5_a = _md5(path_a)
-            md5_b = _md5(path_b)
+            md5_a = _file_hash(path_a)
+            md5_b = _file_hash(path_b)
             if md5_a != md5_b:
                 status = "modified_both"
             elif mtime_a > mtime_b:

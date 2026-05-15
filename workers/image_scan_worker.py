@@ -269,7 +269,7 @@ class ImageScanWorker(BaseWorker):
                 )
 
             hash_string = f"{self.root_dir}:{mtime}:{image_count}:{self.recursive}:{self.include_video}"
-            return hashlib.md5(hash_string.encode()).hexdigest()
+            return hashlib.sha256(hash_string.encode()).hexdigest()
         except Exception:
             return None
 
