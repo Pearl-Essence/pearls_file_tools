@@ -10,7 +10,7 @@ from typing import Dict, List, Optional
 @dataclass
 class SyncEntry:
     rel_path: str
-    status: str   # 'modified_both' | 'a_newer' | 'b_newer' | 'a_only' | 'b_only'
+    status: str  # 'modified_both' | 'a_newer' | 'b_newer' | 'a_only' | 'b_only'
     path_a: Optional[Path]
     path_b: Optional[Path]
     size_a: int = 0
@@ -34,11 +34,11 @@ def _md5(path: Path) -> str:
     """Return hex MD5 of the file at *path*."""
     h = hashlib.md5()
     try:
-        with open(path, 'rb') as fh:
-            for chunk in iter(lambda: fh.read(65536), b''):
+        with open(path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(65536), b""):
                 h.update(chunk)
     except OSError:
-        return ''
+        return ""
     return h.hexdigest()
 
 
@@ -50,11 +50,11 @@ def _index_dir(root: Path) -> Dict[str, Path]:
     index: Dict[str, Path] = {}
     if not root.is_dir():
         return index
-    for p in root.rglob('*'):
+    for p in root.rglob("*"):
         if not p.is_file():
             continue
         # Skip .pearls_trash anywhere in the path
-        if '.pearls_trash' in p.parts:
+        if ".pearls_trash" in p.parts:
             continue
         try:
             rel = p.relative_to(root)
@@ -109,26 +109,28 @@ def compare_directories(
             md5_a = _md5(path_a)
             md5_b = _md5(path_b)
             if md5_a != md5_b:
-                status = 'modified_both'
+                status = "modified_both"
             elif mtime_a > mtime_b:
-                status = 'a_newer'
+                status = "a_newer"
             else:
-                status = 'b_newer'
+                status = "b_newer"
         elif in_a:
-            status = 'a_only'
+            status = "a_only"
         else:
-            status = 'b_only'
+            status = "b_only"
 
-        entries.append(SyncEntry(
-            rel_path=rel,
-            status=status,
-            path_a=path_a,
-            path_b=path_b,
-            size_a=size_a,
-            size_b=size_b,
-            mtime_a=mtime_a,
-            mtime_b=mtime_b,
-        ))
+        entries.append(
+            SyncEntry(
+                rel_path=rel,
+                status=status,
+                path_a=path_a,
+                path_b=path_b,
+                size_a=size_a,
+                size_b=size_b,
+                mtime_a=mtime_a,
+                mtime_b=mtime_b,
+            )
+        )
 
     return SyncReport(
         dir_a=dir_a,

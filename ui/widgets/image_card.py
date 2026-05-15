@@ -12,7 +12,7 @@ from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 class ImageCard(QFrame):
     """A card widget displaying an image thumbnail and info."""
 
-    clicked = Signal(object)               # Emits the image data dict
+    clicked = Signal(object)  # Emits the image data dict
     context_menu_requested = Signal(object, object)  # img_data, QPoint (global)
 
     def __init__(self, image_data: Dict, thumbnail_size: int = 200):
@@ -32,7 +32,7 @@ class ImageCard(QFrame):
         self.setCursor(Qt.PointingHandCursor)
 
         # Highlight sequence cards with a blue border
-        if image_data.get('is_sequence_rep'):
+        if image_data.get("is_sequence_rep"):
             self.setStyleSheet("QFrame { border: 2px solid #1e90ff; border-radius: 4px; }")
 
         # Set fixed size for consistent grid layout
@@ -51,7 +51,7 @@ class ImageCard(QFrame):
         self._load_thumbnail()
 
         # Image name — use sequence label when available
-        display_name = image_data.get('sequence_label') or image_data['name']
+        display_name = image_data.get("sequence_label") or image_data["name"]
         name_label = QLabel(display_name)
         name_label.setAlignment(Qt.AlignCenter)
         name_label.setWordWrap(True)
@@ -68,12 +68,12 @@ class ImageCard(QFrame):
     def _load_thumbnail(self):
         """Load and display the thumbnail."""
         try:
-            is_video = self.image_data.get('is_video', False)
+            is_video = self.image_data.get("is_video", False)
 
             if is_video:
                 pixmap = self._load_video_thumbnail()
             else:
-                image_path = Path(self.image_data['path'])
+                image_path = Path(self.image_data["path"])
                 if not image_path.exists():
                     pixmap = self._create_error_placeholder()
                 else:
@@ -82,18 +82,17 @@ class ImageCard(QFrame):
                         pixmap = self._create_error_placeholder()
                     else:
                         pixmap = pixmap.scaled(
-                            self.thumbnail_size, self.thumbnail_size,
-                            Qt.KeepAspectRatio, Qt.SmoothTransformation
+                            self.thumbnail_size, self.thumbnail_size, Qt.KeepAspectRatio, Qt.SmoothTransformation
                         )
 
             # Overlay badges
-            total = self.image_data.get('sequence_total')
+            total = self.image_data.get("sequence_total")
             if total:
                 pixmap = self._add_sequence_badge(pixmap, total)
 
             if is_video:
                 pixmap = self._add_play_overlay(pixmap)
-                dur = self.image_data.get('duration_secs')
+                dur = self.image_data.get("duration_secs")
                 if dur is not None:
                     pixmap = self._add_duration_badge(pixmap, dur)
 
@@ -104,15 +103,17 @@ class ImageCard(QFrame):
 
     def _load_video_thumbnail(self) -> QPixmap:
         """Load video thumbnail from base64 data or create a placeholder."""
-        b64 = self.image_data.get('thumbnail_b64')
+        b64 = self.image_data.get("thumbnail_b64")
         if b64:
             raw = base64.b64decode(b64)
             pixmap = QPixmap()
-            pixmap.loadFromData(raw, 'PNG')
+            pixmap.loadFromData(raw, "PNG")
             if not pixmap.isNull():
                 return pixmap.scaled(
-                    self.thumbnail_size, self.thumbnail_size,
-                    Qt.KeepAspectRatio, Qt.SmoothTransformation,
+                    self.thumbnail_size,
+                    self.thumbnail_size,
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation,
                 )
         return self._create_video_placeholder()
 
@@ -139,11 +140,13 @@ class ImageCard(QFrame):
 
         # Play triangle
         painter.setBrush(QBrush(QColor(255, 255, 255, 220)))
-        tri = QPolygonF([
-            QPointF(cx - r * 0.5, cy - r),
-            QPointF(cx - r * 0.5, cy + r),
-            QPointF(cx + r, cy),
-        ])
+        tri = QPolygonF(
+            [
+                QPointF(cx - r * 0.5, cy - r),
+                QPointF(cx - r * 0.5, cy + r),
+                QPointF(cx + r, cy),
+            ]
+        )
         painter.drawPolygon(tri)
         painter.end()
         return result
@@ -160,7 +163,7 @@ class ImageCard(QFrame):
         font = QFont("Arial", max(7, self.thumbnail_size // 22), QFont.Bold)
         painter.setFont(font)
         fm = painter.fontMetrics()
-        tw = fm.horizontalAdvance(text) if hasattr(fm, 'horizontalAdvance') else fm.width(text)
+        tw = fm.horizontalAdvance(text) if hasattr(fm, "horizontalAdvance") else fm.width(text)
         th = fm.height()
         pad = 4
         bw = tw + pad * 2
@@ -188,8 +191,7 @@ class ImageCard(QFrame):
         painter.setFont(font)
 
         fm = painter.fontMetrics()
-        text_w = fm.horizontalAdvance(badge_text) if hasattr(fm, 'horizontalAdvance') \
-            else fm.width(badge_text)
+        text_w = fm.horizontalAdvance(badge_text) if hasattr(fm, "horizontalAdvance") else fm.width(badge_text)
         text_h = fm.height()
         padding = 4
         badge_w = text_w + padding * 2
@@ -229,6 +231,4 @@ class ImageCard(QFrame):
         if event.button() == Qt.LeftButton:
             self.clicked.emit(self.image_data)
         elif event.button() == Qt.RightButton:
-            self.context_menu_requested.emit(
-                self.image_data, self.mapToGlobal(event.pos())
-            )
+            self.context_menu_requested.emit(self.image_data, self.mapToGlobal(event.pos()))

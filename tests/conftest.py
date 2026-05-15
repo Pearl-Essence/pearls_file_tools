@@ -37,6 +37,7 @@ def tmp_tree(tmp_path):
 def _reset_config_singleton():
     """Reset the Config singleton between tests so state doesn't leak."""
     from config import Config
+
     Config._instance = None
     yield
     Config._instance = None

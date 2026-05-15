@@ -21,9 +21,7 @@ class Project:
     profile_names: List[str] = field(default_factory=list)
     # Names of ProductionTemplates bound to this project.
     # Empty list means "show all global profiles".
-    created: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
-    )
+    created: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
     # ── serialisation ────────────────────────────────────────────────────
 

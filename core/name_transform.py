@@ -11,38 +11,39 @@ from constants import CASE_LOWER, CASE_NONE, CASE_TITLE, CASE_UPPER
 @dataclass
 class ProductionTemplate:
     """A named naming convention profile for production files."""
+
     name: str
-    tokens: List[str] = field(default_factory=lambda: ['PROJECT', 'EP', 'SHOT', 'DESC', 'VER'])
-    separator: str = '_'
-    version_format: str = 'v{:02d}'
-    episode_format: str = 'EP{:02d}'
+    tokens: List[str] = field(default_factory=lambda: ["PROJECT", "EP", "SHOT", "DESC", "VER"])
+    separator: str = "_"
+    version_format: str = "v{:02d}"
+    episode_format: str = "EP{:02d}"
 
     def compose(self, token_values: Dict[str, str]) -> str:
         """Compose a filename stem from token values; empty tokens are omitted."""
-        parts = [token_values.get(t, '').strip() for t in self.tokens]
+        parts = [token_values.get(t, "").strip() for t in self.tokens]
         return self.separator.join(p for p in parts if p)
 
     def to_dict(self) -> Dict:
         return {
-            'name': self.name,
-            'tokens': self.tokens,
-            'separator': self.separator,
-            'version_format': self.version_format,
-            'episode_format': self.episode_format,
+            "name": self.name,
+            "tokens": self.tokens,
+            "separator": self.separator,
+            "version_format": self.version_format,
+            "episode_format": self.episode_format,
         }
 
     @classmethod
-    def from_dict(cls, d: Dict) -> 'ProductionTemplate':
+    def from_dict(cls, d: Dict) -> "ProductionTemplate":
         return cls(
-            name=d.get('name', 'Unnamed'),
-            tokens=d.get('tokens', ['PROJECT', 'EP', 'SHOT', 'DESC', 'VER']),
-            separator=d.get('separator', '_'),
-            version_format=d.get('version_format', 'v{:02d}'),
-            episode_format=d.get('episode_format', 'EP{:02d}'),
+            name=d.get("name", "Unnamed"),
+            tokens=d.get("tokens", ["PROJECT", "EP", "SHOT", "DESC", "VER"]),
+            separator=d.get("separator", "_"),
+            version_format=d.get("version_format", "v{:02d}"),
+            episode_format=d.get("episode_format", "EP{:02d}"),
         )
 
 
-DEFAULT_TEMPLATE = ProductionTemplate(name='Studio Default')
+DEFAULT_TEMPLATE = ProductionTemplate(name="Studio Default")
 
 # Matches filenames ending in a version token. Accepts a wide variety of
 # real-world conventions:
@@ -59,11 +60,11 @@ DEFAULT_TEMPLATE = ProductionTemplate(name='Studio Default')
 # Captures: stem, separator-as-found, v-letter-as-found, digits, extension —
 # so we can preserve the user's existing punctuation and case on bump.
 VERSION_PATTERN = re.compile(
-    r'^(?P<stem>.+?)'
-    r'(?P<sep>[_\-.\s]+)'
-    r'(?P<vchar>[vV])'
-    r'(?P<digits>\d+)'
-    r'(?P<ext>\.[A-Za-z0-9]+)$'
+    r"^(?P<stem>.+?)"
+    r"(?P<sep>[_\-.\s]+)"
+    r"(?P<vchar>[vV])"
+    r"(?P<digits>\d+)"
+    r"(?P<ext>\.[A-Za-z0-9]+)$"
 )
 
 
@@ -143,9 +144,9 @@ def move_suffix_to_prefix(filename: str, suffix_token: str) -> str:
     if not stem.lower().endswith(suffix_token.lower()):
         return filename
 
-    new_stem = stem[:len(stem) - len(suffix_token)]
-    separator = suffix_token[0] if suffix_token and suffix_token[0] in '_- ' else '_'
-    token_text = suffix_token.lstrip('_- ')
+    new_stem = stem[: len(stem) - len(suffix_token)]
+    separator = suffix_token[0] if suffix_token and suffix_token[0] in "_- " else "_"
+    token_text = suffix_token.lstrip("_- ")
 
     return f"{token_text}{separator}{new_stem}{ext}"
 
@@ -165,7 +166,7 @@ def move_prefix_to_suffix(filename: str, prefix: str) -> str:
         return filename
 
     # Remove prefix from start
-    name_without_prefix = filename[len(prefix):]
+    name_without_prefix = filename[len(prefix) :]
 
     path = Path(name_without_prefix)
     stem = path.stem
@@ -203,7 +204,7 @@ def replace_prefix(filename: str, find: str, replace_with: str) -> str:
     stem = path.stem
     ext = path.suffix
     if stem.startswith(find):
-        stem = replace_with + stem[len(find):]
+        stem = replace_with + stem[len(find) :]
     return f"{stem}{ext}"
 
 
@@ -215,15 +216,13 @@ def replace_suffix(filename: str, find: str, replace_with: str) -> str:
     stem = path.stem
     ext = path.suffix
     if stem.endswith(find):
-        stem = stem[:len(stem) - len(find)] + replace_with
+        stem = stem[: len(stem) - len(find)] + replace_with
     return f"{stem}{ext}"
 
 
-def generate_new_filename(original_filename: str,
-                         prefix: str = "",
-                         suffix: str = "",
-                         rename_to: str = "",
-                         case_transform: str = CASE_NONE) -> str:
+def generate_new_filename(
+    original_filename: str, prefix: str = "", suffix: str = "", rename_to: str = "", case_transform: str = CASE_NONE
+) -> str:
     """
     Generate new filename based on transformation options.
 
@@ -255,11 +254,7 @@ def generate_new_filename(original_filename: str,
 
 
 def generate_sequential_filenames(
-    filenames: List[str],
-    base_name: str,
-    start: int = 1,
-    padding: int = 3,
-    separator: str = "_"
+    filenames: List[str], base_name: str, start: int = 1, padding: int = 3, separator: str = "_"
 ) -> List[Tuple[str, str]]:
     """Return (original, new) pairs with sequential numbering.
 
@@ -285,7 +280,7 @@ def detect_version(filename: str) -> Optional[Tuple[str, int, str]]:
     match = VERSION_PATTERN.match(filename)
     if not match:
         return None
-    return match.group('stem'), int(match.group('digits')), match.group('ext')
+    return match.group("stem"), int(match.group("digits")), match.group("ext")
 
 
 def bump_version(filename: str) -> str:
@@ -301,11 +296,11 @@ def bump_version(filename: str) -> str:
     match = VERSION_PATTERN.match(filename)
     if match is None:
         return filename
-    stem = match.group('stem')
-    sep = match.group('sep')
-    vchar = match.group('vchar')
-    digits = match.group('digits')
-    ext = match.group('ext')
+    stem = match.group("stem")
+    sep = match.group("sep")
+    vchar = match.group("vchar")
+    digits = match.group("digits")
+    ext = match.group("ext")
 
     new_num = int(digits) + 1
     pad = max(len(digits), len(str(new_num)))
@@ -332,9 +327,28 @@ def is_valid_filename(filename: str) -> bool:
 
     # Check for reserved names on Windows
     reserved_names = [
-        'CON', 'PRN', 'AUX', 'NUL',
-        'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
-        'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'
+        "CON",
+        "PRN",
+        "AUX",
+        "NUL",
+        "COM1",
+        "COM2",
+        "COM3",
+        "COM4",
+        "COM5",
+        "COM6",
+        "COM7",
+        "COM8",
+        "COM9",
+        "LPT1",
+        "LPT2",
+        "LPT3",
+        "LPT4",
+        "LPT5",
+        "LPT6",
+        "LPT7",
+        "LPT8",
+        "LPT9",
     ]
 
     name_upper = Path(filename).stem.upper()
@@ -342,7 +356,7 @@ def is_valid_filename(filename: str) -> bool:
         return False
 
     # Check for trailing dots or spaces (not allowed on Windows)
-    if filename.endswith('.') or filename.endswith(' '):
+    if filename.endswith(".") or filename.endswith(" "):
         return False
 
     return True

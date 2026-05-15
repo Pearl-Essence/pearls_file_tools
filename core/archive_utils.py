@@ -19,7 +19,7 @@ from typing import Iterable, List, Optional
 # resulting file lives strictly under the destination root.
 
 # Matches a path component that would escape (.. or ../ or absolute prefix)
-_TRAVERSAL_RE = re.compile(r'(^|[\\/])\.\.([\\/]|$)')
+_TRAVERSAL_RE = re.compile(r"(^|[\\/])\.\.([\\/]|$)")
 
 
 def _is_unsafe_archive_path(name: str) -> bool:
@@ -31,11 +31,11 @@ def _is_unsafe_archive_path(name: str) -> bool:
     """
     if not name:
         return True
-    n = name.replace('\\', '/')
-    if n.startswith('/'):
+    n = name.replace("\\", "/")
+    if n.startswith("/"):
         return True
     # Windows drive letter: 'C:foo' or 'C:/foo'
-    if len(n) >= 2 and n[1] == ':' and n[0].isalpha():
+    if len(n) >= 2 and n[1] == ":" and n[0].isalpha():
         return True
     if _TRAVERSAL_RE.search(n):
         return True
@@ -59,7 +59,7 @@ def _safe_path_under(root: Path, candidate: Path) -> bool:
 def _validate_zip_entries(archive_path: Path) -> Optional[str]:
     """Pre-flight check zip entries for traversal. Returns error string or None."""
     try:
-        with zipfile.ZipFile(archive_path, 'r') as zf:
+        with zipfile.ZipFile(archive_path, "r") as zf:
             for info in zf.infolist():
                 if _is_unsafe_archive_path(info.filename):
                     return f"Refusing to extract: archive contains unsafe path {info.filename!r}"
@@ -76,7 +76,7 @@ def _validate_zip_entries(archive_path: Path) -> Optional[str]:
 def _validate_tar_entries(archive_path: Path) -> Optional[str]:
     """Pre-flight check tar entries for traversal."""
     try:
-        with tarfile.open(archive_path, 'r:*') as tf:
+        with tarfile.open(archive_path, "r:*") as tf:
             for member in tf.getmembers():
                 if _is_unsafe_archive_path(member.name):
                     return f"Refusing to extract: archive contains unsafe path {member.name!r}"
@@ -95,7 +95,7 @@ def _scrub_extracted(temp_dir: Path) -> Iterable[Path]:
     extractor honoured a malicious path despite our validator) are deleted.
     """
     temp_root = temp_dir.resolve(strict=False)
-    for p in list(temp_dir.rglob('*')):
+    for p in list(temp_dir.rglob("*")):
         if not _safe_path_under(temp_root, p):
             try:
                 if p.is_file() or p.is_symlink():
@@ -105,15 +105,18 @@ def _scrub_extracted(temp_dir: Path) -> Iterable[Path]:
             except OSError:
                 pass
 
+
 # Try importing optional libraries for additional archive formats
 try:
     import rarfile
+
     HAS_RARFILE = True
 except ImportError:
     HAS_RARFILE = False
 
 try:
     import py7zr
+
     HAS_PY7ZR = True
 except ImportError:
     HAS_PY7ZR = False
@@ -132,19 +135,19 @@ def get_archive_type(filepath: Path) -> Optional[str]:
     filepath_lower = str(filepath).lower()
 
     # Check for compound extensions first (.tar.gz, .tar.bz2, etc.)
-    tar_extensions = ['.tar', '.tar.gz', '.tgz', '.tar.bz2', '.tbz2', '.tar.xz', '.txz']
+    tar_extensions = [".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz"]
     for ext in tar_extensions:
         if filepath_lower.endswith(ext):
-            return 'tar'
+            return "tar"
 
-    if filepath_lower.endswith('.zip'):
-        return 'zip'
+    if filepath_lower.endswith(".zip"):
+        return "zip"
 
-    if filepath_lower.endswith('.rar') and HAS_RARFILE:
-        return 'rar'
+    if filepath_lower.endswith(".rar") and HAS_RARFILE:
+        return "rar"
 
-    if filepath_lower.endswith('.7z') and HAS_PY7ZR:
-        return '7z'
+    if filepath_lower.endswith(".7z") and HAS_PY7ZR:
+        return "7z"
 
     return None
 
@@ -177,6 +180,7 @@ def smart_extract(temp_dir: Path, final_dest: Path, use_smart_extract: bool = Tr
 
             if dest_path.exists():
                 from core.file_utils import resolve_name_conflict
+
                 dest_path = resolve_name_conflict(dest_path)
 
             if dest_path:
@@ -198,7 +202,7 @@ def extract_zip(archive_path: Path, extract_to: Path, use_smart_extract: bool = 
     temp_dir = None
     try:
         temp_dir = tempfile.mkdtemp(prefix="extract_")
-        with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+        with zipfile.ZipFile(archive_path, "r") as zip_ref:
             zip_ref.extractall(temp_dir)
         # Belt-and-braces — drop any entry the underlying extractor placed
         # outside our temp root.
@@ -222,13 +226,13 @@ def extract_tar(archive_path: Path, extract_to: Path, use_smart_extract: bool = 
     temp_dir = None
     try:
         temp_dir = tempfile.mkdtemp(prefix="extract_")
-        with tarfile.open(archive_path, 'r:*') as tar_ref:
+        with tarfile.open(archive_path, "r:*") as tar_ref:
             # Python 3.12+ exposes a ``filter='data'`` arg that rejects unsafe
             # members (absolute paths, ``..``, device files, dangerous symlinks).
             # Fall back to the legacy call on older Pythons — our pre-flight
             # validator above already rejected the malicious cases.
             try:
-                tar_ref.extractall(temp_dir, filter='data')
+                tar_ref.extractall(temp_dir, filter="data")
             except TypeError:
                 tar_ref.extractall(temp_dir)
         _scrub_extracted(Path(temp_dir))
@@ -250,7 +254,7 @@ def extract_rar(archive_path: Path, extract_to: Path, use_smart_extract: bool = 
     temp_dir = None
     try:
         temp_dir = tempfile.mkdtemp(prefix="extract_")
-        with rarfile.RarFile(archive_path, 'r') as rar_ref:
+        with rarfile.RarFile(archive_path, "r") as rar_ref:
             rar_ref.extractall(temp_dir)
         extracted_items = smart_extract(Path(temp_dir), extract_to, use_smart_extract)
         return extracted_items if extracted_items else None
@@ -270,7 +274,7 @@ def extract_7z(archive_path: Path, extract_to: Path, use_smart_extract: bool = T
     temp_dir = None
     try:
         temp_dir = tempfile.mkdtemp(prefix="extract_")
-        with py7zr.SevenZipFile(archive_path, 'r') as sz_ref:
+        with py7zr.SevenZipFile(archive_path, "r") as sz_ref:
             sz_ref.extractall(temp_dir)
         extracted_items = smart_extract(Path(temp_dir), extract_to, use_smart_extract)
         return extracted_items if extracted_items else None
@@ -283,10 +287,7 @@ def extract_7z(archive_path: Path, extract_to: Path, use_smart_extract: bool = T
 
 
 def extract_archive(
-    archive_path: Path,
-    extract_to: Path,
-    archive_type: Optional[str] = None,
-    use_smart_extract: bool = True
+    archive_path: Path, extract_to: Path, archive_type: Optional[str] = None, use_smart_extract: bool = True
 ) -> Optional[List[Path]]:
     """
     Extract archive based on its type.
@@ -304,13 +305,13 @@ def extract_archive(
     if archive_type is None:
         archive_type = get_archive_type(archive_path)
 
-    if archive_type == 'zip':
+    if archive_type == "zip":
         return extract_zip(archive_path, extract_to, use_smart_extract)
-    elif archive_type == 'tar':
+    elif archive_type == "tar":
         return extract_tar(archive_path, extract_to, use_smart_extract)
-    elif archive_type == 'rar':
+    elif archive_type == "rar":
         return extract_rar(archive_path, extract_to, use_smart_extract)
-    elif archive_type == '7z':
+    elif archive_type == "7z":
         return extract_7z(archive_path, extract_to, use_smart_extract)
     else:
         return None

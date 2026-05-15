@@ -62,11 +62,13 @@ def failed(msg: str) -> None:
 def make_app_themed():
     from branding import APP_NAME
     from main import _apply_theme
+
     QApplication.instance().setApplicationName(APP_NAME)
     _apply_theme(QApplication.instance())
 
 
 # ─── PHASE 1: Construct MainWindow + activate every nav key ────────────────
+
 
 def phase_construct_and_navigate() -> None:
     banner("PHASE 1: MainWindow constructs and every sidebar key activates")
@@ -101,6 +103,7 @@ def phase_construct_and_navigate() -> None:
 
 # ─── PHASE 2: Every menu-bar dialog constructs ────────────────────────────
 
+
 def phase_menu_dialogs() -> None:
     banner("PHASE 2: Menu-bar dialogs construct without errors")
     from config import Config
@@ -118,9 +121,9 @@ def phase_menu_dialogs() -> None:
     cfg.load_from_file()
 
     dialogs = [
-        ("HistoryDialog",   lambda: HistoryDialog()),
-        ("SettingsDialog",  lambda: SettingsDialog(cfg)),
-        ("ProfileDialog",   lambda: ProfileDialog(cfg)),
+        ("HistoryDialog", lambda: HistoryDialog()),
+        ("SettingsDialog", lambda: SettingsDialog(cfg)),
+        ("ProfileDialog", lambda: ProfileDialog(cfg)),
     ]
     for name, factory in dialogs:
         try:
@@ -136,9 +139,11 @@ def phase_menu_dialogs() -> None:
 
 # ─── PHASE 3: Settings round-trip via every tab's save/load ────────────────
 
+
 def phase_settings_roundtrip() -> None:
     banner("PHASE 3: Each tab's save_settings + load_settings completes")
     from ui.main_window import MainWindow
+
     win = MainWindow()
     win.show()
     QApplication.processEvents()
@@ -165,6 +170,7 @@ def phase_settings_roundtrip() -> None:
 
 # ─── PHASE 4: Repeated MainWindow construction (memory hygiene) ────────────
 
+
 def phase_repeated_construction() -> None:
     banner("PHASE 4: Construct + tear down MainWindow 5x (memory hygiene)")
     from ui.main_window import MainWindow
@@ -182,12 +188,13 @@ def phase_repeated_construction() -> None:
 
     avg = sum(elapsed) / len(elapsed)
     drift = elapsed[-1] - elapsed[0]
-    passed(f"5 construction cycles: avg {avg*1000:.0f}ms, drift {drift*1000:+.0f}ms")
+    passed(f"5 construction cycles: avg {avg * 1000:.0f}ms, drift {drift * 1000:+.0f}ms")
     if drift > 1.0:
         failed(f"Cycle time drifted by {drift:.2f}s — possible leak")
 
 
 # ─── PHASE 5: Repeated tab activation ──────────────────────────────────────
+
 
 def phase_rapid_navigation() -> None:
     banner("PHASE 5: Rapid round-robin navigation across all tabs (50 cycles)")
@@ -214,13 +221,14 @@ def phase_rapid_navigation() -> None:
     elapsed = time.perf_counter() - t0
     total_acts = iterations * len(keys)
     if crashes == 0:
-        passed(f"{total_acts} activations in {elapsed:.2f}s ({total_acts/elapsed:.0f}/s) — clean")
+        passed(f"{total_acts} activations in {elapsed:.2f}s ({total_acts / elapsed:.0f}/s) — clean")
     else:
         failed(f"{crashes}/{total_acts} activations crashed")
     win.close()
 
 
 # ─── PHASE 6: QSS theme loaded + serif resolved ───────────────────────────
+
 
 def phase_theme_resolution() -> None:
     banner("PHASE 6: QSS load + brand serif resolution")
@@ -250,6 +258,7 @@ def phase_theme_resolution() -> None:
 
 # ─── PHASE 7: All placeholder SVGs present ─────────────────────────────────
 
+
 def phase_svg_assets() -> None:
     banner("PHASE 7: All placeholder SVGs referenced by NAV_TREE exist")
     from branding import ICONS_DIR, NAV_TREE
@@ -270,6 +279,7 @@ def phase_svg_assets() -> None:
 
 
 # ─── main ─────────────────────────────────────────────────────────────────
+
 
 def main() -> int:
     phases = [

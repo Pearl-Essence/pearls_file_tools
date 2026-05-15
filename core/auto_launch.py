@@ -17,11 +17,11 @@ def _get_launch_command() -> str:
     """Return the command that starts the application."""
     # Prefer run.sh / run.bat if they exist next to the package
     pkg_dir = Path(__file__).resolve().parent.parent  # pearls_file_tools/
-    if sys.platform == 'darwin' or sys.platform.startswith('linux'):
+    if sys.platform == "darwin" or sys.platform.startswith("linux"):
         run_sh = pkg_dir / "run.sh"
         if run_sh.is_file():
             return str(run_sh)
-    elif sys.platform == 'win32':
+    elif sys.platform == "win32":
         run_bat = pkg_dir / "run.bat"
         if run_bat.is_file():
             return str(run_bat)
@@ -30,6 +30,7 @@ def _get_launch_command() -> str:
 
 
 # ── macOS ────────────────────────────────────────────────────────────────────
+
 
 def _macos_plist_path() -> Path:
     return Path.home() / "Library" / "LaunchAgents" / _PLIST_NAME
@@ -69,6 +70,7 @@ def _macos_get() -> bool:
 
 # ── Windows ──────────────────────────────────────────────────────────────────
 
+
 def _windows_set(enabled: bool) -> None:
     try:
         import winreg
@@ -76,8 +78,7 @@ def _windows_set(enabled: bool) -> None:
         return
     key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
     try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0,
-                            winreg.KEY_SET_VALUE) as key:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE) as key:
             if enabled:
                 cmd = _get_launch_command()
                 winreg.SetValueEx(key, _REG_KEY_NAME, 0, winreg.REG_SZ, cmd)
@@ -97,8 +98,7 @@ def _windows_get() -> bool:
         return False
     key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
     try:
-        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0,
-                            winreg.KEY_READ) as key:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_READ) as key:
             winreg.QueryValueEx(key, _REG_KEY_NAME)
             return True
     except (FileNotFoundError, OSError):
@@ -106,6 +106,7 @@ def _windows_get() -> bool:
 
 
 # ── Linux ────────────────────────────────────────────────────────────────────
+
 
 def _linux_desktop_path() -> Path:
     return Path.home() / ".config" / "autostart" / _DESKTOP_NAME
@@ -137,11 +138,12 @@ def _linux_get() -> bool:
 
 # ── Public API ───────────────────────────────────────────────────────────────
 
+
 def set_auto_launch(enabled: bool) -> None:
     """Enable or disable launching Pearl Post Suite at OS login."""
-    if sys.platform == 'darwin':
+    if sys.platform == "darwin":
         _macos_set(enabled)
-    elif sys.platform == 'win32':
+    elif sys.platform == "win32":
         _windows_set(enabled)
     else:
         _linux_set(enabled)
@@ -149,9 +151,9 @@ def set_auto_launch(enabled: bool) -> None:
 
 def get_auto_launch() -> bool:
     """Return whether Pearl Post Suite is configured to launch at OS login."""
-    if sys.platform == 'darwin':
+    if sys.platform == "darwin":
         return _macos_get()
-    elif sys.platform == 'win32':
+    elif sys.platform == "win32":
         return _windows_get()
     else:
         return _linux_get()

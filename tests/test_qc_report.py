@@ -6,6 +6,7 @@ from core.qc_report import _flag_file, _fmt_size, generate_qc_report
 
 # ── _fmt_size ───────────────────────────────────────────────────────────────
 
+
 class TestFmtSize:
     def test_bytes(self):
         assert _fmt_size(500) == "500 B"
@@ -14,10 +15,10 @@ class TestFmtSize:
         assert _fmt_size(1024) == "1.0 KB"
 
     def test_megabytes(self):
-        assert _fmt_size(1024 ** 2) == "1.0 MB"
+        assert _fmt_size(1024**2) == "1.0 MB"
 
     def test_gigabytes(self):
-        assert _fmt_size(1024 ** 3) == "1.00 GB"
+        assert _fmt_size(1024**3) == "1.00 GB"
 
     def test_zero(self):
         assert _fmt_size(0) == "0 B"
@@ -27,6 +28,7 @@ class TestFmtSize:
 
 
 # ── _flag_file ──────────────────────────────────────────────────────────────
+
 
 class TestFlagFile:
     def test_normal_file_ok(self, tmp_path):
@@ -63,13 +65,13 @@ class TestFlagFile:
 
 # ── generate_qc_report ─────────────────────────────────────────────────────
 
+
 class TestGenerateQcReport:
     @patch("core.media_info.get_media_info", return_value=None)
     def test_generates_html(self, mock_media, tmp_path):
         (tmp_path / "clip.mov").write_bytes(b"x" * 100)
         (tmp_path / "doc.txt").write_text("text")
-        report_path = generate_qc_report(tmp_path, "TestProject",
-                                         include_thumbnails=False)
+        report_path = generate_qc_report(tmp_path, "TestProject", include_thumbnails=False)
         assert report_path.exists()
         assert report_path.suffix == ".html"
         content = report_path.read_text()
@@ -79,16 +81,14 @@ class TestGenerateQcReport:
     def test_report_contains_files(self, mock_media, tmp_path):
         (tmp_path / "file_a.txt").write_text("a")
         (tmp_path / "file_b.txt").write_text("b")
-        report_path = generate_qc_report(tmp_path, "Test",
-                                         include_thumbnails=False)
+        report_path = generate_qc_report(tmp_path, "Test", include_thumbnails=False)
         content = report_path.read_text()
         assert "file_a.txt" in content
         assert "file_b.txt" in content
 
     @patch("core.media_info.get_media_info", return_value=None)
     def test_empty_directory(self, mock_media, tmp_path):
-        report_path = generate_qc_report(tmp_path, "Empty",
-                                         include_thumbnails=False)
+        report_path = generate_qc_report(tmp_path, "Empty", include_thumbnails=False)
         assert report_path.exists()
         content = report_path.read_text()
         assert "0" in content  # total files = 0
@@ -96,14 +96,12 @@ class TestGenerateQcReport:
     @patch("core.media_info.get_media_info", return_value=None)
     def test_flagged_count(self, mock_media, tmp_path):
         (tmp_path / "empty.txt").write_bytes(b"")  # zero-byte → flagged
-        report_path = generate_qc_report(tmp_path, "Test",
-                                         include_thumbnails=False)
+        report_path = generate_qc_report(tmp_path, "Test", include_thumbnails=False)
         content = report_path.read_text()
         assert "zero-byte" in content
 
     @patch("core.media_info.get_media_info", return_value=None)
     def test_report_filename_format(self, mock_media, tmp_path):
-        report_path = generate_qc_report(tmp_path, "Test",
-                                         include_thumbnails=False)
+        report_path = generate_qc_report(tmp_path, "Test", include_thumbnails=False)
         assert report_path.name.startswith("QC_Report_")
         assert report_path.name.endswith(".html")

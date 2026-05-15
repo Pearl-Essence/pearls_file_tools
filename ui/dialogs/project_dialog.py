@@ -22,11 +22,11 @@ class ProjectDialog(QDialog):
 
     # Keys that appear as PathCards
     PATH_KEYS = [
-        ("ingest_source",  "INGEST SOURCE"),
-        ("ingest_dest",    "INGEST DESTINATION"),
-        ("mirror_dest",    "MIRROR DESTINATION"),
-        ("export_output",  "EXPORT OUTPUT"),
-        ("media_folder",   "MEDIA FOLDER"),
+        ("ingest_source", "INGEST SOURCE"),
+        ("ingest_dest", "INGEST DESTINATION"),
+        ("mirror_dest", "MIRROR DESTINATION"),
+        ("export_output", "EXPORT OUTPUT"),
+        ("media_folder", "MEDIA FOLDER"),
     ]
 
     def __init__(self, project=None, parent=None):
@@ -65,10 +65,7 @@ class ProjectDialog(QDialog):
         # Default paths
         paths_group = QGroupBox("Default Locations")
         paths_layout = QVBoxLayout()
-        note = QLabel(
-            "These paths auto-populate when the project is active. "
-            "Leave blank to skip."
-        )
+        note = QLabel("These paths auto-populate when the project is active. Leave blank to skip.")
         note.setObjectName("cardSub")
         note.setWordWrap(True)
         paths_layout.addWidget(note)

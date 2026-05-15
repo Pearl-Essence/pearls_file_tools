@@ -118,10 +118,13 @@ class BulkRenamerTab(BaseTab):
             subtitle="Rename many files at once with detection, templates, sequencing, and transposition.",
         )
         self.preview_btn = header.add_action(
-            "Preview changes", on_click=self.preview_changes,
+            "Preview changes",
+            on_click=self.preview_changes,
         )
         self.apply_btn = header.add_action(
-            "Apply rename", on_click=self.apply_rename, primary=True,
+            "Apply rename",
+            on_click=self.apply_rename,
+            primary=True,
         )
         return header
 
@@ -171,9 +174,9 @@ class BulkRenamerTab(BaseTab):
 
         # Stacked rename options — one Panel per mode.
         self.rename_stack = QStackedWidget()
-        self.rename_stack.addWidget(self.create_rename_options_group())      # 0 — standard
+        self.rename_stack.addWidget(self.create_rename_options_group())  # 0 — standard
         self.rename_stack.addWidget(self.create_sequential_options_group())  # 1 — sequential
-        self.rename_stack.addWidget(self.create_template_options_group())    # 2 — template
+        self.rename_stack.addWidget(self.create_template_options_group())  # 2 — template
         v.addWidget(self.rename_stack)
 
         v.addWidget(self.create_companion_options_group())
@@ -187,9 +190,7 @@ class BulkRenamerTab(BaseTab):
 
     # ── queue panel (sub-section of options scroll) ──────────────────────
     def _build_queue_panel(self) -> QWidget:
-        panel, v = _make_section(
-            "DIRECTORY QUEUE  ·  OPTIONAL — FILES FROM ALL QUEUED DIRS ARE MERGED"
-        )
+        panel, v = _make_section("DIRECTORY QUEUE  ·  OPTIONAL — FILES FROM ALL QUEUED DIRS ARE MERGED")
 
         btn_row = QHBoxLayout()
         btn_row.setSpacing(8)
@@ -225,9 +226,7 @@ class BulkRenamerTab(BaseTab):
         v.setSpacing(8)
 
         self.batch_mode_chk = QCheckBox("Batch mode — process first-level subdirectories")
-        self.batch_mode_chk.setToolTip(
-            "Select a root folder and check which subdirectories to process in one run"
-        )
+        self.batch_mode_chk.setToolTip("Select a root folder and check which subdirectories to process in one run")
         self.batch_mode_chk.toggled.connect(self._on_batch_mode_toggled)
         v.addWidget(self.batch_mode_chk)
 
@@ -328,8 +327,7 @@ class BulkRenamerTab(BaseTab):
         self.normalize_btn = QPushButton("Normalize incoming")
         self.normalize_btn.setObjectName("ghostBtn")
         self.normalize_btn.setToolTip(
-            "Strip common bad prefixes/suffixes from selected files "
-            "(e.g. '_COPY', 'Copy of ')"
+            "Strip common bad prefixes/suffixes from selected files (e.g. '_COPY', 'Copy of ')"
         )
         self.normalize_btn.clicked.connect(self.normalize_incoming)
         h.addWidget(self.normalize_btn)
@@ -358,8 +356,7 @@ class BulkRenamerTab(BaseTab):
         self.profile_combo = QComboBox()
         self.profile_combo.setMinimumWidth(200)
         self.profile_combo.setToolTip(
-            "The active profile drives the Template rename mode and "
-            "the conformance check in Lint Folder."
+            "The active profile drives the Template rename mode and the conformance check in Lint Folder."
         )
         self.profile_combo.addItem("(None)")
         self.profile_combo.currentTextChanged.connect(self._on_profile_changed)
@@ -387,8 +384,8 @@ class BulkRenamerTab(BaseTab):
         current = self.profile_combo.currentText()
         self.profile_combo.clear()
         self.profile_combo.addItem("(None)")
-        for d in self.config.get('naming.profiles', []):
-            name = d.get('name', '')
+        for d in self.config.get("naming.profiles", []):
+            name = d.get("name", "")
             if name:
                 self.profile_combo.addItem(name)
         idx = self.profile_combo.findText(current)
@@ -399,35 +396,37 @@ class BulkRenamerTab(BaseTab):
         name = self.profile_combo.currentText()
         if name == "(None)":
             return None
-        for d in self.config.get('naming.profiles', []):
-            if d.get('name') == name:
+        for d in self.config.get("naming.profiles", []):
+            if d.get("name") == name:
                 return ProductionTemplate.from_dict(d)
         return None
 
     def _on_profile_changed(self, name: str):
-        self.config.set('naming.active_profile',
-                        name if name != "(None)" else None)
+        self.config.set("naming.active_profile", name if name != "(None)" else None)
         self._rebuild_template_panel(self._get_active_profile())
 
     def _save_as_profile(self):
         from PySide6.QtWidgets import QInputDialog
+
         profile = self._get_active_profile() or DEFAULT_TEMPLATE
         name, ok = QInputDialog.getText(self, "Save as Profile", "Profile name:")
         if not ok or not name.strip():
             return
         name = name.strip()
-        profiles = list(self.config.get('naming.profiles', []))
-        if any(p.get('name') == name for p in profiles):
+        profiles = list(self.config.get("naming.profiles", []))
+        if any(p.get("name") == name for p in profiles):
             self.show_warning("Duplicate Name", f"A profile named '{name}' already exists.")
             return
-        profiles.append({
-            'name': name,
-            'tokens': profile.tokens,
-            'separator': profile.separator,
-            'version_format': profile.version_format,
-            'episode_format': profile.episode_format,
-        })
-        self.config.set('naming.profiles', profiles)
+        profiles.append(
+            {
+                "name": name,
+                "tokens": profile.tokens,
+                "separator": profile.separator,
+                "version_format": profile.version_format,
+                "episode_format": profile.episode_format,
+            }
+        )
+        self.config.set("naming.profiles", profiles)
         self._load_profile_combo()
         idx = self.profile_combo.findText(name)
         if idx >= 0:
@@ -435,9 +434,10 @@ class BulkRenamerTab(BaseTab):
 
     def _manage_profiles(self):
         from ui.dialogs.profile_dialog import ProfileDialog
+
         dialog = ProfileDialog(self.config, self)
         dialog.exec()
-        active = self.config.get('naming.active_profile')
+        active = self.config.get("naming.active_profile")
         self._load_profile_combo()
         if active:
             idx = self.profile_combo.findText(active)
@@ -457,9 +457,7 @@ class BulkRenamerTab(BaseTab):
         scroll.setMaximumHeight(165)
         self.template_tokens_widget = QWidget()
         self.template_tokens_layout = QFormLayout()
-        self.template_tokens_layout.setFieldGrowthPolicy(
-            QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow
-        )
+        self.template_tokens_layout.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
         self.template_tokens_widget.setLayout(self.template_tokens_layout)
         scroll.setWidget(self.template_tokens_widget)
         layout.addWidget(scroll)
@@ -473,7 +471,7 @@ class BulkRenamerTab(BaseTab):
 
     def _rebuild_template_panel(self, profile: Optional[ProductionTemplate] = None):
         """Rebuild token QLineEdits for *profile* (or DEFAULT_TEMPLATE)."""
-        if not hasattr(self, 'template_tokens_layout'):
+        if not hasattr(self, "template_tokens_layout"):
             return
         template = profile if profile is not None else DEFAULT_TEMPLATE
         self._current_template = template
@@ -486,12 +484,12 @@ class BulkRenamerTab(BaseTab):
 
         for token in template.tokens:
             edit = QLineEdit()
-            if token == 'VER':
+            if token == "VER":
                 try:
                     placeholder = f"e.g. {template.version_format.format(1)}"
                 except Exception:
                     placeholder = "e.g. v01"
-            elif token in ('EP', 'EPISODE'):
+            elif token in ("EP", "EPISODE"):
                 try:
                     placeholder = f"e.g. {template.episode_format.format(1)}"
                 except Exception:
@@ -506,7 +504,7 @@ class BulkRenamerTab(BaseTab):
         self._update_template_preview()
 
     def _update_template_preview(self):
-        if not hasattr(self, 'template_preview_label') or self._current_template is None:
+        if not hasattr(self, "template_preview_label") or self._current_template is None:
             return
         values = {t: e.text().strip() for t, e in self.template_inputs.items()}
         composed = self._current_template.compose(values)
@@ -526,7 +524,7 @@ class BulkRenamerTab(BaseTab):
     def _on_mode_changed(self):
         mode = self.mode_btn_group.checkedId()
         self.rename_stack.setCurrentIndex(mode)
-        is_standard = (mode == 0)
+        is_standard = mode == 0
         self.prefix_group_widget.setVisible(is_standard)
         # Preview now works in every mode — Standard, Number Files, and
         # Template all compute their own "what-would-rename-to" projection
@@ -543,7 +541,7 @@ class BulkRenamerTab(BaseTab):
 
         preset_layout = QHBoxLayout()
         preset_layout.setSpacing(14)
-        for category in ['images', 'documents', 'videos', 'audio', 'archives']:
+        for category in ["images", "documents", "videos", "audio", "archives"]:
             checkbox = QCheckBox(category.capitalize())
             checkbox.stateChanged.connect(self.refresh_file_list)
             self.extension_checkboxes[category] = checkbox
@@ -584,9 +582,7 @@ class BulkRenamerTab(BaseTab):
             return row
 
         self.rename_input = QLineEdit()
-        self.rename_input.setPlaceholderText(
-            "Replace entire base name (prefix/suffix still applied)"
-        )
+        self.rename_input.setPlaceholderText("Replace entire base name (prefix/suffix still applied)")
         v.addLayout(_row("Rename to", self.rename_input))
 
         self.prefix_input = QLineEdit()
@@ -610,8 +606,7 @@ class BulkRenamerTab(BaseTab):
         self.case_group.addButton(self.case_lower_radio, 2)
         self.case_group.addButton(self.case_title_radio, 3)
         self.case_none_radio.setChecked(True)
-        for r in (self.case_none_radio, self.case_upper_radio,
-                  self.case_lower_radio, self.case_title_radio):
+        for r in (self.case_none_radio, self.case_upper_radio, self.case_lower_radio, self.case_title_radio):
             case_layout.addWidget(r)
         case_layout.addStretch()
         v.addLayout(case_layout)
@@ -728,9 +723,7 @@ class BulkRenamerTab(BaseTab):
         pad = self.seq_padding_spin.value()
         n1 = str(start).zfill(pad)
         n2 = str(start + 1).zfill(pad)
-        self.seq_preview_label.setText(
-            f"Preview: {base}{sep}{n1}.ext, {base}{sep}{n2}.ext, \u2026"
-        )
+        self.seq_preview_label.setText(f"Preview: {base}{sep}{n1}.ext, {base}{sep}{n2}.ext, \u2026")
 
     # ── companion file options ────────────────────────────────────────────
 
@@ -750,8 +743,7 @@ class BulkRenamerTab(BaseTab):
         self.rename_captions_chk = QCheckBox("Rename caption/subtitle files (.srt, .vtt, .ttml, \u2026)")
         self.rename_captions_chk.setChecked(True)
         self.rename_captions_chk.setToolTip(
-            "When renaming a video, also rename any same-stem subtitle files\n"
-            "(.srt, .vtt, .ttml, .sbv, .ass, .ssa)"
+            "When renaming a video, also rename any same-stem subtitle files\n(.srt, .vtt, .ttml, .sbv, .ass, .ssa)"
         )
         comp_row.addWidget(self.rename_sidecars_chk)
         comp_row.addWidget(self.rename_captions_chk)
@@ -892,10 +884,10 @@ class BulkRenamerTab(BaseTab):
                 extensions.extend(ALL_EXTENSION_CATEGORIES[category])
         custom = self.custom_ext_input.text().strip()
         if custom:
-            for ext in custom.split(','):
+            for ext in custom.split(","):
                 ext = ext.strip()
-                if ext and not ext.startswith('.'):
-                    ext = '.' + ext
+                if ext and not ext.startswith("."):
+                    ext = "." + ext
                 if ext:
                     extensions.append(ext.lower())
         return extensions
@@ -976,7 +968,7 @@ class BulkRenamerTab(BaseTab):
         if not self._batch_root.is_dir():
             return
         for d in sorted(self._batch_root.iterdir()):
-            if d.is_dir() and not d.name.startswith('.'):
+            if d.is_dir() and not d.name.startswith("."):
                 item = QListWidgetItem(d.name)
                 item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
                 item.setCheckState(Qt.Checked)
@@ -1014,9 +1006,7 @@ class BulkRenamerTab(BaseTab):
         extensions = active_extensions if active_extensions else None
         mode = self.mode_btn_group.checkedId()
 
-        progress = QProgressDialog(
-            "Running batch rename…", "Cancel", 0, len(checked_dirs), self
-        )
+        progress = QProgressDialog("Running batch rename…", "Cancel", 0, len(checked_dirs), self)
         progress.setWindowTitle("Batch Rename")
         progress.setWindowModality(Qt.WindowModal)
         progress.show()
@@ -1052,11 +1042,8 @@ class BulkRenamerTab(BaseTab):
                     if not composed:
                         errors.append(f"{subdir.name}: template incomplete")
                         continue
-                    sep = self._current_template.separator if self._current_template else '_'
-                    direct = [
-                        (f, f"{composed}{sep}{str(j + 1).zfill(3)}{f.suffix}")
-                        for j, f in enumerate(files)
-                    ]
+                    sep = self._current_template.separator if self._current_template else "_"
+                    direct = [(f, f"{composed}{sep}{str(j + 1).zfill(3)}{f.suffix}") for j, f in enumerate(files)]
                 else:
                     direct = None
 
@@ -1091,13 +1078,9 @@ class BulkRenamerTab(BaseTab):
         progress.setValue(len(checked_dirs))
 
         if errors:
-            self.show_warning(
-                "Batch Errors",
-                "Some directories had errors:\n\n" + "\n".join(errors)
-            )
+            self.show_warning("Batch Errors", "Some directories had errors:\n\n" + "\n".join(errors))
         else:
-            self.show_info("Batch Complete",
-                           f"Processed {len(checked_dirs)} director(ies) successfully.")
+            self.show_info("Batch Complete", f"Processed {len(checked_dirs)} director(ies) successfully.")
 
         self.refresh_file_list()
 
@@ -1117,19 +1100,19 @@ class BulkRenamerTab(BaseTab):
             counts = detect_common_suffixes(filenames)
             label = "suffix"
         if not counts:
-            self.show_info(f"No {label.capitalize()}es Found",
-                           f"No common {label} patterns detected.")
+            self.show_info(f"No {label.capitalize()}es Found", f"No common {label} patterns detected.")
             return
         self.clear_prefix_checkboxes()
         for token in sorted(counts.keys(), key=lambda x: counts[x], reverse=True):
             count = counts[token]
-            cb = QCheckBox(f'{token}  ({count} file{"s" if count > 1 else ""})')
+            cb = QCheckBox(f"{token}  ({count} file{'s' if count > 1 else ''})")
             cb.setChecked(True)
             self.prefix_checkboxes[token] = cb
             self.prefix_layout.addWidget(cb)
-        self.show_info(f"{label.capitalize()}es Detected",
-                       f"Found {len(counts)} common {label} pattern(s).\n"
-                       "Uncheck any you don't want to process.")
+        self.show_info(
+            f"{label.capitalize()}es Detected",
+            f"Found {len(counts)} common {label} pattern(s).\nUncheck any you don't want to process.",
+        )
 
     def detect_prefixes(self):
         self.detect_tokens()
@@ -1146,7 +1129,7 @@ class BulkRenamerTab(BaseTab):
                 selected.append(prefix)
         manual_input = self.manual_prefix_input.text().strip()
         if manual_input:
-            selected.extend(p.strip() for p in manual_input.split(',') if p.strip())
+            selected.extend(p.strip() for p in manual_input.split(",") if p.strip())
         return selected
 
     def get_case_transform(self) -> str:
@@ -1180,16 +1163,17 @@ class BulkRenamerTab(BaseTab):
         include_hidden = self.include_hidden_chk.isChecked()
         if not include_hidden:
             from core.file_utils import is_hidden_file
+
             selected_files = [f for f in selected_files if not is_hidden_file(f.name)]
         if not selected_files:
             self.show_info(
                 "All Files Hidden",
-                "All selected files are hidden (start with '.').\n"
-                "Tick 'Include hidden files' to rename them."
+                "All selected files are hidden (start with '.').\nTick 'Include hidden files' to rename them.",
             )
             return
 
         from ui.dialogs.preview_dialog import PreviewDialog
+
         mode = self.mode_btn_group.checkedId()
         preview_data: List[Tuple[str, str]] = []
 
@@ -1197,10 +1181,7 @@ class BulkRenamerTab(BaseTab):
             # Number Files mode
             base = self.seq_base_input.text().strip()
             if not base:
-                self.show_warning(
-                    "Base Name Required",
-                    "Enter a base name for sequential numbering before previewing."
-                )
+                self.show_warning("Base Name Required", "Enter a base name for sequential numbering before previewing.")
                 return
             pairs = generate_sequential_filenames(
                 [f.name for f in selected_files],
@@ -1215,20 +1196,14 @@ class BulkRenamerTab(BaseTab):
             # Template mode
             base = self._get_template_composed_name()
             if not base:
-                self.show_warning(
-                    "Incomplete Template",
-                    "Fill in at least one template token before previewing."
-                )
+                self.show_warning("Incomplete Template", "Fill in at least one template token before previewing.")
                 return
-            sep = self._current_template.separator if self._current_template else '_'
+            sep = self._current_template.separator if self._current_template else "_"
             if len(selected_files) == 1:
-                preview_data = [
-                    (selected_files[0].name, f"{base}{selected_files[0].suffix}")
-                ]
+                preview_data = [(selected_files[0].name, f"{base}{selected_files[0].suffix}")]
             else:
                 preview_data = [
-                    (f.name, f"{base}{sep}{str(i + 1).zfill(3)}{f.suffix}")
-                    for i, f in enumerate(selected_files)
+                    (f.name, f"{base}{sep}{str(i + 1).zfill(3)}{f.suffix}") for i, f in enumerate(selected_files)
                 ]
 
         else:
@@ -1237,6 +1212,7 @@ class BulkRenamerTab(BaseTab):
             # RenameWorker._build_work_list so what you see is what you get.
             from core.name_transform import move_prefix_to_suffix, move_suffix_to_prefix
             from core.pattern_matching import match_prefix, match_suffix
+
             tokens = self.get_selected_prefixes()
             is_p2s = self.transpose_p2s_radio.isChecked()
             fp_find = self.replace_prefix_find.text()
@@ -1299,8 +1275,7 @@ class BulkRenamerTab(BaseTab):
             # Sequential numbering
             base = self.seq_base_input.text().strip()
             if not base:
-                self.show_warning("Base Name Required",
-                                  "Enter a base name for sequential numbering.")
+                self.show_warning("Base Name Required", "Enter a base name for sequential numbering.")
                 return
             pairs = generate_sequential_filenames(
                 [f.name for f in selected_files],
@@ -1316,7 +1291,7 @@ class BulkRenamerTab(BaseTab):
             if not self.confirm_action(
                 "Confirm Sequential Rename",
                 f"Rename {len(selected_files)} file(s) as:\n\n{preview_lines}\n\n"
-                "This can be undone using 'Undo Last Operation'."
+                "This can be undone using 'Undo Last Operation'.",
             ):
                 return
             self.worker_thread = RenameWorker(
@@ -1332,27 +1307,20 @@ class BulkRenamerTab(BaseTab):
             # Template mode
             base = self._get_template_composed_name()
             if not base:
-                self.show_warning("Incomplete Template",
-                                  "Fill in at least one template token.")
+                self.show_warning("Incomplete Template", "Fill in at least one template token.")
                 return
-            sep = self._current_template.separator if self._current_template else '_'
+            sep = self._current_template.separator if self._current_template else "_"
             if len(selected_files) == 1:
-                direct = [(selected_files[0],
-                           f"{base}{selected_files[0].suffix}")]
+                direct = [(selected_files[0], f"{base}{selected_files[0].suffix}")]
             else:
-                direct = [
-                    (f, f"{base}{sep}{str(i + 1).zfill(3)}{f.suffix}")
-                    for i, f in enumerate(selected_files)
-                ]
-            preview_lines = "\n".join(
-                f"  {p.name} \u2192 {n}" for p, n in direct[:5]
-            )
+                direct = [(f, f"{base}{sep}{str(i + 1).zfill(3)}{f.suffix}") for i, f in enumerate(selected_files)]
+            preview_lines = "\n".join(f"  {p.name} \u2192 {n}" for p, n in direct[:5])
             if len(direct) > 5:
                 preview_lines += f"\n  \u2026 and {len(direct) - 5} more"
             if not self.confirm_action(
                 "Confirm Template Rename",
                 f"Rename {len(selected_files)} file(s):\n\n{preview_lines}\n\n"
-                "This can be undone using 'Undo Last Operation'."
+                "This can be undone using 'Undo Last Operation'.",
             ):
                 return
             self.worker_thread = RenameWorker(
@@ -1376,8 +1344,7 @@ class BulkRenamerTab(BaseTab):
 
             if not self.confirm_action(
                 "Confirm Rename",
-                f"Rename {len(selected_files)} file(s)?\n\n"
-                "This can be undone using 'Undo Last Operation'."
+                f"Rename {len(selected_files)} file(s)?\n\nThis can be undone using 'Undo Last Operation'.",
             ):
                 return
             self.worker_thread = RenameWorker(
@@ -1416,30 +1383,30 @@ class BulkRenamerTab(BaseTab):
             self.show_info(
                 "No Versions Found",
                 "None of the selected files have a recognisable trailing version "
-                "token. Supported formats: _v##, -v##, ' v##', _V##, .v##."
+                "token. Supported formats: _v##, -v##, ' v##', _V##, .v##.",
             )
             return
         if not self.confirm_action(
             "Confirm Bump Version",
-            f"Increment version suffix on {len(direct)} file(s)?\n\n"
-            "This can be undone using 'Undo Last Operation'."
+            f"Increment version suffix on {len(direct)} file(s)?\n\nThis can be undone using 'Undo Last Operation'.",
         ):
             return
         from workers.rename_worker import RenameWorker
+
         self.worker_thread = RenameWorker([], direct_renames=direct)
         self.worker_thread.progress.connect(self.emit_status)
         self.worker_thread.finished.connect(self.on_rename_finished)
         self.worker_thread.start()
         self.enable_controls(False)
 
-    def on_rename_finished(self, success: bool, message: str,
-                           operation_record: Optional[OperationRecord] = None):
+    def on_rename_finished(self, success: bool, message: str, operation_record: Optional[OperationRecord] = None):
         self.enable_controls(True)
         if success and operation_record:
             self.undo_stack.append(operation_record)
             self.undo_btn.setEnabled(True)
             try:
                 from core.history import RenameHistory
+
                 RenameHistory().log_operation(operation_record)
             except Exception:
                 pass
@@ -1465,24 +1432,27 @@ class BulkRenamerTab(BaseTab):
         import glob
         import subprocess
         import sys
+
         if not self.current_directory:
             self.show_warning("No Directory", "No directory selected.")
             return
         pattern = str(Path(self.current_directory) / "_pearls_rename_log_*.csv")
         matches = sorted(glob.glob(pattern))
         if not matches:
-            self.show_info("No CSV Found",
-                           "No rename log CSV files found in the current directory.\n"
-                           "A CSV is written after each successful rename batch.")
+            self.show_info(
+                "No CSV Found",
+                "No rename log CSV files found in the current directory.\n"
+                "A CSV is written after each successful rename batch.",
+            )
             return
         latest = matches[-1]
         try:
-            if sys.platform == 'darwin':
-                subprocess.Popen(['open', latest])
-            elif sys.platform == 'win32':
-                subprocess.Popen(['start', '', latest], shell=True)
+            if sys.platform == "darwin":
+                subprocess.Popen(["open", latest])
+            elif sys.platform == "win32":
+                subprocess.Popen(["start", "", latest], shell=True)
             else:
-                subprocess.Popen(['xdg-open', latest])
+                subprocess.Popen(["xdg-open", latest])
             self.emit_status(f"Opened: {Path(latest).name}")
         except Exception as e:
             self.show_error("Could Not Open File", str(e))
@@ -1496,8 +1466,7 @@ class BulkRenamerTab(BaseTab):
         record = self.undo_stack.pop()
         success_count, error_count, errors = record.undo()
         if error_count == 0:
-            self.show_info("Undo Complete",
-                           f"Successfully undone {success_count} rename(s).")
+            self.show_info("Undo Complete", f"Successfully undone {success_count} rename(s).")
         else:
             error_msg = f"Undone {success_count} rename(s).\n{error_count} error(s):\n\n"
             error_msg += "\n".join(errors[:10])
@@ -1517,13 +1486,12 @@ class BulkRenamerTab(BaseTab):
             return
         from core.linter import FilenameLint
         from ui.dialogs.lint_dialog import LintDialog
+
         directory = Path(self.current_directory)
         profile = self._get_active_profile()
         self.emit_status("Linting filenames\u2026")
         issues = FilenameLint().lint_directory(directory, profile)
-        self.emit_status(
-            f"Lint complete: {len(issues)} issue(s) found in {directory.name}"
-        )
+        self.emit_status(f"Lint complete: {len(issues)} issue(s) found in {directory.name}")
         dialog = LintDialog(directory, issues, self)
         dialog.show()
 
@@ -1535,6 +1503,7 @@ class BulkRenamerTab(BaseTab):
             self.show_warning("No Files", "No files loaded.")
             return
         from ui.dialogs.normalize_dialog import NormalizeDialog
+
         dialog = NormalizeDialog(files, self.config, self)
         if dialog.exec() != NormalizeDialog.Accepted:
             return
@@ -1543,6 +1512,7 @@ class BulkRenamerTab(BaseTab):
             self.show_info("No Changes", "No files matched the current patterns.")
             return
         from workers.rename_worker import RenameWorker
+
         self.worker_thread = RenameWorker(
             [],
             direct_renames=pairs,
@@ -1558,31 +1528,30 @@ class BulkRenamerTab(BaseTab):
 
     def load_settings(self):
         """Load tab-specific settings."""
-        last_dir = self.config.get_tab_directory('bulk_renamer')
+        last_dir = self.config.get_tab_directory("bulk_renamer")
         if last_dir:
             self.path_card.set_path(last_dir)
             self.set_directory(last_dir)
 
-        recursive = self.config.get_tab_setting('bulk_renamer', 'recursive_default', False)
+        recursive = self.config.get_tab_setting("bulk_renamer", "recursive_default", False)
         self.recursive_check.setChecked(recursive)
 
-        filters = self.config.get_tab_setting('bulk_renamer', 'extension_filters', {})
+        filters = self.config.get_tab_setting("bulk_renamer", "extension_filters", {})
         for category, enabled in filters.items():
             if category in self.extension_checkboxes:
                 self.extension_checkboxes[category].setChecked(enabled)
 
-        case_default = self.config.get_tab_setting(
-            'bulk_renamer', 'case_transform_default', 'none')
-        if case_default == 'upper':
+        case_default = self.config.get_tab_setting("bulk_renamer", "case_transform_default", "none")
+        if case_default == "upper":
             self.case_upper_radio.setChecked(True)
-        elif case_default == 'lower':
+        elif case_default == "lower":
             self.case_lower_radio.setChecked(True)
-        elif case_default == 'title':
+        elif case_default == "title":
             self.case_title_radio.setChecked(True)
 
         # Restore active profile
         self._load_profile_combo()
-        active = self.config.get('naming.active_profile')
+        active = self.config.get("naming.active_profile")
         if active:
             idx = self.profile_combo.findText(active)
             if idx >= 0:
@@ -1590,12 +1559,7 @@ class BulkRenamerTab(BaseTab):
 
     def save_settings(self):
         """Save tab-specific settings."""
-        self.config.set_tab_setting('bulk_renamer', 'recursive_default',
-                                    self.recursive_check.isChecked())
-        filters = {
-            category: checkbox.isChecked()
-            for category, checkbox in self.extension_checkboxes.items()
-        }
-        self.config.set_tab_setting('bulk_renamer', 'extension_filters', filters)
-        self.config.set_tab_setting('bulk_renamer', 'case_transform_default',
-                                    self.get_case_transform())
+        self.config.set_tab_setting("bulk_renamer", "recursive_default", self.recursive_check.isChecked())
+        filters = {category: checkbox.isChecked() for category, checkbox in self.extension_checkboxes.items()}
+        self.config.set_tab_setting("bulk_renamer", "extension_filters", filters)
+        self.config.set_tab_setting("bulk_renamer", "case_transform_default", self.get_case_transform())

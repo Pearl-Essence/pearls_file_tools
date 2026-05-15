@@ -31,10 +31,11 @@ from workers.base_worker import BaseWorker
 # Background worker
 # ---------------------------------------------------------------------------
 
+
 class _SyncWorker(BaseWorker):
     """Run compare_directories in a background thread."""
 
-    finished = Signal(bool, str, object)   # shadows BaseWorker.finished
+    finished = Signal(bool, str, object)  # shadows BaseWorker.finished
 
     def __init__(self, dir_a: Path, dir_b: Path, since: Optional[datetime.datetime]):
         super().__init__()
@@ -58,30 +59,30 @@ class _SyncWorker(BaseWorker):
 # ---------------------------------------------------------------------------
 
 _STATUS_META = {
-    'modified_both': ("Modified in Both",  '#e07830'),
-    'a_newer':       ("A is Newer",        '#4080d0'),
-    'b_newer':       ("B is Newer",        '#30b8c0'),
-    'a_only':        ("Only in A",         '#4ec94e'),
-    'b_only':        ("Only in B",         '#d04040'),
+    "modified_both": ("Modified in Both", "#e07830"),
+    "a_newer": ("A is Newer", "#4080d0"),
+    "b_newer": ("B is Newer", "#30b8c0"),
+    "a_only": ("Only in A", "#4ec94e"),
+    "b_only": ("Only in B", "#d04040"),
 }
 
-_STATUS_ORDER = ['modified_both', 'a_newer', 'b_newer', 'a_only', 'b_only']
+_STATUS_ORDER = ["modified_both", "a_newer", "b_newer", "a_only", "b_only"]
 
 
 def _fmt_size(n: int) -> str:
     if n == 0:
-        return ''
+        return ""
     if n < 1024:
         return f"{n} B"
-    if n < 1024 ** 2:
-        return f"{n/1024:.1f} KB"
-    return f"{n/1024**2:.1f} MB"
+    if n < 1024**2:
+        return f"{n / 1024:.1f} KB"
+    return f"{n / 1024**2:.1f} MB"
 
 
 def _fmt_mtime(ts: float) -> str:
     if ts == 0.0:
-        return ''
-    return datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M')
+        return ""
+    return datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
 
 
 class SyncDialog(QDialog):
@@ -131,9 +132,7 @@ class SyncDialog(QDialog):
         # ---- Results tree -----------------------------------------------
         self._tree = QTreeWidget()
         self._tree.setColumnCount(6)
-        self._tree.setHeaderLabels(
-            ["File", "Status", "Size A", "Size B", "Modified A", "Modified B"]
-        )
+        self._tree.setHeaderLabels(["File", "Status", "Size A", "Size B", "Modified A", "Modified B"])
         self._tree.header().setStretchLastSection(False)
         self._tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self._tree.setContextMenuPolicy(Qt.CustomContextMenu)
@@ -186,9 +185,7 @@ class SyncDialog(QDialog):
         self._report = result
         self._populate_tree(result)
         total = len(result.entries)
-        self._status_label.setText(
-            f"Found {total} difference(s).  Generated {result.generated.strftime('%H:%M:%S')}"
-        )
+        self._status_label.setText(f"Found {total} difference(s).  Generated {result.generated.strftime('%H:%M:%S')}")
 
     def _populate_tree(self, report: SyncReport):
         self._tree.clear()
@@ -251,9 +248,7 @@ class SyncDialog(QDialog):
 
         menu.addSeparator()
 
-        open_in_finder = QAction(
-            "Open in Finder" if sys.platform == 'darwin' else "Open in Explorer", self
-        )
+        open_in_finder = QAction("Open in Finder" if sys.platform == "darwin" else "Open in Explorer", self)
         open_in_finder.triggered.connect(lambda: self._open_in_finder(entry))
         menu.addAction(open_in_finder)
 
@@ -293,7 +288,8 @@ class SyncDialog(QDialog):
             remaining = parent.childCount()
             text = parent.text(0)
             import re
-            new_text = re.sub(r'\(\d+\)', f'({remaining})', text)
+
+            new_text = re.sub(r"\(\d+\)", f"({remaining})", text)
             parent.setText(0, new_text)
             if remaining == 0:
                 idx = self._tree.indexOfTopLevelItem(parent)
@@ -305,9 +301,10 @@ class SyncDialog(QDialog):
         if path is None:
             return
         import subprocess
-        if sys.platform == 'darwin':
-            subprocess.run(['open', '-R', str(path)], check=False)
-        elif sys.platform == 'win32':
-            subprocess.run(['explorer', '/select,', str(path)], check=False)
+
+        if sys.platform == "darwin":
+            subprocess.run(["open", "-R", str(path)], check=False)
+        elif sys.platform == "win32":
+            subprocess.run(["explorer", "/select,", str(path)], check=False)
         else:
-            subprocess.run(['xdg-open', str(path.parent)], check=False)
+            subprocess.run(["xdg-open", str(path.parent)], check=False)

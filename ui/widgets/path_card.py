@@ -91,9 +91,7 @@ class PathCard(Panel):
 
     def _browse(self):
         start = str(self._path) if self._path else str(Path.home())
-        chosen = QFileDialog.getExistingDirectory(
-            self, f"Choose {self._role.lower()}", start
-        )
+        chosen = QFileDialog.getExistingDirectory(self, f"Choose {self._role.lower()}", start)
         if chosen:
             self.set_path(chosen)
             self.path_changed.emit(chosen)

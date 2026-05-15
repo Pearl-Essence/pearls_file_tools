@@ -35,9 +35,7 @@ class OrganizeWorker(BaseWorker):
         """Execute the file organization."""
         try:
             total_files = sum(
-                len(files)
-                for subdir_groups in self.file_groups.values()
-                for files in subdir_groups.values()
+                len(files) for subdir_groups in self.file_groups.values() for files in subdir_groups.values()
             )
             processed = 0
 
@@ -81,11 +79,7 @@ class OrganizeWorker(BaseWorker):
                             action = self.apply_to_all
 
                         if action == "skip":
-                            self.progress.emit(
-                                f"Skipped {group_name} (folder exists)",
-                                processed,
-                                total_files
-                            )
+                            self.progress.emit(f"Skipped {group_name} (folder exists)", processed, total_files)
                             processed += len(files)
                             continue
                         elif action != "merge":
@@ -114,24 +108,12 @@ class OrganizeWorker(BaseWorker):
                             # Move file
                             if safe_move(file_path, target_path):
                                 processed += 1
-                                self.progress.emit(
-                                    f"Moved {file_path.name} → {group_name}/",
-                                    processed,
-                                    total_files
-                                )
+                                self.progress.emit(f"Moved {file_path.name} → {group_name}/", processed, total_files)
                             else:
-                                self.progress.emit(
-                                    f"Failed to move {file_path.name}",
-                                    processed,
-                                    total_files
-                                )
+                                self.progress.emit(f"Failed to move {file_path.name}", processed, total_files)
 
                         except Exception as e:
-                            self.progress.emit(
-                                f"Error moving {file_path.name}: {str(e)}",
-                                processed,
-                                total_files
-                            )
+                            self.progress.emit(f"Error moving {file_path.name}: {str(e)}", processed, total_files)
 
             self.finished.emit(True, f"Successfully organized {processed} files!")
 

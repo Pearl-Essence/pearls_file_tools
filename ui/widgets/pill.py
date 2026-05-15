@@ -8,8 +8,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel
 
 # Canonical kinds — keep in sync with QSS QLabel[pill="..."] selectors.
-KIND_OK    = "ok"
-KIND_WARN  = "warn"
+KIND_OK = "ok"
+KIND_WARN = "warn"
 KIND_ERROR = "error"
 KIND_MUTED = "muted"
 

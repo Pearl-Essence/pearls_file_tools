@@ -32,6 +32,7 @@ from ui.widgets.tab_header import TabHeader
 # Empty-state hero
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class _ValidatorHero(QWidget):
     """Amber-orb centered empty state shown before a folder is chosen."""
 
@@ -91,6 +92,7 @@ class _ValidatorHero(QWidget):
 
     def _on_choose(self):
         from PySide6.QtWidgets import QFileDialog
+
         chosen = QFileDialog.getExistingDirectory(self, "Choose delivery folder")
         if chosen:
             self.folder_picked.emit(chosen)
@@ -99,6 +101,7 @@ class _ValidatorHero(QWidget):
 # ─────────────────────────────────────────────────────────────────────────────
 # SpecValidatorTab
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class SpecValidatorTab(BaseTab):
     """Spec Validator — v0.17 chrome around the existing validator logic."""
@@ -179,11 +182,11 @@ class SpecValidatorTab(BaseTab):
     # Persistence
     # ─────────────────────────────────────────────────────────────────────
     def load_settings(self):
-        directory = self.config.get_tab_directory('delivery')
+        directory = self.config.get_tab_directory("delivery")
         if directory and Path(directory).is_dir():
             self._on_folder_picked(directory)
 
     def save_settings(self):
         directory = self._inner.dir_selector.get_directory()
         if directory and directory != str(Path.home()):
-            self.config.set_tab_directory('delivery', directory)
+            self.config.set_tab_directory("delivery", directory)

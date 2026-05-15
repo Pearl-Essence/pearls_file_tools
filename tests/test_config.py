@@ -14,6 +14,7 @@ class TestGetConfigDir:
 
     def test_platform_appropriate(self):
         import sys
+
         result = get_config_dir()
         if sys.platform == "darwin":
             assert ".config" in str(result)

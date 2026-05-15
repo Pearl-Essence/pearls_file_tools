@@ -35,8 +35,8 @@ from ui.widgets.tab_header import TabHeader
 # Wrapper helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _shell(host: QWidget, eyebrow: str, title: str, subtitle: str,
-           inner: QWidget) -> QVBoxLayout:
+
+def _shell(host: QWidget, eyebrow: str, title: str, subtitle: str, inner: QWidget) -> QVBoxLayout:
     """Standard v0.17 outer layout: 24/20 padding, header strip, then content."""
     root = QVBoxLayout(host)
     root.setContentsMargins(24, 20, 24, 20)
@@ -49,6 +49,7 @@ def _shell(host: QWidget, eyebrow: str, title: str, subtitle: str,
 # ─────────────────────────────────────────────────────────────────────────────
 # 03 · MAINTAIN tabs
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class StaleFilesTab(BaseTab):
     """Detect and soft-delete stale, temp, zero-byte, or empty items."""
@@ -67,14 +68,14 @@ class StaleFilesTab(BaseTab):
         )
 
     def load_settings(self):
-        directory = self.config.get_tab_directory('studio_tools')
+        directory = self.config.get_tab_directory("studio_tools")
         if directory and Path(directory).is_dir():
             self._inner.dir_selector.set_directory(directory)
 
     def save_settings(self):
         directory = self._inner.dir_selector.get_directory()
         if directory:
-            self.config.set_tab_directory('studio_tools', directory)
+            self.config.set_tab_directory("studio_tools", directory)
 
 
 class StorageReportTab(BaseTab):
@@ -94,7 +95,7 @@ class StorageReportTab(BaseTab):
         )
 
     def load_settings(self):
-        directory = self.config.get_tab_directory('studio_tools')
+        directory = self.config.get_tab_directory("studio_tools")
         if directory and Path(directory).is_dir():
             self._inner.dir_selector.set_directory(directory)
 
@@ -120,7 +121,7 @@ class TrashTab(BaseTab):
         )
 
     def load_settings(self):
-        directory = self.config.get_tab_directory('studio_tools')
+        directory = self.config.get_tab_directory("studio_tools")
         if directory and Path(directory).is_dir():
             self._inner.dir_selector.set_directory(directory)
             self._inner._load_trash(directory)
@@ -178,6 +179,7 @@ class ExportWatcherTab(BaseTab):
 # ─────────────────────────────────────────────────────────────────────────────
 # 05 · ARCHIVE tabs
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class ColdStorageTab(BaseTab):
     """Archive a project folder to a destination with manifest + verify."""

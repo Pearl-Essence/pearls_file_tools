@@ -1,6 +1,5 @@
 """Comprehensive tests for core/linter.py."""
 
-
 import pytest
 
 from core.linter import (
@@ -14,8 +13,7 @@ from core.name_transform import ProductionTemplate
 
 class TestLintIssueLabels:
     def test_all_issue_types_have_labels(self):
-        expected = {"illegal_char", "too_long", "reserved_name",
-                    "wip_flag", "case_duplicate", "profile_mismatch"}
+        expected = {"illegal_char", "too_long", "reserved_name", "wip_flag", "case_duplicate", "profile_mismatch"}
         assert expected == set(ISSUE_LABELS.keys())
 
 
@@ -25,7 +23,7 @@ class TestIllegalCharsConstant:
             assert ch in ILLEGAL_CHARS_WIN
 
     def test_contains_nul(self):
-        assert '\x00' in ILLEGAL_CHARS_WIN
+        assert "\x00" in ILLEGAL_CHARS_WIN
 
 
 class TestWindowsReservedConstant:
@@ -52,7 +50,7 @@ class TestFilenameLint:
         # Create file with colon-free name, then check a name that has one
         # We can't create files with colons on macOS, so we test the logic
         # by verifying the ILLEGAL_CHARS_WIN set directly
-        assert ':' in ILLEGAL_CHARS_WIN
+        assert ":" in ILLEGAL_CHARS_WIN
 
     def test_reserved_name_detected(self, linter, tmp_path):
         (tmp_path / "CON.txt").write_text("data")
@@ -116,7 +114,7 @@ class TestFilenameLint:
             pytest.skip("OS doesn't support this filename length")
         issues = linter.lint_directory(tmp_path)
         types = [i.issue_type for i in issues]
-        if len(long_name.encode('utf-8')) > 255:
+        if len(long_name.encode("utf-8")) > 255:
             assert "too_long" in types
 
     def test_profile_mismatch(self, linter, tmp_path):
