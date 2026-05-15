@@ -4,10 +4,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QComboBox, QDialog, QDialogButtonBox, QGroupBox, QHBoxLayout,
-    QHeaderView, QLabel, QPushButton, QTableWidget, QTableWidgetItem,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
 )
 
@@ -40,22 +47,26 @@ def check_conflicts(groups: Dict[str, List[Path]], root: Path) -> List[Conflict]
 
             # File already exists at destination (and isn't itself)
             if target_file.exists() and target_file.resolve() != file_path.resolve():
-                conflicts.append(Conflict(
-                    filename=file_path.name,
-                    existing_path=target_file,
-                    incoming_path=file_path,
-                    conflict_type='already_exists',
-                ))
+                conflicts.append(
+                    Conflict(
+                        filename=file_path.name,
+                        existing_path=target_file,
+                        incoming_path=file_path,
+                        conflict_type="already_exists",
+                    )
+                )
 
             # Case-insensitive duplicate within the same destination folder
             key = file_path.name.lower()
             if key in seen_lower:
-                conflicts.append(Conflict(
-                    filename=file_path.name,
-                    existing_path=seen_lower[key],
-                    incoming_path=file_path,
-                    conflict_type='name_collision',
-                ))
+                conflicts.append(
+                    Conflict(
+                        filename=file_path.name,
+                        existing_path=seen_lower[key],
+                        incoming_path=file_path,
+                        conflict_type="name_collision",
+                    )
+                )
             else:
                 seen_lower[key] = file_path
 
@@ -69,7 +80,7 @@ class PreflightDialog(QDialog):
     Returns QDialog.Rejected if the user cancels (operation should be aborted).
     """
 
-    ACTIONS = ['Rename with counter', 'Overwrite', 'Skip']
+    ACTIONS = ["Rename with counter", "Overwrite", "Skip"]
 
     def __init__(self, conflicts: List[Conflict], parent=None):
         super().__init__(parent)
@@ -84,16 +95,14 @@ class PreflightDialog(QDialog):
 
         summary = QLabel(
             f"<b>{len(self.conflicts)} conflict(s) detected.</b>  "
-            "Choose an action for each, or use \"Apply to all\" then click OK to proceed."
+            'Choose an action for each, or use "Apply to all" then click OK to proceed.'
         )
         summary.setWordWrap(True)
         layout.addWidget(summary)
 
         # Conflict table
         self.table = QTableWidget(len(self.conflicts), 4)
-        self.table.setHorizontalHeaderLabels(
-            ["Filename", "Existing Location", "Incoming", "Action"]
-        )
+        self.table.setHorizontalHeaderLabels(["Filename", "Existing Location", "Incoming", "Action"])
         hdr = self.table.horizontalHeader()
         hdr.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         hdr.setSectionResizeMode(1, QHeaderView.Stretch)
@@ -147,7 +156,4 @@ class PreflightDialog(QDialog):
 
     def get_actions(self) -> Dict[str, str]:
         """Return {filename: chosen_action} for every conflict row."""
-        return {
-            self.conflicts[i].filename: self.combos[i].currentText()
-            for i in range(len(self.conflicts))
-        }
+        return {self.conflicts[i].filename: self.combos[i].currentText() for i in range(len(self.conflicts))}

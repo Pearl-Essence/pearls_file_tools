@@ -1,34 +1,32 @@
 """Comprehensive tests for constants.py."""
 
-import pytest
 from constants import (
-    IMAGE_EXTENSIONS,
-    DOCUMENT_EXTENSIONS,
-    VIDEO_EXTENSIONS,
-    AUDIO_EXTENSIONS,
-    ARCHIVE_EXTENSIONS,
     ALL_EXTENSION_CATEGORIES,
+    ARCHIVE_EXTENSIONS,
+    AUDIO_EXTENSIONS,
     CAPTION_EXTENSIONS,
-    SIDECAR_EXTENSIONS,
-    PHOTO_KEYWORDS,
-    CONFIG_FILE_NAME,
-    OP_TYPE_RENAME,
-    OP_TYPE_ORGANIZE,
-    OP_TYPE_EXTRACT,
-    OP_TYPE_COPY,
-    CASE_NONE,
-    CASE_UPPER,
     CASE_LOWER,
+    CASE_NONE,
     CASE_TITLE,
+    CASE_UPPER,
     CONFLICT_COUNTER,
-    CONFLICT_TIMESTAMP,
     CONFLICT_SKIP,
-    DEFAULT_WINDOW_WIDTH,
-    DEFAULT_WINDOW_HEIGHT,
-    DEFAULT_THUMBNAIL_SIZE,
+    CONFLICT_TIMESTAMP,
     DEFAULT_GRID_COLUMNS,
+    DEFAULT_THUMBNAIL_SIZE,
+    DEFAULT_WINDOW_HEIGHT,
+    DEFAULT_WINDOW_WIDTH,
+    DOCUMENT_EXTENSIONS,
+    IMAGE_EXTENSIONS,
+    OP_TYPE_COPY,
+    OP_TYPE_EXTRACT,
+    OP_TYPE_ORGANIZE,
+    OP_TYPE_RENAME,
+    PHOTO_KEYWORDS,
+    SIDECAR_EXTENSIONS,
     THEME_DARK,
     THEME_LIGHT,
+    VIDEO_EXTENSIONS,
 )
 
 
@@ -91,17 +89,16 @@ class TestExtensionSets:
             assert ext in ARCHIVE_EXTENSIONS
 
     def test_no_extension_overlap_between_categories(self):
-        cats = [IMAGE_EXTENSIONS, DOCUMENT_EXTENSIONS, VIDEO_EXTENSIONS,
-                AUDIO_EXTENSIONS, ARCHIVE_EXTENSIONS]
+        cats = [IMAGE_EXTENSIONS, DOCUMENT_EXTENSIONS, VIDEO_EXTENSIONS, AUDIO_EXTENSIONS, ARCHIVE_EXTENSIONS]
         for i, a in enumerate(cats):
             for j, b in enumerate(cats):
                 if i < j:
                     overlap = a & b
                     # .dng appears in both images and videos — known exception
                     allowed_overlap = {".dng"}
-                    assert overlap <= allowed_overlap, (
-                        f"Unexpected overlap between categories {i} and {j}: {overlap - allowed_overlap}"
-                    )
+                    assert (
+                        overlap <= allowed_overlap
+                    ), f"Unexpected overlap between categories {i} and {j}: {overlap - allowed_overlap}"
 
 
 class TestAllExtensionCategories:

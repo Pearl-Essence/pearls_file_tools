@@ -1,18 +1,20 @@
 """Image/video scan worker thread for Pearl's File Tools."""
 
 import base64
-import os
-import json
 import hashlib
+import json
+import os
 import subprocess
-from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Optional
-from PySide6.QtCore import Signal
-from workers.base_worker import BaseWorker
-from constants import IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
+from pathlib import Path
+from typing import Dict, List, Optional
 
-CACHE_FILE_NAME = '.image_browser_cache.json'
+from PySide6.QtCore import Signal
+
+from constants import IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
+from workers.base_worker import BaseWorker
+
+CACHE_FILE_NAME = ".image_browser_cache.json"
 
 
 class ImageScanWorker(BaseWorker):
@@ -24,8 +26,7 @@ class ImageScanWorker(BaseWorker):
     def emit_finished(self, success: bool, message: str, images=None):
         self.finished.emit(success, message, images)
 
-    def __init__(self, root_dir: str, recursive: bool = True, use_cache: bool = True,
-                 include_video: bool = True):
+    def __init__(self, root_dir: str, recursive: bool = True, use_cache: bool = True, include_video: bool = True):
         super().__init__()
         self.root_dir = Path(root_dir)
         self.recursive = recursive
@@ -62,10 +63,10 @@ class ImageScanWorker(BaseWorker):
                     current_dir = Path(dirpath)
                     relative_dir = current_dir.relative_to(self.root_dir)
 
-                    if any(part.startswith('.') for part in relative_dir.parts):
+                    if any(part.startswith(".") for part in relative_dir.parts):
                         continue
 
-                    folder_name = str(relative_dir) if str(relative_dir) != '.' else 'Root'
+                    folder_name = str(relative_dir) if str(relative_dir) != "." else "Root"
                     self.emit_progress(f"Scanning: {folder_name}")
 
                     for filename in filenames:
@@ -82,13 +83,13 @@ class ImageScanWorker(BaseWorker):
                             self.emit_progress(f"Skipping {filename}: {exc}")
                             continue
                         entry = {
-                            'name': filename,
-                            'path': str(file_path),
-                            'folder': folder_name,
-                            'size': size,
+                            "name": filename,
+                            "path": str(file_path),
+                            "folder": folder_name,
+                            "size": size,
                         }
                         if ext in VIDEO_EXTENSIONS:
-                            entry['is_video'] = True
+                            entry["is_video"] = True
                         images.append(entry)
             else:
                 self.emit_progress(f"Scanning: {self.root_dir.name}")
@@ -100,37 +101,37 @@ class ImageScanWorker(BaseWorker):
                     ext = file_path.suffix.lower()
                     if file_path.is_file() and ext in self._valid_extensions:
                         entry = {
-                            'name': file_path.name,
-                            'path': str(file_path),
-                            'folder': 'Root',
-                            'size': file_path.stat().st_size,
+                            "name": file_path.name,
+                            "path": str(file_path),
+                            "folder": "Root",
+                            "size": file_path.stat().st_size,
                         }
                         if ext in VIDEO_EXTENSIONS:
-                            entry['is_video'] = True
+                            entry["is_video"] = True
                         images.append(entry)
 
             # Sort images by name
-            images.sort(key=lambda x: x['name'].lower())
+            images.sort(key=lambda x: x["name"].lower())
 
             # Detect image sequences per folder (videos excluded)
             self._annotate_sequences(images)
 
             # Enrich video entries with thumbnails and duration
-            video_entries = [e for e in images if e.get('is_video')]
+            video_entries = [e for e in images if e.get("is_video")]
             if video_entries:
                 self.emit_progress(f"Generating thumbnails for {len(video_entries)} video(s)...")
                 for i, entry in enumerate(video_entries):
                     if self.is_cancelled:
                         break
-                    thumb_b64 = self._extract_video_thumbnail(entry['path'])
+                    thumb_b64 = self._extract_video_thumbnail(entry["path"])
                     if thumb_b64:
-                        entry['thumbnail_b64'] = thumb_b64
-                    duration = self._get_video_duration(entry['path'])
+                        entry["thumbnail_b64"] = thumb_b64
+                    duration = self._get_video_duration(entry["path"])
                     if duration is not None:
-                        entry['duration_secs'] = duration
+                        entry["duration_secs"] = duration
 
-            total_images = sum(1 for e in images if not e.get('is_video'))
-            total_videos = sum(1 for e in images if e.get('is_video'))
+            total_images = sum(1 for e in images if not e.get("is_video"))
+            total_videos = sum(1 for e in images if e.get("is_video"))
             parts = []
             if total_images:
                 parts.append(f"{total_images} image(s)")
@@ -168,22 +169,22 @@ class ImageScanWorker(BaseWorker):
         # Clear any stale sequence annotations from a previous scan (e.g. cached data)
         # so that dissolved sequences don't leave hidden ghost frames.
         for img in images:
-            img.pop('in_sequence', None)
-            img.pop('is_sequence_rep', None)
-            img.pop('sequence_key', None)
-            img.pop('sequence_label', None)
-            img.pop('sequence_total', None)
-            img.pop('sequence_files', None)
+            img.pop("in_sequence", None)
+            img.pop("is_sequence_rep", None)
+            img.pop("sequence_key", None)
+            img.pop("sequence_label", None)
+            img.pop("sequence_total", None)
+            img.pop("sequence_files", None)
 
         # Group image indices by folder (skip videos — they don't participate in sequences)
         folder_map: Dict[str, List[int]] = {}
         for i, img in enumerate(images):
-            if img.get('is_video'):
+            if img.get("is_video"):
                 continue
-            folder_map.setdefault(img['folder'], []).append(i)
+            folder_map.setdefault(img["folder"], []).append(i)
 
         for folder, indices in folder_map.items():
-            filenames = [images[i]['name'] for i in indices]
+            filenames = [images[i]["name"] for i in indices]
             sequences = detect_image_sequences(filenames)
             if not sequences:
                 continue
@@ -196,34 +197,32 @@ class ImageScanWorker(BaseWorker):
 
             # Annotate images and identify representatives
             for i in indices:
-                fname = images[i]['name']
+                fname = images[i]["name"]
                 if fname not in fname_to_key:
                     continue
                 seq_key = fname_to_key[fname]
                 seq = sequences[seq_key]
-                images[i]['in_sequence'] = True
-                images[i]['sequence_key'] = seq_key
+                images[i]["in_sequence"] = True
+                images[i]["sequence_key"] = seq_key
 
                 if fname == seq.files[0]:  # First frame = representative
-                    parent_dir = Path(images[i]['path']).parent
-                    images[i]['is_sequence_rep'] = True
-                    images[i]['sequence_label'] = seq.label
-                    images[i]['sequence_total'] = len(seq.files)
-                    images[i]['sequence_files'] = [
-                        str(parent_dir / f) for f in seq.files
-                    ]
+                    parent_dir = Path(images[i]["path"]).parent
+                    images[i]["is_sequence_rep"] = True
+                    images[i]["sequence_label"] = seq.label
+                    images[i]["sequence_total"] = len(seq.files)
+                    images[i]["sequence_files"] = [str(parent_dir / f) for f in seq.files]
 
     @staticmethod
     def _extract_video_thumbnail(path: str) -> Optional[str]:
         """Extract a single frame from a video via ffmpeg and return as base64 PNG."""
         try:
             result = subprocess.run(
-                ['ffmpeg', '-i', path, '-vframes', '1', '-f', 'image2pipe',
-                 '-vcodec', 'png', 'pipe:1'],
-                capture_output=True, timeout=10,
+                ["ffmpeg", "-i", path, "-vframes", "1", "-f", "image2pipe", "-vcodec", "png", "pipe:1"],
+                capture_output=True,
+                timeout=10,
             )
             if result.returncode == 0 and result.stdout:
-                return base64.b64encode(result.stdout).decode('ascii')
+                return base64.b64encode(result.stdout).decode("ascii")
         except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
             pass
         return None
@@ -233,9 +232,19 @@ class ImageScanWorker(BaseWorker):
         """Get video duration in seconds via ffprobe."""
         try:
             result = subprocess.run(
-                ['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration',
-                 '-of', 'default=noprint_wrappers=1:nokey=1', path],
-                capture_output=True, text=True, timeout=10,
+                [
+                    "ffprobe",
+                    "-v",
+                    "quiet",
+                    "-show_entries",
+                    "format=duration",
+                    "-of",
+                    "default=noprint_wrappers=1:nokey=1",
+                    path,
+                ],
+                capture_output=True,
+                text=True,
+                timeout=10,
             )
             if result.returncode == 0 and result.stdout.strip():
                 return float(result.stdout.strip())
@@ -252,13 +261,11 @@ class ImageScanWorker(BaseWorker):
 
             if self.recursive:
                 image_count = sum(
-                    1 for _ in self.root_dir.rglob('*')
-                    if _.is_file() and _.suffix.lower() in self._valid_extensions
+                    1 for _ in self.root_dir.rglob("*") if _.is_file() and _.suffix.lower() in self._valid_extensions
                 )
             else:
                 image_count = sum(
-                    1 for f in self.root_dir.iterdir()
-                    if f.is_file() and f.suffix.lower() in self._valid_extensions
+                    1 for f in self.root_dir.iterdir() if f.is_file() and f.suffix.lower() in self._valid_extensions
                 )
 
             hash_string = f"{self.root_dir}:{mtime}:{image_count}:{self.recursive}:{self.include_video}"
@@ -272,20 +279,20 @@ class ImageScanWorker(BaseWorker):
             if not self.cache_file.exists():
                 return None
 
-            with open(self.cache_file, 'r', encoding='utf-8') as f:
+            with open(self.cache_file, "r", encoding="utf-8") as f:
                 cache_data = json.load(f)
 
             # Validate cache
             current_hash = self._get_directory_hash()
-            if cache_data.get('directory_hash') != current_hash:
+            if cache_data.get("directory_hash") != current_hash:
                 self.emit_progress("Cache outdated, rescanning...")
                 return None
 
             # Validate that cached image files still exist
-            images = cache_data.get('images', [])
+            images = cache_data.get("images", [])
             valid_images = []
             for img in images:
-                if Path(img['path']).exists():
+                if Path(img["path"]).exists():
                     valid_images.append(img)
 
             # If too many missing images, rescan
@@ -303,15 +310,15 @@ class ImageScanWorker(BaseWorker):
         """Save images to cache file. Silently skips if path is read-only (e.g. network share)."""
         try:
             cache_data = {
-                'version': '1.0',
-                'timestamp': datetime.now().isoformat(),
-                'directory': str(self.root_dir),
-                'directory_hash': self._get_directory_hash(),
-                'recursive': self.recursive,
-                'image_count': len(images),
-                'images': images
+                "version": "1.0",
+                "timestamp": datetime.now().isoformat(),
+                "directory": str(self.root_dir),
+                "directory_hash": self._get_directory_hash(),
+                "recursive": self.recursive,
+                "image_count": len(images),
+                "images": images,
             }
-            with open(self.cache_file, 'w', encoding='utf-8') as f:
+            with open(self.cache_file, "w", encoding="utf-8") as f:
                 json.dump(cache_data, f, indent=2)
         except (PermissionError, OSError):
             pass

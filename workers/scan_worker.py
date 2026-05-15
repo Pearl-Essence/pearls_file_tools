@@ -2,9 +2,11 @@
 
 from pathlib import Path
 from typing import Dict, List, Optional
+
 from PySide6.QtCore import Signal
+
+from core.pattern_matching import PRESET_STANDARD, GroupingPreset, group_files_by_preset
 from workers.base_worker import BaseWorker
-from core.pattern_matching import group_files_by_pattern, group_files_by_preset, GroupingPreset, PRESET_STANDARD
 
 
 class ScanWorker(BaseWorker):
@@ -15,8 +17,7 @@ class ScanWorker(BaseWorker):
     def emit_finished(self, success: bool, message: str, grouped=None, unsorted=None):
         self.finished.emit(success, message, grouped, unsorted)
 
-    def __init__(self, root_dir: str, confidence_threshold: float = 0.4,
-                 preset: Optional[GroupingPreset] = None):
+    def __init__(self, root_dir: str, confidence_threshold: float = 0.4, preset: Optional[GroupingPreset] = None):
         """
         Initialize the scan worker.
 
@@ -30,20 +31,14 @@ class ScanWorker(BaseWorker):
         self.confidence_threshold = confidence_threshold
         self.preset = preset or PRESET_STANDARD
 
-    def _scan_one_dir(self, directory: Path,
-                      grouped_results: Dict, unsorted_results: Dict):
+    def _scan_one_dir(self, directory: Path, grouped_results: Dict, unsorted_results: Dict):
         """Scan a single directory and merge results into the provided dicts."""
         files = [f for f in directory.iterdir() if f.is_file()]
         if not files:
             return
         filenames = [f.name for f in files]
-        groups_dict, unsorted_list = group_files_by_preset(
-            filenames, self.preset, self.confidence_threshold
-        )
-        groups_with_paths = {
-            grp: [directory / fn for fn in fns]
-            for grp, fns in groups_dict.items()
-        }
+        groups_dict, unsorted_list = group_files_by_preset(filenames, self.preset, self.confidence_threshold)
+        groups_with_paths = {grp: [directory / fn for fn in fns] for grp, fns in groups_dict.items()}
         unsorted_with_paths = [directory / fn for fn in unsorted_list]
         if groups_with_paths:
             grouped_results[str(directory)] = groups_with_paths

@@ -15,7 +15,6 @@ import hashlib
 import json
 import re
 import shutil
-import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -23,49 +22,65 @@ from typing import Dict, List, Optional, Tuple
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor, QPainter
 from PySide6.QtWidgets import (
-    QAbstractItemView, QApplication, QButtonGroup, QCheckBox, QComboBox,
-    QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-    QListWidget, QListWidgetItem, QMessageBox, QProgressBar, QPushButton,
-    QRadioButton, QSizePolicy, QSpinBox, QTabWidget,
-    QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget, QWizard, QWizardPage,
+    QAbstractItemView,
+    QButtonGroup,
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QRadioButton,
+    QSizePolicy,
+    QSpinBox,
+    QTabWidget,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWidget,
+    QWizard,
+    QWizardPage,
 )
 
+from constants import ALL_EXTENSION_CATEGORIES
+from core.trash import StudioTrash, TrashItem
 from ui.tabs.base_tab import BaseTab
 from ui.widgets.directory_selector import DirectorySelectorWidget
 from workers.base_worker import BaseWorker
-from core.trash import StudioTrash, TrashItem
-from constants import ALL_EXTENSION_CATEGORIES
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-_STALE_MARKERS = re.compile(r'_WIP|_DRAFT|_TEST|_TEMP', re.IGNORECASE)
+_STALE_MARKERS = re.compile(r"_WIP|_DRAFT|_TEST|_TEMP", re.IGNORECASE)
 
-_CATEGORY_EXTS: Dict[str, set] = {
-    cat: {e.lower() for e in exts}
-    for cat, exts in ALL_EXTENSION_CATEGORIES.items()
-}
+_CATEGORY_EXTS: Dict[str, set] = {cat: {e.lower() for e in exts} for cat, exts in ALL_EXTENSION_CATEGORIES.items()}
 
-_CATEGORY_ORDER = ['videos', 'images', 'audio', 'documents', 'archives', 'other']
+_CATEGORY_ORDER = ["videos", "images", "audio", "documents", "archives", "other"]
 
 _CATEGORY_COLORS = {
-    'videos':    QColor('#82aaff'),
-    'images':    QColor('#c3e88d'),
-    'audio':     QColor('#c792ea'),
-    'documents': QColor('#ffcb6b'),
-    'archives':  QColor('#f78c6c'),
-    'other':     QColor('#546e7a'),
+    "videos": QColor("#82aaff"),
+    "images": QColor("#c3e88d"),
+    "audio": QColor("#c792ea"),
+    "documents": QColor("#ffcb6b"),
+    "archives": QColor("#f78c6c"),
+    "other": QColor("#546e7a"),
 }
 
 _STRIP_PATTERNS = [
-    re.compile(r'^\.'),
-    re.compile(r'_WIP|_DRAFT|_TEMP|_TEST', re.IGNORECASE),
-    re.compile(r'\.(tmp|bak|log)$', re.IGNORECASE),
-    re.compile(r'__pycache__'),
-    re.compile(r'Thumbs\.db$', re.IGNORECASE),
-    re.compile(r'\.DS_Store$'),
+    re.compile(r"^\."),
+    re.compile(r"_WIP|_DRAFT|_TEMP|_TEST", re.IGNORECASE),
+    re.compile(r"\.(tmp|bak|log)$", re.IGNORECASE),
+    re.compile(r"__pycache__"),
+    re.compile(r"Thumbs\.db$", re.IGNORECASE),
+    re.compile(r"\.DS_Store$"),
 ]
 
 
@@ -74,22 +89,22 @@ def _file_category(suffix: str) -> str:
     for cat, exts in _CATEGORY_EXTS.items():
         if s in exts:
             return cat
-    return 'other'
+    return "other"
 
 
 def _fmt_size(n: int) -> str:
     if n < 1024:
         return f"{n} B"
-    if n < 1024 ** 2:
+    if n < 1024**2:
         return f"{n / 1024:.1f} KB"
-    if n < 1024 ** 3:
+    if n < 1024**3:
         return f"{n / 1024 ** 2:.1f} MB"
     return f"{n / 1024 ** 3:.2f} GB"
 
 
 def _md5(path: Path, chunk: int = 1 << 20) -> str:
     h = hashlib.md5()
-    with path.open('rb') as f:
+    with path.open("rb") as f:
         while True:
             buf = f.read(chunk)
             if not buf:
@@ -100,9 +115,9 @@ def _md5(path: Path, chunk: int = 1 << 20) -> str:
 
 def _should_strip(filepath: Path) -> bool:
     for part in filepath.parts:
-        if part.startswith('.') and len(part) > 1:
+        if part.startswith(".") and len(part) > 1:
             return True
-        if part == '__pycache__':
+        if part == "__pycache__":
             return True
     name = filepath.name
     for pat in _STRIP_PATTERNS:
@@ -116,13 +131,10 @@ def _gather_files(
     extra_exclude_patterns: List[str],
 ) -> Tuple[List[Path], List[Path]]:
     """Return (include_files, exclude_files) applying default + extra excludes."""
-    extra_pats = [
-        re.compile(p.replace('*', '.*'), re.IGNORECASE)
-        for p in extra_exclude_patterns if p.strip()
-    ]
+    extra_pats = [re.compile(p.replace("*", ".*"), re.IGNORECASE) for p in extra_exclude_patterns if p.strip()]
     include: List[Path] = []
     exclude: List[Path] = []
-    for fp in source_dir.rglob('*'):
+    for fp in source_dir.rglob("*"):
         if not fp.is_file():
             continue
         if TRASH_DIR_NAME in fp.parts:
@@ -137,7 +149,7 @@ def _gather_files(
     return sorted(include), sorted(exclude)
 
 
-TRASH_DIR_NAME = '.pearls_trash'
+TRASH_DIR_NAME = ".pearls_trash"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # NLE project file format registry
@@ -145,25 +157,26 @@ TRASH_DIR_NAME = '.pearls_trash'
 
 # Each entry: NLE name → set of extensions (lowercase, with dot)
 _NLE_FORMATS: Dict[str, set] = {
-    'DaVinci Resolve':     {'.drp'},
-    'Final Cut Pro':       {'.fcpbundle', '.fcpxml'},
-    'Premiere Pro':        {'.prproj'},
-    'After Effects':       {'.aep', '.aet'},
-    'Avid Media Composer': {'.avp', '.avs'},
-    'Pro Tools':           {'.ptx', '.ptf'},
-    'Vegas Pro':           {'.veg'},
-    'Audition':            {'.sesx'},
-    'Logic Pro':           {'.logicx'},
-    'Kdenlive':            {'.kdenlive'},
+    "DaVinci Resolve": {".drp"},
+    "Final Cut Pro": {".fcpbundle", ".fcpxml"},
+    "Premiere Pro": {".prproj"},
+    "After Effects": {".aep", ".aet"},
+    "Avid Media Composer": {".avp", ".avs"},
+    "Pro Tools": {".ptx", ".ptf"},
+    "Vegas Pro": {".veg"},
+    "Audition": {".sesx"},
+    "Logic Pro": {".logicx"},
+    "Kdenlive": {".kdenlive"},
 }
 
 # Extensions that are macOS package directories — back up by zipping
-_PACKAGE_EXTS = {'.fcpbundle', '.logicx'}
+_PACKAGE_EXTS = {".fcpbundle", ".logicx"}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Data classes
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 @dataclass
 class StaleFile:
@@ -177,10 +190,12 @@ class StaleFile:
 # Background workers
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class _NLEBackupWorker(BaseWorker):
     """Backup NLE project files/packages from scan_dir to dest_dir with a timestamp suffix."""
+
     finished = Signal(bool, str, object)  # success, msg, List[dict]|None
-    file_backed = Signal(str)             # name of each completed item
+    file_backed = Signal(str)  # name of each completed item
 
     def __init__(self, scan_dir: Path, dest_dir: Path, extensions: set):
         super().__init__()
@@ -238,7 +253,7 @@ class _NLEBackupWorker(BaseWorker):
             if not projects:
                 self.emit_finished(True, "No matching project files found.", [])
                 return
-            ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+            ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             results = []
             for proj in projects:
                 if self.is_cancelled:
@@ -247,10 +262,11 @@ class _NLEBackupWorker(BaseWorker):
                     if proj.is_dir():
                         # Package directory (e.g. .fcpbundle) — zip it
                         import zipfile
+
                         dest_name = f"{proj.stem}_{ts}.zip"
                         dest_path = self.dest_dir / dest_name
-                        with zipfile.ZipFile(dest_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-                            for fp in proj.rglob('*'):
+                        with zipfile.ZipFile(dest_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                            for fp in proj.rglob("*"):
                                 if fp.is_file():
                                     zf.write(fp, fp.relative_to(proj.parent))
                         size = dest_path.stat().st_size
@@ -259,17 +275,26 @@ class _NLEBackupWorker(BaseWorker):
                         dest_path = self.dest_dir / dest_name
                         shutil.copy2(str(proj), str(dest_path))
                         size = dest_path.stat().st_size
-                    results.append({
-                        'name': proj.name, 'dest': dest_name,
-                        'size': size, 'timestamp': ts, 'ok': True,
-                    })
+                    results.append(
+                        {
+                            "name": proj.name,
+                            "dest": dest_name,
+                            "size": size,
+                            "timestamp": ts,
+                            "ok": True,
+                        }
+                    )
                     self.file_backed.emit(proj.name)
                 except Exception as exc:
-                    results.append({
-                        'name': proj.name, 'error': str(exc),
-                        'timestamp': ts, 'ok': False,
-                    })
-            ok = sum(1 for r in results if r.get('ok'))
+                    results.append(
+                        {
+                            "name": proj.name,
+                            "error": str(exc),
+                            "timestamp": ts,
+                            "ok": False,
+                        }
+                    )
+            ok = sum(1 for r in results if r.get("ok"))
             self.emit_finished(True, f"Backed up {ok}/{len(results)} project(s)", results)
         except Exception as exc:
             self.emit_finished(False, str(exc), None)
@@ -289,12 +314,10 @@ class _StaleWorker(BaseWorker):
 
     def run(self):
         results: List[StaleFile] = []
-        cutoff_ts = (
-            datetime.datetime.now() - datetime.timedelta(days=self.max_age_days)
-        ).timestamp()
+        cutoff_ts = (datetime.datetime.now() - datetime.timedelta(days=self.max_age_days)).timestamp()
         try:
             self.emit_progress("Scanning for stale files…")
-            for item in self.directory.rglob('*'):
+            for item in self.directory.rglob("*"):
                 if self.is_cancelled:
                     break
                 if TRASH_DIR_NAME in item.parts:
@@ -309,14 +332,10 @@ class _StaleWorker(BaseWorker):
                     elif stat.st_size == 0:
                         results.append(StaleFile(item, "Zero-byte file", 0))
                     elif self.check_atime and stat.st_atime < cutoff_ts:
-                        days = int(
-                            (datetime.datetime.now().timestamp() - stat.st_atime) / 86400
-                        )
-                        results.append(StaleFile(
-                            item, f"Not accessed in {days} days", stat.st_size
-                        ))
+                        days = int((datetime.datetime.now().timestamp() - stat.st_atime) / 86400)
+                        results.append(StaleFile(item, f"Not accessed in {days} days", stat.st_size))
                 elif item.is_dir():
-                    if not any(True for _ in item.rglob('*') if _.is_file()):
+                    if not any(True for _ in item.rglob("*") if _.is_file()):
                         results.append(StaleFile(item, "Empty folder", 0, is_dir=True))
             self.emit_finished(True, f"Found {len(results)} stale item(s)", results)
         except Exception as exc:
@@ -337,7 +356,7 @@ class _StorageWorker(BaseWorker):
         data: Dict[str, Dict[str, int]] = {}
         try:
             self.emit_progress("Scanning storage usage…")
-            for fp in self.directory.rglob('*'):
+            for fp in self.directory.rglob("*"):
                 if self.is_cancelled:
                     break
                 if not fp.is_file():
@@ -350,9 +369,9 @@ class _StorageWorker(BaseWorker):
                     continue
                 try:
                     rel = fp.relative_to(self.directory)
-                    folder = rel.parts[0] if len(rel.parts) > 1 else '__root__'
+                    folder = rel.parts[0] if len(rel.parts) > 1 else "__root__"
                 except ValueError:
-                    folder = '__root__'
+                    folder = "__root__"
                 cat = _file_category(fp.suffix)
                 if folder not in data:
                     data[folder] = {c: 0 for c in _CATEGORY_ORDER}
@@ -387,31 +406,35 @@ class _ManifestWorker(BaseWorker):
                     checksum = _md5(fp)
                     rel = str(fp.relative_to(self.source_dir))
                     size = fp.stat().st_size
-                    mtime = datetime.datetime.fromtimestamp(
-                        fp.stat().st_mtime
-                    ).isoformat()
-                    manifest.append({
-                        'path': rel, 'md5': checksum,
-                        'size': size, 'mtime': mtime,
-                    })
+                    mtime = datetime.datetime.fromtimestamp(fp.stat().st_mtime).isoformat()
+                    manifest.append(
+                        {
+                            "path": rel,
+                            "md5": checksum,
+                            "size": size,
+                            "mtime": mtime,
+                        }
+                    )
                     self.file_hashed.emit(fp.name, i + 1, total)
                 except Exception:
                     pass
-            manifest_path = self.dest_dir / 'MANIFEST.json'
+            manifest_path = self.dest_dir / "MANIFEST.json"
             manifest_path.parent.mkdir(parents=True, exist_ok=True)
             manifest_path.write_text(
                 json.dumps(
                     {
-                        'source': str(self.source_dir),
-                        'files': manifest,
-                        'generated': datetime.datetime.now().isoformat(),
+                        "source": str(self.source_dir),
+                        "files": manifest,
+                        "generated": datetime.datetime.now().isoformat(),
                     },
-                    indent=2, ensure_ascii=False,
+                    indent=2,
+                    ensure_ascii=False,
                 ),
-                encoding='utf-8',
+                encoding="utf-8",
             )
             self.emit_finished(
-                True, f"Manifest created: {len(manifest)} file(s)",
+                True,
+                f"Manifest created: {len(manifest)} file(s)",
                 (manifest_path, manifest),
             )
         except Exception as exc:
@@ -445,16 +468,14 @@ class _CopyWorker(BaseWorker):
         try:
             if self.as_zip:
                 import zipfile
-                ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+
+                ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                 zip_path = self.dest_dir / f"{self.source_dir.name}_{ts}.zip"
-                with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
                     for i, fp in enumerate(self.include_files):
                         if self.is_cancelled:
                             break
-                        arcname = (
-                            fp.name if self.flatten
-                            else str(fp.relative_to(self.source_dir))
-                        )
+                        arcname = fp.name if self.flatten else str(fp.relative_to(self.source_dir))
                         zf.write(str(fp), arcname)
                         self.file_copied.emit(fp.name, i + 1, total)
                 self.emit_finished(True, f"Created {zip_path.name}", zip_path)
@@ -470,7 +491,8 @@ class _CopyWorker(BaseWorker):
                     shutil.copy2(str(fp), str(dst))
                     self.file_copied.emit(fp.name, i + 1, total)
                 self.emit_finished(
-                    True, f"Copied {total} file(s) to {self.dest_dir.name}",
+                    True,
+                    f"Copied {total} file(s) to {self.dest_dir.name}",
                     self.dest_dir,
                 )
         except Exception as exc:
@@ -496,8 +518,8 @@ class _VerifyWorker(BaseWorker):
             for entry in self.manifest_data:
                 if self.is_cancelled:
                     break
-                rel = entry['path']
-                expected = entry['md5']
+                rel = entry["path"]
+                expected = entry["md5"]
                 # Try relative path first, then flat name
                 candidate = self.dest_dir / rel
                 if not candidate.exists():
@@ -511,9 +533,7 @@ class _VerifyWorker(BaseWorker):
                 self.file_verified.emit(rel, ok)
             passed = sum(1 for _, ok, _ in results if ok)
             failed = len(results) - passed
-            self.emit_finished(
-                True, f"{passed}/{len(results)} verified, {failed} failed", results
-            )
+            self.emit_finished(True, f"{passed}/{len(results)} verified, {failed} failed", results)
         except Exception as exc:
             self.emit_finished(False, str(exc), None)
 
@@ -521,6 +541,7 @@ class _VerifyWorker(BaseWorker):
 # ─────────────────────────────────────────────────────────────────────────────
 # Storage proportional bar
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class _StorageBar(QWidget):
     """Horizontal stacked bar showing storage breakdown by file category."""
@@ -545,7 +566,7 @@ class _StorageBar(QWidget):
         x = 0
         for cat, sz in self._segments:
             seg_w = max(1, int(w * sz / self._total))
-            p.fillRect(x, 0, seg_w, h, _CATEGORY_COLORS.get(cat, _CATEGORY_COLORS['other']))
+            p.fillRect(x, 0, seg_w, h, _CATEGORY_COLORS.get(cat, _CATEGORY_COLORS["other"]))
             x += seg_w
         p.end()
 
@@ -553,6 +574,7 @@ class _StorageBar(QWidget):
 # ─────────────────────────────────────────────────────────────────────────────
 # Stale Files pane
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class _StaleFilesPane(QWidget):
     def __init__(self, config, parent=None):
@@ -581,8 +603,7 @@ class _StaleFilesPane(QWidget):
         self.chk_atime = QCheckBox("Flag files not accessed in N days")
         self.chk_atime.setChecked(True)
         self.chk_atime.setToolTip(
-            "Uses file last-access time (atime). May be unreliable on some macOS volumes "
-            "where noatime is set."
+            "Uses file last-access time (atime). May be unreliable on some macOS volumes " "where noatime is set."
         )
         opts_layout.addRow(self.chk_atime)
         layout.addWidget(opts)
@@ -628,9 +649,7 @@ class _StaleFilesPane(QWidget):
         self.status_label.setText("Scanning…")
         self._trash = StudioTrash(directory)
 
-        self._worker = _StaleWorker(
-            directory, self.age_spin.value(), self.chk_atime.isChecked()
-        )
+        self._worker = _StaleWorker(directory, self.age_spin.value(), self.chk_atime.isChecked())
         self._worker.progress.connect(self.status_label.setText)
         self._worker.finished.connect(self._on_done)
         self._worker.start()
@@ -647,7 +666,7 @@ class _StaleFilesPane(QWidget):
         self.result_list.clear()
         if not self._stale_items:
             item = QListWidgetItem("✓  No stale files found")
-            item.setForeground(QBrush(QColor('#c3e88d')))
+            item.setForeground(QBrush(QColor("#c3e88d")))
             self.result_list.addItem(item)
         else:
             for sf in self._stale_items:
@@ -662,26 +681,26 @@ class _StaleFilesPane(QWidget):
             self.trash_btn.setEnabled(True)
 
         total_size = sum(sf.size_bytes for sf in self._stale_items)
-        self.summary_label.setText(
-            f"Found {len(self._stale_items)} stale item(s)  |  {_fmt_size(total_size)} total"
-        )
+        self.summary_label.setText(f"Found {len(self._stale_items)} stale item(s)  |  {_fmt_size(total_size)} total")
 
     def _trash_selected(self):
         if not self._trash:
             return
         checked = [
-            i for i in range(self.result_list.count())
-            if self.result_list.item(i).checkState() == Qt.Checked
-            and i < len(self._stale_items)
+            i
+            for i in range(self.result_list.count())
+            if self.result_list.item(i).checkState() == Qt.Checked and i < len(self._stale_items)
         ]
         if not checked:
             QMessageBox.information(self, "None Checked", "Check items to send to trash.")
             return
         selected = [self._stale_items[i] for i in checked]
         reply = QMessageBox.question(
-            self, "Confirm Trash",
+            self,
+            "Confirm Trash",
             f"Send {len(selected)} item(s) to .pearls_trash/?  They can be restored later.",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
             return
@@ -693,6 +712,7 @@ class _StaleFilesPane(QWidget):
 # ─────────────────────────────────────────────────────────────────────────────
 # Storage Report pane
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class _StoragePane(QWidget):
     def __init__(self, config, parent=None):
@@ -725,9 +745,7 @@ class _StoragePane(QWidget):
         legend_row = QHBoxLayout()
         for cat in _CATEGORY_ORDER:
             swatch = QLabel("▮")
-            swatch.setStyleSheet(
-                f"color: {_CATEGORY_COLORS[cat].name()}; font-size: 16px;"
-            )
+            swatch.setStyleSheet(f"color: {_CATEGORY_COLORS[cat].name()}; font-size: 16px;")
             legend_row.addWidget(swatch)
             legend_row.addWidget(QLabel(cat.capitalize()))
             legend_row.addSpacing(6)
@@ -758,6 +776,7 @@ class _StoragePane(QWidget):
         btn_row.addWidget(self.export_qds_btn)
 
         from core.qdirstat_cache import detect_qdirstat
+
         self._qdirstat_path = detect_qdirstat()
         self.open_qds_btn = QPushButton("Open in qDirStat")
         if self._qdirstat_path:
@@ -815,12 +834,10 @@ class _StoragePane(QWidget):
 
         cat_totals: Dict[str, int] = {c: 0 for c in _CATEGORY_ORDER}
 
-        for folder, cats in sorted(
-            data.items(), key=lambda kv: sum(kv[1].values()), reverse=True
-        ):
+        for folder, cats in sorted(data.items(), key=lambda kv: sum(kv[1].values()), reverse=True):
             folder_total = sum(cats.values())
             pct = f"{100 * folder_total / grand_total:.1f}%"
-            label = "(root files)" if folder == '__root__' else folder
+            label = "(root files)" if folder == "__root__" else folder
             parent = QTreeWidgetItem([label, _fmt_size(folder_total), pct])
             self.tree.addTopLevelItem(parent)
             for cat in _CATEGORY_ORDER:
@@ -828,13 +845,14 @@ class _StoragePane(QWidget):
                 if sz == 0:
                     continue
                 cat_totals[cat] += sz
-                child = QTreeWidgetItem([
-                    f"  {cat.capitalize()}", _fmt_size(sz),
-                    f"{100 * sz / grand_total:.1f}%",
-                ])
-                child.setForeground(
-                    0, QBrush(_CATEGORY_COLORS.get(cat, _CATEGORY_COLORS['other']))
+                child = QTreeWidgetItem(
+                    [
+                        f"  {cat.capitalize()}",
+                        _fmt_size(sz),
+                        f"{100 * sz / grand_total:.1f}%",
+                    ]
                 )
+                child.setForeground(0, QBrush(_CATEGORY_COLORS.get(cat, _CATEGORY_COLORS["other"])))
                 parent.addChild(child)
 
         total_item = QTreeWidgetItem(["TOTAL", _fmt_size(grand_total), "100%"])
@@ -846,16 +864,17 @@ class _StoragePane(QWidget):
         if not self._data:
             return
         dest_str, _ = QFileDialog.getSaveFileName(
-            self, "Save Storage Report",
+            self,
+            "Save Storage Report",
             str(Path(self.dir_selector.get_directory()) / "storage_report.csv"),
             "CSV Files (*.csv)",
         )
         if not dest_str:
             return
         try:
-            with open(dest_str, 'w', newline='', encoding='utf-8') as f:
+            with open(dest_str, "w", newline="", encoding="utf-8") as f:
                 w = csv.writer(f)
-                w.writerow(['Folder', 'Category', 'Size (bytes)', 'Size'])
+                w.writerow(["Folder", "Category", "Size (bytes)", "Size"])
                 for folder, cats in sorted(self._data.items()):
                     for cat in _CATEGORY_ORDER:
                         sz = cats.get(cat, 0)
@@ -867,20 +886,24 @@ class _StoragePane(QWidget):
 
     def _import_qdirstat(self):
         path_str, _ = QFileDialog.getOpenFileName(
-            self, "Import qDirStat Cache", "",
+            self,
+            "Import qDirStat Cache",
+            "",
             "qDirStat Cache (*.cache.gz);;All Files (*)",
         )
         if not path_str:
             return
         try:
             from core.qdirstat_cache import parse_qdirstat_cache
+
             data = parse_qdirstat_cache(Path(path_str))
             self._data = data
             self._populate(data)
             self.export_btn.setEnabled(bool(data))
             self.export_qds_btn.setEnabled(bool(data))
             QMessageBox.information(
-                self, "Imported",
+                self,
+                "Imported",
                 f"Loaded {len(data)} folder(s) from qDirStat cache.",
             )
         except Exception as exc:
@@ -890,7 +913,8 @@ class _StoragePane(QWidget):
         if not self._data:
             return
         dest_str, _ = QFileDialog.getSaveFileName(
-            self, "Export qDirStat Cache",
+            self,
+            "Export qDirStat Cache",
             str(Path(self.dir_selector.get_directory()) / "storage.cache.gz"),
             "qDirStat Cache (*.cache.gz)",
         )
@@ -898,6 +922,7 @@ class _StoragePane(QWidget):
             return
         try:
             from core.qdirstat_cache import write_qdirstat_cache
+
             root = Path(self.dir_selector.get_directory())
             write_qdirstat_cache(self._data, root, Path(dest_str))
             QMessageBox.information(self, "Exported", f"Cache saved:\n{dest_str}")
@@ -912,6 +937,7 @@ class _StoragePane(QWidget):
             QMessageBox.warning(self, "No Folder", "Select a valid folder first.")
             return
         import subprocess
+
         try:
             subprocess.Popen([self._qdirstat_path, directory])
         except Exception as exc:
@@ -921,6 +947,7 @@ class _StoragePane(QWidget):
 # ─────────────────────────────────────────────────────────────────────────────
 # Trash pane
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class _TrashPane(QWidget):
     def __init__(self, config, parent=None):
@@ -1000,18 +1027,18 @@ class _TrashPane(QWidget):
         self.tree.clear()
         for item in self._items:
             orig = Path(item.original_path)
-            twi = QTreeWidgetItem([
-                orig.name,
-                str(orig.parent),
-                item.deleted_at[:19].replace('T', ' '),
-                _fmt_size(item.size_bytes),
-            ])
+            twi = QTreeWidgetItem(
+                [
+                    orig.name,
+                    str(orig.parent),
+                    item.deleted_at[:19].replace("T", " "),
+                    _fmt_size(item.size_bytes),
+                ]
+            )
             twi.setToolTip(0, str(orig))
             self.tree.addTopLevelItem(twi)
         total_size = self._trash.total_size()
-        self.summary_label.setText(
-            f"{len(self._items)} item(s) in trash  |  {_fmt_size(total_size)} total"
-        )
+        self.summary_label.setText(f"{len(self._items)} item(s) in trash  |  {_fmt_size(total_size)} total")
         self._update_buttons()
 
     def _update_buttons(self):
@@ -1036,7 +1063,7 @@ class _TrashPane(QWidget):
             return
 
         ok = 0
-        renamed: List[str] = []   # items whose original location was occupied
+        renamed: List[str] = []  # items whose original location was occupied
         for item in selected:
             restored_to = self._trash.restore(item)
             if restored_to is None:
@@ -1049,8 +1076,7 @@ class _TrashPane(QWidget):
         if renamed:
             msg += (
                 "\n\nThe following item(s) were restored under a new name "
-                "because the original location already contained a file:\n  • "
-                + "\n  • ".join(renamed)
+                "because the original location already contained a file:\n  • " + "\n  • ".join(renamed)
             )
         QMessageBox.information(self, "Restore", msg)
         self._refresh()
@@ -1063,9 +1089,11 @@ class _TrashPane(QWidget):
             QMessageBox.information(self, "None Selected", "Select items to delete.")
             return
         reply = QMessageBox.question(
-            self, "Permanent Delete",
+            self,
+            "Permanent Delete",
             f"Permanently delete {len(selected)} item(s)? This cannot be undone.",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
             return
@@ -1077,9 +1105,11 @@ class _TrashPane(QWidget):
         if not self._trash or not self._items:
             return
         reply = QMessageBox.question(
-            self, "Empty Trash",
+            self,
+            "Empty Trash",
             f"Permanently delete all {len(self._items)} item(s)?\nThis cannot be undone.",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
             return
@@ -1092,13 +1122,12 @@ class _TrashPane(QWidget):
 # Cold Storage Wizard pages
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class _SelectPage(QWizardPage):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setTitle("Select Folders")
-        self.setSubTitle(
-            "Choose the project folder to archive and where to save the output."
-        )
+        self.setSubTitle("Choose the project folder to archive and where to save the output.")
         layout = QVBoxLayout(self)
         self.src = DirectorySelectorWidget(label_text="Project folder:")
         self.src.directory_changed.connect(self.completeChanged)
@@ -1125,8 +1154,7 @@ class _ReviewPage(QWizardPage):
         super().__init__(parent)
         self.setTitle("Review Exclusions")
         self.setSubTitle(
-            "The following files will be EXCLUDED from the archive "
-            "(hidden, temp, cache, and WIP markers)."
+            "The following files will be EXCLUDED from the archive " "(hidden, temp, cache, and WIP markers)."
         )
         layout = QVBoxLayout(self)
         self.exclude_list = QListWidget()
@@ -1153,8 +1181,7 @@ class _ReviewPage(QWizardPage):
 
         total_incl = sum(fp.stat().st_size for fp in include if fp.exists())
         self.info_label.setText(
-            f"{len(include)} file(s) will be included ({_fmt_size(total_incl)})  |  "
-            f"{len(exclude)} file(s) excluded"
+            f"{len(include)} file(s) will be included ({_fmt_size(total_incl)})  |  " f"{len(exclude)} file(s) excluded"
         )
 
 
@@ -1227,13 +1254,8 @@ class _ManifestPage(QWizardPage):
         # Apply any extra excludes from the configure page
         extra = w.config_page.extra_excludes()
         if extra:
-            extra_pats = [
-                re.compile(p.replace('*', '.*'), re.IGNORECASE) for p in extra
-            ]
-            include = [
-                fp for fp in include
-                if not any(pat.search(fp.name) for pat in extra_pats)
-            ]
+            extra_pats = [re.compile(p.replace("*", ".*"), re.IGNORECASE) for p in extra]
+            include = [fp for fp in include if not any(pat.search(fp.name) for pat in extra_pats)]
         w._include_files = include
         self.progress.setMaximum(max(1, len(include)))
 
@@ -1246,7 +1268,7 @@ class _ManifestPage(QWizardPage):
         self.progress.setValue(current)
         self.status_label.setText(f"[{current}/{total}] {name}")
         item = QListWidgetItem(f"✓  {name}")
-        item.setForeground(QBrush(QColor('#c3e88d')))
+        item.setForeground(QBrush(QColor("#c3e88d")))
         self.log.addItem(item)
         self.log.scrollToBottom()
 
@@ -1339,21 +1361,18 @@ class _VerifyPage(QWizardPage):
         self.progress.setValue(0)
         self.log.clear()
         w: ColdStorageWizard = self.wizard()
-        manifest_data = getattr(w, '_manifest_data', [])
-        copy_result = getattr(w, '_copy_result', None)
+        manifest_data = getattr(w, "_manifest_data", [])
+        copy_result = getattr(w, "_copy_result", None)
 
         # ZIP output — skip per-file verify (can't easily hash inside zip without extracting)
         if w.config_page.as_zip():
-            self.summary_label.setText(
-                "ZIP archive created. Skipping in-archive checksum verification."
-            )
+            self.summary_label.setText("ZIP archive created. Skipping in-archive checksum verification.")
             self.summary_label.setStyleSheet("font-weight: bold; padding: 4px; color: #ffcb6b;")
             self._done = True
             self.completeChanged.emit()
             return
 
-        dest = copy_result if isinstance(copy_result, Path) and copy_result.is_dir() \
-            else w.select_page.dest_dir()
+        dest = copy_result if isinstance(copy_result, Path) and copy_result.is_dir() else w.select_page.dest_dir()
         self.progress.setMaximum(max(1, len(manifest_data)))
 
         self._worker = _VerifyWorker(dest, manifest_data)
@@ -1363,7 +1382,7 @@ class _VerifyPage(QWizardPage):
 
     def _on_file(self, rel: str, ok: bool):
         item = QListWidgetItem(f"{'✓' if ok else '✗'}  {Path(rel).name}")
-        item.setForeground(QBrush(QColor('#c3e88d' if ok else '#ff5370')))
+        item.setForeground(QBrush(QColor("#c3e88d" if ok else "#ff5370")))
         self.log.addItem(item)
         self.log.scrollToBottom()
         self.progress.setValue(self.progress.value() + 1)
@@ -1371,11 +1390,9 @@ class _VerifyPage(QWizardPage):
     def _on_done(self, success: bool, message: str, results):
         passed = sum(1 for _, ok, _ in (results or []) if ok)
         total = len(results or [])
-        color = '#c3e88d' if passed == total else '#ffcb6b'
+        color = "#c3e88d" if passed == total else "#ffcb6b"
         self.summary_label.setText(message)
-        self.summary_label.setStyleSheet(
-            f"font-weight: bold; padding: 4px; color: {color};"
-        )
+        self.summary_label.setStyleSheet(f"font-weight: bold; padding: 4px; color: {color};")
         self._done = True
         self.completeChanged.emit()
 
@@ -1404,8 +1421,12 @@ class ColdStorageWizard(QWizard):
         self.verify_page = _VerifyPage()
 
         for page in (
-            self.select_page, self.review_page, self.config_page,
-            self.manifest_page, self.execute_page, self.verify_page,
+            self.select_page,
+            self.review_page,
+            self.config_page,
+            self.manifest_page,
+            self.execute_page,
+            self.verify_page,
         ):
             self.addPage(page)
 
@@ -1413,6 +1434,7 @@ class ColdStorageWizard(QWizard):
 # ─────────────────────────────────────────────────────────────────────────────
 # Archive pane (wizard launcher)
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class _ArchivePane(QWidget):
     def __init__(self, config, parent=None):
@@ -1449,9 +1471,7 @@ class _ArchivePane(QWidget):
         btn_row = QHBoxLayout()
         btn_row.addStretch()
         self.start_btn = QPushButton("Start Cold Storage Wizard…")
-        self.start_btn.setStyleSheet(
-            "padding: 10px 28px; font-weight: bold; font-size: 13px;"
-        )
+        self.start_btn.setStyleSheet("padding: 10px 28px; font-weight: bold; font-size: 13px;")
         self.start_btn.setToolTip("Open the step-by-step archiving wizard")
         self.start_btn.clicked.connect(self._launch)
         btn_row.addWidget(self.start_btn)
@@ -1467,6 +1487,7 @@ class _ArchivePane(QWidget):
 # ─────────────────────────────────────────────────────────────────────────────
 # NLE Backup pane
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class _NLEBackupPane(QWidget):
     """Backup NLE project files for any supported application."""
@@ -1536,7 +1557,7 @@ class _NLEBackupPane(QWidget):
                 exts |= _NLE_FORMATS[nle_name]
         for token in self.custom_ext_edit.text().split():
             token = token.strip()
-            if token and token.startswith('.'):
+            if token and token.startswith("."):
                 exts.add(token.lower())
         return exts
 
@@ -1559,9 +1580,7 @@ class _NLEBackupPane(QWidget):
         self.backup_btn.setEnabled(False)
         self.status_label.setText("Backing up…")
         self._worker = _NLEBackupWorker(scan, dest, exts)
-        self._worker.file_backed.connect(
-            lambda name: self.status_label.setText(f"Copying {name}…")
-        )
+        self._worker.file_backed.connect(lambda name: self.status_label.setText(f"Copying {name}…"))
         self._worker.finished.connect(self._on_done)
         self._worker.start()
 
@@ -1572,62 +1591,61 @@ class _NLEBackupPane(QWidget):
             QMessageBox.critical(self, "Backup Failed", message)
             return
 
-        now_str = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.last_backup_label.setText(f"Last backup: {now_str}")
 
         self.log.addItem(f"── Backup run: {now_str} ──")
-        for r in (results or []):
-            if r.get('ok'):
-                item = QListWidgetItem(
-                    f"  ✓  {r['name']}  →  {r['dest']}  ({_fmt_size(r['size'])})"
-                )
-                item.setForeground(QBrush(QColor('#c3e88d')))
+        for r in results or []:
+            if r.get("ok"):
+                item = QListWidgetItem(f"  ✓  {r['name']}  →  {r['dest']}  ({_fmt_size(r['size'])})")
+                item.setForeground(QBrush(QColor("#c3e88d")))
             else:
                 item = QListWidgetItem(f"  ✗  {r['name']}  —  {r.get('error', 'error')}")
-                item.setForeground(QBrush(QColor('#ff5370')))
+                item.setForeground(QBrush(QColor("#ff5370")))
             self.log.addItem(item)
         self.log.scrollToBottom()
 
-        self.config.set('nle_backup.scan_dir', self.scan_selector.get_directory())
-        self.config.set('nle_backup.backup_dir', self.dest_selector.get_directory())
-        self.config.set('nle_backup.last_backup', now_str)
+        self.config.set("nle_backup.scan_dir", self.scan_selector.get_directory())
+        self.config.set("nle_backup.backup_dir", self.dest_selector.get_directory())
+        self.config.set("nle_backup.last_backup", now_str)
 
     def load_settings(self):
-        scan = self.config.get('nle_backup.scan_dir', '')
+        scan = self.config.get("nle_backup.scan_dir", "")
         if scan:
             self.scan_selector.set_directory(scan)
-        dest = self.config.get('nle_backup.backup_dir', '')
+        dest = self.config.get("nle_backup.backup_dir", "")
         if dest:
             self.dest_selector.set_directory(dest)
-        last = self.config.get('nle_backup.last_backup', '')
+        last = self.config.get("nle_backup.last_backup", "")
         if last:
             self.last_backup_label.setText(f"Last backup: {last}")
-        enabled = self.config.get('nle_backup.enabled_nles', None)
+        enabled = self.config.get("nle_backup.enabled_nles", None)
         if enabled is not None:
             for nle_name, chk in self._nle_checkboxes.items():
                 chk.setChecked(nle_name in enabled)
-        custom = self.config.get('nle_backup.custom_exts', '')
+        custom = self.config.get("nle_backup.custom_exts", "")
         if custom:
             self.custom_ext_edit.setText(custom)
 
     def save_settings(self):
         scan = self.scan_selector.get_directory()
         if scan:
-            self.config.set('nle_backup.scan_dir', scan)
+            self.config.set("nle_backup.scan_dir", scan)
         dest = self.dest_selector.get_directory()
         if dest:
-            self.config.set('nle_backup.backup_dir', dest)
+            self.config.set("nle_backup.backup_dir", dest)
         enabled = [n for n, chk in self._nle_checkboxes.items() if chk.isChecked()]
-        self.config.set('nle_backup.enabled_nles', enabled)
-        self.config.set('nle_backup.custom_exts', self.custom_ext_edit.text())
+        self.config.set("nle_backup.enabled_nles", enabled)
+        self.config.set("nle_backup.custom_exts", self.custom_ext_edit.text())
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Export folder watcher pane
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class _ExportWatcherPane(QWidget):
-    _WATCH_EXTS = {'.mov', '.mp4', '.mxf', '.m4v', '.avi', '.mkv'}
+    _WATCH_EXTS = {".mov", ".mp4", ".mxf", ".m4v", ".avi", ".mkv"}
 
     def __init__(self, config, parent=None):
         super().__init__(parent)
@@ -1656,12 +1674,9 @@ class _ExportWatcherPane(QWidget):
         )
         opts_layout.addRow("Check against profile:", self.profile_combo)
 
-        self.chk_validate = QCheckBox(
-            "Run delivery validation on watch folder after each arrival"
-        )
+        self.chk_validate = QCheckBox("Run delivery validation on watch folder after each arrival")
         self.chk_validate.setToolTip(
-            "Automatically run the spec validator on the entire watch folder\n"
-            "each time a new media file is detected"
+            "Automatically run the spec validator on the entire watch folder\n" "each time a new media file is detected"
         )
         opts_layout.addRow(self.chk_validate)
 
@@ -1693,8 +1708,8 @@ class _ExportWatcherPane(QWidget):
         current = self.profile_combo.currentText()
         self.profile_combo.clear()
         self.profile_combo.addItem("(None)")
-        for p in self.config.get('naming.profiles', []):
-            name = p.get('name', '')
+        for p in self.config.get("naming.profiles", []):
+            name = p.get("name", "")
             if name:
                 self.profile_combo.addItem(name)
         idx = self.profile_combo.findText(current)
@@ -1717,18 +1732,16 @@ class _ExportWatcherPane(QWidget):
             QMessageBox.warning(self, "No Folder", "Select a valid watch folder.")
             return
         self._known_files = {
-            fp for fp in directory.rglob('*')
-            if fp.is_file() and fp.suffix.lower() in self._WATCH_EXTS
+            fp for fp in directory.rglob("*") if fp.is_file() and fp.suffix.lower() in self._WATCH_EXTS
         }
         self._watching = True
         self._timer.start(self.interval_spin.value() * 1000)
         self.toggle_btn.setText("Stop Watching")
         self.interval_spin.setEnabled(False)
-        ts = datetime.datetime.now().strftime('%H:%M:%S')
+        ts = datetime.datetime.now().strftime("%H:%M:%S")
         self._log(
-            f"[{ts}]  Started watching: {directory.name}"
-            f"  ({len(self._known_files)} existing file(s) ignored)",
-            '#c3e88d',
+            f"[{ts}]  Started watching: {directory.name}" f"  ({len(self._known_files)} existing file(s) ignored)",
+            "#c3e88d",
         )
         self.status_label.setText(f"Watching: {directory}")
 
@@ -1737,8 +1750,8 @@ class _ExportWatcherPane(QWidget):
         self._watching = False
         self.toggle_btn.setText("Start Watching")
         self.interval_spin.setEnabled(True)
-        ts = datetime.datetime.now().strftime('%H:%M:%S')
-        self._log(f"[{ts}]  Watching stopped.", '#888888')
+        ts = datetime.datetime.now().strftime("%H:%M:%S")
+        self._log(f"[{ts}]  Watching stopped.", "#888888")
         self.status_label.setText("Not watching.")
 
     def _poll(self):
@@ -1746,39 +1759,37 @@ class _ExportWatcherPane(QWidget):
         if not directory.is_dir():
             self._stop()
             return
-        current = {
-            fp for fp in directory.rglob('*')
-            if fp.is_file() and fp.suffix.lower() in self._WATCH_EXTS
-        }
+        current = {fp for fp in directory.rglob("*") if fp.is_file() and fp.suffix.lower() in self._WATCH_EXTS}
         new_files = current - self._known_files
         self._known_files = current
         for fp in sorted(new_files):
             self._on_arrival(fp, directory)
 
     def _on_arrival(self, fp: Path, watch_dir: Path):
-        ts = datetime.datetime.now().strftime('%H:%M:%S')
+        ts = datetime.datetime.now().strftime("%H:%M:%S")
         try:
             size = fp.stat().st_size
         except OSError:
             size = 0
-        self._log(f"[{ts}]  ▶  New file: {fp.name}  ({_fmt_size(size)})", '#82aaff')
+        self._log(f"[{ts}]  ▶  New file: {fp.name}  ({_fmt_size(size)})", "#82aaff")
 
         # Profile conformance check
         profile_name = self.profile_combo.currentText()
         if profile_name != "(None)":
-            for p in self.config.get('naming.profiles', []):
-                if p.get('name') == profile_name:
+            for p in self.config.get("naming.profiles", []):
+                if p.get("name") == profile_name:
                     try:
-                        from core.name_transform import ProductionTemplate
                         from core.linter import FilenameLint
+                        from core.name_transform import ProductionTemplate
+
                         template = ProductionTemplate.from_dict(p)
                         issues = FilenameLint().lint_directory(fp.parent, profile=template)
                         file_issues = [i for i in issues if i.filename == fp.name]
                         if file_issues:
                             for issue in file_issues:
-                                self._log(f"       ⚠  {issue.description}", '#ffcb6b')
+                                self._log(f"       ⚠  {issue.description}", "#ffcb6b")
                         else:
-                            self._log(f"       ✓  Conforms to profile '{profile_name}'", '#c3e88d')
+                            self._log(f"       ✓  Conforms to profile '{profile_name}'", "#c3e88d")
                     except Exception:
                         pass
                     break
@@ -1786,9 +1797,10 @@ class _ExportWatcherPane(QWidget):
         # Optional delivery validation
         if self.chk_validate.isChecked():
             try:
-                from core.delivery import DeliveryValidator, DeliveryProfile
+                from core.delivery import DeliveryProfile, DeliveryValidator
+
                 report = DeliveryValidator().validate(watch_dir, DeliveryProfile())
-                color = '#c3e88d' if report.passed else '#ff5370'
+                color = "#c3e88d" if report.passed else "#ff5370"
                 status = "PASSED" if report.passed else "FAILED"
                 self._log(
                     f"       Validation {status}: {report.error_count()} error(s), "
@@ -1796,28 +1808,29 @@ class _ExportWatcherPane(QWidget):
                     color,
                 )
             except Exception as exc:
-                self._log(f"       Validation error: {exc}", '#ff5370')
+                self._log(f"       Validation error: {exc}", "#ff5370")
 
-    def _log(self, text: str, color_hex: str = '#e0e0e0'):
+    def _log(self, text: str, color_hex: str = "#e0e0e0"):
         item = QListWidgetItem(text)
         item.setForeground(QBrush(QColor(color_hex)))
         self.log.addItem(item)
         self.log.scrollToBottom()
 
     def load_settings(self):
-        d = self.config.get('export_watcher.watch_dir', '')
+        d = self.config.get("export_watcher.watch_dir", "")
         if d:
             self.dir_selector.set_directory(d)
 
     def save_settings(self):
         d = self.dir_selector.get_directory()
         if d:
-            self.config.set('export_watcher.watch_dir', d)
+            self.config.set("export_watcher.watch_dir", d)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Main StudioToolsTab
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class StudioToolsTab(BaseTab):
     """Studio utilities: stale files, storage report, trash, cold storage, NLE backup, export watcher."""
@@ -1848,7 +1861,7 @@ class StudioToolsTab(BaseTab):
         layout.addWidget(self._inner_tabs)
 
     def load_settings(self):
-        directory = self.config.get_tab_directory('studio_tools')
+        directory = self.config.get_tab_directory("studio_tools")
         if directory and Path(directory).is_dir():
             self._stale_pane.dir_selector.set_directory(directory)
             self._storage_pane.dir_selector.set_directory(directory)
@@ -1860,6 +1873,6 @@ class StudioToolsTab(BaseTab):
     def save_settings(self):
         directory = self._stale_pane.dir_selector.get_directory()
         if directory:
-            self.config.set_tab_directory('studio_tools', directory)
+            self.config.set_tab_directory("studio_tools", directory)
         self._nle_pane.save_settings()
         self._watcher_pane.save_settings()

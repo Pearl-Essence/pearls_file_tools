@@ -4,8 +4,16 @@ from pathlib import Path
 from typing import List, Tuple
 
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QTableWidget, QTableWidgetItem, QHeaderView, QCheckBox, QDialogButtonBox,
+    QCheckBox,
+    QDialog,
+    QDialogButtonBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
 )
 
 
@@ -26,12 +34,12 @@ def _strip_patterns(filename: str, patterns: List[str]) -> str:
             p_lower = pat.lower()
             s_lower = stem.lower()
             if s_lower.startswith(p_lower):
-                stem = stem[len(pat):]
+                stem = stem[len(pat) :]
                 changed = True
             elif s_lower.endswith(p_lower):
                 stem = stem[: len(stem) - len(pat)]
                 changed = True
-    stem = stem.strip('_- ')
+    stem = stem.strip("_- ")
     return f"{stem}{ext}" if stem else filename
 
 
@@ -51,16 +59,18 @@ class NormalizeDialog(QDialog):
     def _setup_ui(self):
         layout = QVBoxLayout()
 
-        layout.addWidget(QLabel(
-            "Strip common bad prefixes / suffixes from filenames.\n"
-            "Only files whose names actually change are shown in the preview."
-        ))
+        layout.addWidget(
+            QLabel(
+                "Strip common bad prefixes / suffixes from filenames.\n"
+                "Only files whose names actually change are shown in the preview."
+            )
+        )
 
         patterns_row = QHBoxLayout()
         patterns_row.addWidget(QLabel("Patterns to strip:"))
         self.patterns_edit = QLineEdit()
-        bad = self._config.get('naming.bad_patterns', [])
-        self.patterns_edit.setText(', '.join(bad))
+        bad = self._config.get("naming.bad_patterns", [])
+        self.patterns_edit.setText(", ".join(bad))
         self.patterns_edit.setPlaceholderText("e.g. _COPY, _BACKUP, Copy of ")
         self.patterns_edit.textChanged.connect(self._refresh_preview)
         patterns_row.addWidget(self.patterns_edit, stretch=1)
@@ -91,7 +101,7 @@ class NormalizeDialog(QDialog):
         self.setLayout(layout)
 
     def _get_patterns(self) -> List[str]:
-        return [p.strip() for p in self.patterns_edit.text().split(',') if p.strip()]
+        return [p.strip() for p in self.patterns_edit.text().split(",") if p.strip()]
 
     def _refresh_preview(self):
         patterns = self._get_patterns()
@@ -113,7 +123,7 @@ class NormalizeDialog(QDialog):
 
     def _on_accept(self):
         if self.save_chk.isChecked():
-            self._config.set('naming.bad_patterns', self._get_patterns())
+            self._config.set("naming.bad_patterns", self._get_patterns())
         self.accept()
 
     def get_rename_pairs(self) -> List[Tuple[Path, str]]:

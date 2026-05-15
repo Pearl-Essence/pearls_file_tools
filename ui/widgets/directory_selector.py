@@ -1,8 +1,9 @@
 """Directory selector widget for Pearl's File Tools."""
 
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QPushButton, QFileDialog, QCheckBox
-from PySide6.QtCore import Signal
 from pathlib import Path
+
+from PySide6.QtCore import Signal
+from PySide6.QtWidgets import QCheckBox, QFileDialog, QHBoxLayout, QLabel, QPushButton, QWidget
 
 
 class DirectorySelectorWidget(QWidget):
@@ -54,11 +55,7 @@ class DirectorySelectorWidget(QWidget):
 
     def browse_directory(self):
         """Open directory browser dialog."""
-        directory = QFileDialog.getExistingDirectory(
-            self,
-            "Select Directory",
-            self.last_directory
-        )
+        directory = QFileDialog.getExistingDirectory(self, "Select Directory", self.last_directory)
 
         if directory:
             self.set_directory(directory)

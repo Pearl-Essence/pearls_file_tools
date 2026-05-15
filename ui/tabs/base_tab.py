@@ -1,14 +1,16 @@
 """Base tab class for Pearl's File Tools."""
 
 from abc import ABCMeta, abstractmethod
-from PySide6.QtWidgets import QWidget, QMessageBox
-from PySide6.QtCore import Signal, QObject
 from typing import Optional
+
+from PySide6.QtCore import QObject, Signal
+from PySide6.QtWidgets import QMessageBox, QWidget
 
 
 # Create a metaclass that combines PySide6's metaclass with ABCMeta
 class QABCMeta(type(QObject), ABCMeta):
     """Metaclass that combines Qt's metaclass with ABC's metaclass."""
+
     pass
 
 
@@ -81,7 +83,7 @@ class BaseTab(QWidget, metaclass=QABCMeta):
         """
         self.current_directory = path
         # Save to config
-        tab_name = self.get_tab_name().lower().replace(' ', '_')
+        tab_name = self.get_tab_name().lower().replace(" ", "_")
         self.config.set_tab_directory(tab_name, path)
 
     def get_directory(self) -> str:
@@ -143,13 +145,7 @@ class BaseTab(QWidget, metaclass=QABCMeta):
         Returns:
             True if user confirmed, False otherwise
         """
-        reply = QMessageBox.question(
-            self,
-            title,
-            message,
-            QMessageBox.Yes | QMessageBox.No,
-            QMessageBox.No
-        )
+        reply = QMessageBox.question(self, title, message, QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         return reply == QMessageBox.Yes
 
     def enable_controls(self, enabled: bool):

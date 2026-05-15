@@ -1,8 +1,8 @@
 """Comprehensive tests for config.py."""
 
 import json
-import pytest
 from pathlib import Path
+
 from config import Config, get_config_dir, get_data_dir
 
 
@@ -14,6 +14,7 @@ class TestGetConfigDir:
 
     def test_platform_appropriate(self):
         import sys
+
         result = get_config_dir()
         if sys.platform == "darwin":
             assert ".config" in str(result)

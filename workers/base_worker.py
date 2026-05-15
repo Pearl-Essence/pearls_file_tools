@@ -10,8 +10,8 @@ class BaseWorker(QThread):
     incompatible with ABCMeta. Subclasses must implement run().
     """
 
-    progress = Signal(str)       # status message
-    finished = Signal(bool, str) # (success, message)
+    progress = Signal(str)  # status message
+    finished = Signal(bool, str)  # (success, message)
 
     def __init__(self):
         super().__init__()

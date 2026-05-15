@@ -1,9 +1,9 @@
 """Shared fixtures for Pearl Post Suite tests."""
 
-import os
 import sys
-import pytest
 from pathlib import Path
+
+import pytest
 
 # Ensure the package root is on sys.path so `import constants` etc. work
 # the same way they do when the app runs from pearls_file_tools/.
@@ -35,6 +35,7 @@ def tmp_tree(tmp_path):
 def _reset_config_singleton():
     """Reset the Config singleton between tests so state doesn't leak."""
     from config import Config
+
     Config._instance = None
     yield
     Config._instance = None
