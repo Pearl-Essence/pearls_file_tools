@@ -6,19 +6,28 @@ sidebar items that point to dialogs (Sync Check, Watch Folders) intercept
 the activation and open the dialog without changing the current pane.
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QAction, QCursor, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow, QMenu,
-    QMessageBox, QPushButton, QSplitter, QStackedWidget, QVBoxLayout,
+    QApplication,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMenu,
+    QMessageBox,
+    QPushButton,
+    QSplitter,
+    QStackedWidget,
+    QVBoxLayout,
     QWidget,
 )
 
 from branding import APP_NAME, APP_TAGLINE, ICONS_DIR, NAV_TREE
 from config import Config
-from constants import DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT
+from constants import DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH
 from ui.widgets.sidebar_nav import SidebarNav
 
 
@@ -121,17 +130,13 @@ class MainWindow(QMainWindow):
     def _build_project_strip(self) -> QWidget:
         wrap = QFrame()
         wrap.setObjectName("projectStrip")
-        wrap.setStyleSheet(
-            "QFrame#projectStrip { border-bottom: 1px solid #1C1E24; }"
-        )
+        wrap.setStyleSheet("QFrame#projectStrip { border-bottom: 1px solid #1C1E24; }")
         v = QVBoxLayout(wrap)
         v.setContentsMargins(18, 8, 18, 14)
         v.setSpacing(2)
 
         self._proj_label = QLabel("No project loaded")
-        self._proj_label.setStyleSheet(
-            "color: #E8E6DF; font-size: 12px; font-weight: 600;"
-        )
+        self._proj_label.setStyleSheet("color: #E8E6DF; font-size: 12px; font-weight: 600;")
         self._proj_meta = QLabel("—")
         self._proj_meta.setObjectName("cardMetrics")
 
@@ -159,9 +164,7 @@ class MainWindow(QMainWindow):
     def _build_user_footer(self) -> QWidget:
         wrap = QFrame()
         wrap.setObjectName("userFooter")
-        wrap.setStyleSheet(
-            "QFrame#userFooter { border-top: 1px solid #1C1E24; }"
-        )
+        wrap.setStyleSheet("QFrame#userFooter { border-top: 1px solid #1C1E24; }")
         h = QHBoxLayout(wrap)
         h.setContentsMargins(18, 12, 18, 12)
         h.setSpacing(10)
@@ -185,12 +188,11 @@ class MainWindow(QMainWindow):
         avatar.setFixedSize(22, 22)
         avatar.setAlignment(Qt.AlignCenter)
         avatar.setStyleSheet(
-            "background:#2A2418; color:#E8B547; border-radius:11px;"
-            "font-size:10px; font-weight:700;"
+            "background:#2A2418; color:#E8B547; border-radius:11px;" "font-size:10px; font-weight:700;"
         )
         col = QVBoxLayout()
         col.setSpacing(0)
-        name = QLabel(self.config.get('user.name', 'Levi K.'))
+        name = QLabel(self.config.get("user.name", "Levi K."))
         name.setStyleSheet("color: #E8E6DF; font-size: 11px;")
         self._crumb = QLabel("—")
         self._crumb.setObjectName("eyebrow")
@@ -207,28 +209,30 @@ class MainWindow(QMainWindow):
     def _mount_tabs(self):
         """Construct every tab class and register them in the stack."""
         # Lazy imports keep startup time predictable and avoid circular deps.
-        from ui.tabs.ingest_tab import IngestTab
-        from ui.tabs.proxy_tab import ProxyTab
-        from ui.tabs.bulk_renamer_tab import BulkRenamerTab
-        from ui.tabs.file_organizer_tab import FileOrganizerTab
         from ui.tabs.archive_extractor_tab import ArchiveExtractorTab
-        from ui.tabs.image_browser_tab import ImageBrowserTab
-        from ui.tabs.studio_tabs import (
-            ColdStorageTab, ExportWatcherTab, NLEBackupTab,
-            StaleFilesTab, StorageReportTab, TrashTab,
-        )
-        from ui.tabs.maintain_panes import SyncCheckTab, WatchFoldersTab
-        from ui.tabs.delivery_validator_tab import SpecValidatorTab
+        from ui.tabs.bulk_renamer_tab import BulkRenamerTab
         from ui.tabs.delivery_package_tab import PackageExportTab
+        from ui.tabs.delivery_validator_tab import SpecValidatorTab
+        from ui.tabs.file_organizer_tab import FileOrganizerTab
+        from ui.tabs.image_browser_tab import ImageBrowserTab
+        from ui.tabs.ingest_tab import IngestTab
+        from ui.tabs.maintain_panes import SyncCheckTab, WatchFoldersTab
+        from ui.tabs.proxy_tab import ProxyTab
+        from ui.tabs.studio_tabs import (
+            ColdStorageTab,
+            ExportWatcherTab,
+            NLEBackupTab,
+            StaleFilesTab,
+            StorageReportTab,
+            TrashTab,
+        )
 
         # factory_key -> tab instance
         validator_tab = SpecValidatorTab(self.config)
-        package_tab   = PackageExportTab(self.config)
+        package_tab = PackageExportTab(self.config)
         # Cross-tab wire: when validator emits pass, pre-fill the package tab.
         validator_tab.validation_passed.connect(
-            lambda passed: package_tab.set_source_from_validator(
-                validator_tab.get_directory()
-            ) if passed else None
+            lambda passed: package_tab.set_source_from_validator(validator_tab.get_directory()) if passed else None
         )
 
         watch_folders_tab = WatchFoldersTab(self.config)
@@ -236,22 +240,22 @@ class MainWindow(QMainWindow):
         watch_folders_tab.set_indicator_callback(self._update_watch_indicator)
 
         tabs = {
-            "offload":         IngestTab(self.config),
-            "proxy":           ProxyTab(self.config),
-            "rename":          BulkRenamerTab(self.config),
-            "organize":        FileOrganizerTab(self.config),
-            "extract":         ArchiveExtractorTab(self.config),
-            "stills":          ImageBrowserTab(self.config),
-            "stale":           StaleFilesTab(self.config),
-            "storage":         StorageReportTab(self.config),
-            "nle_backup":      NLEBackupTab(self.config),
-            "export_watcher":  ExportWatcherTab(self.config),
-            "trash":           TrashTab(self.config),
-            "sync_check":      SyncCheckTab(self.config),
-            "watch_folders":   watch_folders_tab,
-            "validator":       validator_tab,
-            "package":         package_tab,
-            "cold_storage":    ColdStorageTab(self.config),
+            "offload": IngestTab(self.config),
+            "proxy": ProxyTab(self.config),
+            "rename": BulkRenamerTab(self.config),
+            "organize": FileOrganizerTab(self.config),
+            "extract": ArchiveExtractorTab(self.config),
+            "stills": ImageBrowserTab(self.config),
+            "stale": StaleFilesTab(self.config),
+            "storage": StorageReportTab(self.config),
+            "nle_backup": NLEBackupTab(self.config),
+            "export_watcher": ExportWatcherTab(self.config),
+            "trash": TrashTab(self.config),
+            "sync_check": SyncCheckTab(self.config),
+            "watch_folders": watch_folders_tab,
+            "validator": validator_tab,
+            "package": package_tab,
+            "cold_storage": ColdStorageTab(self.config),
         }
         for key, tab in tabs.items():
             tab.status_changed.connect(self._update_status)
@@ -333,9 +337,9 @@ class MainWindow(QMainWindow):
     # ─────────────────────────────────────────────────────────────────
     def _load_window_state(self):
         screen = QApplication.primaryScreen().availableGeometry()
-        remember_size = self.config.get('settings.remember_window_size', True)
+        remember_size = self.config.get("settings.remember_window_size", True)
 
-        geo = self.config.get('window.geometry') if remember_size else None
+        geo = self.config.get("window.geometry") if remember_size else None
         if geo and len(geo) == 4:
             x, y, w, h = geo
         else:
@@ -345,29 +349,30 @@ class MainWindow(QMainWindow):
             y = screen.y() + (screen.height() - h) // 2
         max_w = int(screen.width() * 0.90)
         max_h = int(screen.height() * 0.85)
-        w = min(w, max_w); h = min(h, max_h)
+        w = min(w, max_w)
+        h = min(h, max_h)
         x = max(screen.x(), min(x, screen.x() + screen.width() - w))
         y = max(screen.y(), min(y, screen.y() + screen.height() - h))
         self.setGeometry(x, y, w, h)
-        if remember_size and self.config.get('window.maximized', False):
+        if remember_size and self.config.get("window.maximized", False):
             self.showMaximized()
 
-        remember_tab = self.config.get('settings.remember_last_tab', True)
-        last_key = self.config.get('window.last_nav', 'offload') if remember_tab else 'offload'
+        remember_tab = self.config.get("settings.remember_last_tab", True)
+        last_key = self.config.get("window.last_nav", "offload") if remember_tab else "offload"
         self.sidebar.select_key(last_key)
 
     def _save_window_state(self):
         geo = self.geometry()
-        self.config.set('window.geometry', [geo.x(), geo.y(), geo.width(), geo.height()])
-        self.config.set('window.maximized', self.isMaximized())
+        self.config.set("window.geometry", [geo.x(), geo.y(), geo.width(), geo.height()])
+        self.config.set("window.maximized", self.isMaximized())
         key = self.sidebar.current_key()
         if key:
-            self.config.set('window.last_nav', key)
+            self.config.set("window.last_nav", key)
         self.config.save_to_file()
 
     def closeEvent(self, event):
         for tab in self._tab_instances:
-            if hasattr(tab, 'save_settings'):
+            if hasattr(tab, "save_settings"):
                 tab.save_settings()
         self._save_window_state()
         event.accept()
@@ -388,41 +393,46 @@ class MainWindow(QMainWindow):
 
     def _open_directory(self):
         cur = self.stack.currentWidget()
-        if hasattr(cur, 'browse_directory'):
+        if hasattr(cur, "browse_directory"):
             cur.browse_directory()
 
     def _refresh_current(self):
         cur = self.stack.currentWidget()
-        if hasattr(cur, 'refresh'):
+        if hasattr(cur, "refresh"):
             cur.refresh()
 
     def _show_settings(self):
         from ui.dialogs.settings_dialog import SettingsDialog
+
         dlg = SettingsDialog(self.config, self)
-        if dlg.exec() == SettingsDialog.Accepted and getattr(dlg, 'settings_changed', False):
-            QMessageBox.information(self, "Settings saved",
-                                    "Some changes may require restarting the application.")
+        if dlg.exec() == SettingsDialog.Accepted and getattr(dlg, "settings_changed", False):
+            QMessageBox.information(self, "Settings saved", "Some changes may require restarting the application.")
 
     def _show_history(self):
         from ui.dialogs.history_dialog import HistoryDialog
+
         HistoryDialog(self).exec()
 
     def _manage_profiles(self):
         from ui.dialogs.profile_dialog import ProfileDialog
+
         ProfileDialog(self.config, self).exec()
 
     def _clear_caches(self):
         reply = QMessageBox.question(
-            self, "Clear caches",
+            self,
+            "Clear caches",
             "Clear all cached data (image directory scans)?\n\nAre you sure?",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
             return
         from pathlib import Path as _P
+
         cleared = 0
         total = 0
-        names = ['.image_browser_cache.json']
+        names = [".image_browser_cache.json"]
         roots = [_P.home()]
         if self.config.config_path:
             roots.append(_P(self.config.config_path).parent)
@@ -441,16 +451,16 @@ class MainWindow(QMainWindow):
         if cleared:
             kb = total / 1024
             sz = f"{kb:.2f} KB" if kb < 1024 else f"{kb/1024:.2f} MB"
-            QMessageBox.information(self, "Cache cleared",
-                                    f"Cleared {cleared} cache file(s)\nFreed {sz} of disk space")
+            QMessageBox.information(self, "Cache cleared", f"Cleared {cleared} cache file(s)\nFreed {sz} of disk space")
         else:
-            QMessageBox.information(self, "No caches found",
-                                    "No cache files were found to clear.")
+            QMessageBox.information(self, "No caches found", "No cache files were found to clear.")
 
     def _show_about(self):
         from __init__ import __version__
+
         QMessageBox.about(
-            self, f"About {APP_NAME}",
+            self,
+            f"About {APP_NAME}",
             f"<h3>{APP_NAME}</h3>"
             f"<p><b>Version {__version__}</b></p>"
             f"<p>A premium post-production file management suite.</p>"
@@ -462,7 +472,7 @@ class MainWindow(QMainWindow):
             f"<li><b>Deliver</b> — spec validation + packaging</li>"
             f"<li><b>Archive</b> — LTO / cold storage <i>(planned)</i></li>"
             f"</ul>"
-            f"<p style='margin-top:10px;'><i>Built with PySide6</i></p>"
+            f"<p style='margin-top:10px;'><i>Built with PySide6</i></p>",
         )
 
     # ─────────────────────────────────────────────────────────────────
@@ -482,17 +492,17 @@ class MainWindow(QMainWindow):
     # ─────────────────────────────────────────────────────────────────
     def _get_projects(self) -> list:
         """Return list of Project dicts from config."""
-        return self.config.get('projects', [])
+        return self.config.get("projects", [])
 
     def _save_projects(self, projects: list):
-        self.config.set('projects', projects)
+        self.config.set("projects", projects)
         self.config.save_to_file()
 
     def _get_active_project_name(self) -> Optional[str]:
-        return self.config.get('active_project', None)
+        return self.config.get("active_project", None)
 
     def _set_active_project(self, name: Optional[str]):
-        self.config.set('active_project', name)
+        self.config.set("active_project", name)
         self.config.save_to_file()
         self._refresh_project_strip()
         self._apply_project_defaults()
@@ -503,8 +513,8 @@ class MainWindow(QMainWindow):
             self._proj_label.setText(name)
             # Find description
             for p in self._get_projects():
-                if p.get('name') == name:
-                    desc = p.get('description', '')
+                if p.get("name") == name:
+                    desc = p.get("description", "")
                     self._proj_meta.setText(desc if desc else "Active project")
                     return
             self._proj_meta.setText("Active project")
@@ -519,13 +529,9 @@ class MainWindow(QMainWindow):
 
         if projects:
             for p in projects:
-                name = p.get('name', 'Untitled')
-                act = menu.addAction(
-                    f"{'★ ' if name == active else ''}{name}"
-                )
-                act.triggered.connect(
-                    lambda checked, n=name: self._set_active_project(n)
-                )
+                name = p.get("name", "Untitled")
+                act = menu.addAction(f"{'★ ' if name == active else ''}{name}")
+                act.triggered.connect(lambda checked, n=name: self._set_active_project(n))
             menu.addSeparator()
 
         menu.addAction("No Project", lambda: self._set_active_project(None))
@@ -539,6 +545,7 @@ class MainWindow(QMainWindow):
 
     def _new_project(self):
         from ui.dialogs.project_dialog import ProjectDialog
+
         dlg = ProjectDialog(parent=self)
         if dlg.exec() == ProjectDialog.Accepted and dlg.result_project:
             projects = self._get_projects()
@@ -556,7 +563,7 @@ class MainWindow(QMainWindow):
 
         projects = self._get_projects()
         for i, p in enumerate(projects):
-            if p.get('name') == active:
+            if p.get("name") == active:
                 proj = Project.from_dict(p)
                 dlg = ProjectDialog(project=proj, parent=self)
                 if dlg.exec() == ProjectDialog.Accepted and dlg.result_project:
@@ -570,14 +577,15 @@ class MainWindow(QMainWindow):
         if not active:
             return
         reply = QMessageBox.question(
-            self, "Delete project",
-            f"Delete project '{active}'?\n\n"
-            "This removes the project definition only — no files are deleted.",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            self,
+            "Delete project",
+            f"Delete project '{active}'?\n\n" "This removes the project definition only — no files are deleted.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
             return
-        projects = [p for p in self._get_projects() if p.get('name') != active]
+        projects = [p for p in self._get_projects() if p.get("name") != active]
         self._save_projects(projects)
         self._set_active_project(None)
 
@@ -590,19 +598,19 @@ class MainWindow(QMainWindow):
             return
 
         for p in self._get_projects():
-            if p.get('name') == active:
+            if p.get("name") == active:
                 proj = Project.from_dict(p)
                 paths = proj.default_paths
 
                 # Find tabs by factory key and apply defaults
                 for tab in self._tab_instances:
-                    tab_name = getattr(tab, 'get_tab_name', lambda: '')()
-                    if tab_name == "Offload" and hasattr(tab, '_pane'):
+                    tab_name = getattr(tab, "get_tab_name", lambda: "")()
+                    if tab_name == "Offload" and hasattr(tab, "_pane"):
                         pane = tab._pane
-                        if paths.get('ingest_source') and not pane.card_src.get_path():
-                            pane.card_src.set_path(paths['ingest_source'])
-                        if paths.get('ingest_dest') and not pane.card_dst.get_path():
-                            pane.card_dst.set_path(paths['ingest_dest'])
-                        if paths.get('mirror_dest') and not pane.card_mirror.get_path():
-                            pane.card_mirror.set_path(paths['mirror_dest'])
+                        if paths.get("ingest_source") and not pane.card_src.get_path():
+                            pane.card_src.set_path(paths["ingest_source"])
+                        if paths.get("ingest_dest") and not pane.card_dst.get_path():
+                            pane.card_dst.set_path(paths["ingest_dest"])
+                        if paths.get("mirror_dest") and not pane.card_mirror.get_path():
+                            pane.card_mirror.set_path(paths["mirror_dest"])
                 return

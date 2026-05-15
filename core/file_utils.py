@@ -2,12 +2,11 @@
 
 import hashlib
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Tuple
-from datetime import datetime
-from constants import (
-    ALL_EXTENSION_CATEGORIES, CONFLICT_COUNTER, CONFLICT_TIMESTAMP, CONFLICT_SKIP
-)
+
+from constants import ALL_EXTENSION_CATEGORIES, CONFLICT_COUNTER, CONFLICT_SKIP, CONFLICT_TIMESTAMP
 
 
 def is_hidden_file(filename: str) -> bool:
@@ -18,7 +17,7 @@ def is_hidden_file(filename: str) -> bool:
     are almost always config / OS files (``.DS_Store``, ``.gitignore``,
     ``.env``) and the visual surprise of moving the dot is rarely intended.
     """
-    return bool(filename) and filename.startswith('.')
+    return bool(filename) and filename.startswith(".")
 
 
 def split_compound_suffix(filename: str) -> Tuple[str, str]:
@@ -32,9 +31,9 @@ def split_compound_suffix(filename: str) -> Tuple[str, str]:
     its full stem ``shot1.0.42`` and suffix ``.exr``, exactly what frame
     sequences need.
     """
-    parts = filename.split('.')
+    parts = filename.split(".")
     if len(parts) < 2:
-        return filename, ''
+        return filename, ""
     suffix_parts: List[str] = []
     for i, seg in enumerate(reversed(parts[1:])):
         if not (1 <= len(seg) <= 5 and seg.isascii()):
@@ -50,9 +49,9 @@ def split_compound_suffix(filename: str) -> Tuple[str, str]:
                 break
         suffix_parts.insert(0, seg)
     if not suffix_parts:
-        return filename, ''
-    stem = '.'.join(parts[: len(parts) - len(suffix_parts)])
-    suffix = '.' + '.'.join(suffix_parts)
+        return filename, ""
+    stem = ".".join(parts[: len(parts) - len(suffix_parts)])
+    suffix = "." + ".".join(suffix_parts)
     return stem, suffix
 
 
@@ -163,7 +162,7 @@ def format_file_size(size: int) -> str:
     Returns:
         Formatted string (e.g., "1.5 MB")
     """
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+    for unit in ["B", "KB", "MB", "GB", "TB"]:
         if size < 1024.0:
             return f"{size:.1f} {unit}"
         size /= 1024.0
@@ -183,7 +182,7 @@ def calculate_directory_hash(directory: Path) -> str:
     try:
         folders = []
         for item in directory.iterdir():
-            if item.is_dir() and not item.name.startswith('.'):
+            if item.is_dir() and not item.name.startswith("."):
                 try:
                     folders.append(f"{item.name}:{item.stat().st_mtime}")
                 except (PermissionError, OSError):
@@ -259,9 +258,9 @@ def safe_move(src_path: Path, dest_path: Path) -> bool:
         return False
 
 
-def get_files_in_directory(directory: Path,
-                           extensions: Optional[List[str]] = None,
-                           recursive: bool = False) -> List[Path]:
+def get_files_in_directory(
+    directory: Path, extensions: Optional[List[str]] = None, recursive: bool = False
+) -> List[Path]:
     """
     Get list of files in a directory, optionally filtered by extensions.
 

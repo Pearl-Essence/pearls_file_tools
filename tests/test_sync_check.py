@@ -1,19 +1,18 @@
 """Comprehensive tests for core/sync_check.py."""
 
-import time
 import datetime
-import pytest
 from pathlib import Path
+
 from core.sync_check import (
     SyncEntry,
     SyncReport,
-    _md5,
     _index_dir,
+    _md5,
     compare_directories,
 )
 
-
 # ── _md5 ────────────────────────────────────────────────────────────────────
+
 
 class TestMd5:
     def test_consistent_hash(self, tmp_path):
@@ -43,6 +42,7 @@ class TestMd5:
 
 
 # ── _index_dir ──────────────────────────────────────────────────────────────
+
 
 class TestIndexDir:
     def test_indexes_files(self, tmp_path):
@@ -78,6 +78,7 @@ class TestIndexDir:
 
 # ── SyncReport ──────────────────────────────────────────────────────────────
 
+
 class TestSyncReport:
     def test_by_status(self):
         entries = [
@@ -92,6 +93,7 @@ class TestSyncReport:
 
 
 # ── compare_directories ────────────────────────────────────────────────────
+
 
 class TestCompareDirectories:
     def test_identical_dirs(self, tmp_path):

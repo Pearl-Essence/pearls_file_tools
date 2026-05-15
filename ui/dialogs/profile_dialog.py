@@ -1,10 +1,19 @@
 """Naming profile management dialog for Pearl's File Tools."""
 
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QPushButton,
-    QGroupBox, QFormLayout, QLineEdit, QLabel, QDialogButtonBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
     QMessageBox,
+    QPushButton,
+    QVBoxLayout,
 )
+
 from core.name_transform import ProductionTemplate
 
 
@@ -15,7 +24,7 @@ class ProfileDialog(QDialog):
         super().__init__(parent)
         self.config = config
         self._profiles: list = self._load_profiles()
-        self._active_name: str = config.get('naming.active_profile') or ''
+        self._active_name: str = config.get("naming.active_profile") or ""
         self.setWindowTitle("Manage Naming Profiles")
         self.setMinimumSize(640, 420)
         self._setup_ui()
@@ -24,13 +33,12 @@ class ProfileDialog(QDialog):
     # ── persistence ───────────────────────────────────────────────────────
 
     def _load_profiles(self):
-        raw = self.config.get('naming.profiles', [])
+        raw = self.config.get("naming.profiles", [])
         return [ProductionTemplate.from_dict(d) for d in raw]
 
     def _save_profiles(self):
-        self.config.set('naming.profiles', [p.to_dict() for p in self._profiles])
-        self.config.set('naming.active_profile',
-                        self._active_name if self._active_name else None)
+        self.config.set("naming.profiles", [p.to_dict() for p in self._profiles])
+        self.config.set("naming.active_profile", self._active_name if self._active_name else None)
 
     # ── UI setup ──────────────────────────────────────────────────────────
 
@@ -115,7 +123,7 @@ class ProfileDialog(QDialog):
         if 0 <= row < len(self._profiles):
             p = self._profiles[row]
             self.name_edit.setText(p.name)
-            self.tokens_edit.setText(', '.join(p.tokens))
+            self.tokens_edit.setText(", ".join(p.tokens))
             self.separator_edit.setText(p.separator)
             self.version_edit.setText(p.version_format)
             self.episode_edit.setText(p.episode_format)
@@ -128,7 +136,7 @@ class ProfileDialog(QDialog):
         if not name:
             QMessageBox.warning(self, "Name Required", "Profile name cannot be empty.")
             return
-        tokens = [t.strip() for t in self.tokens_edit.text().split(',') if t.strip()]
+        tokens = [t.strip() for t in self.tokens_edit.text().split(",") if t.strip()]
         if not tokens:
             QMessageBox.warning(self, "Tokens Required", "At least one token is required.")
             return
@@ -136,9 +144,9 @@ class ProfileDialog(QDialog):
         self._profiles[row] = ProductionTemplate(
             name=name,
             tokens=tokens,
-            separator=self.separator_edit.text() or '_',
-            version_format=self.version_edit.text() or 'v{:02d}',
-            episode_format=self.episode_edit.text() or 'EP{:02d}',
+            separator=self.separator_edit.text() or "_",
+            version_format=self.version_edit.text() or "v{:02d}",
+            episode_format=self.episode_edit.text() or "EP{:02d}",
         )
         if self._active_name == old_name:
             self._active_name = name
@@ -159,13 +167,16 @@ class ProfileDialog(QDialog):
             return
         name = self._profiles[row].name
         reply = QMessageBox.question(
-            self, "Delete Profile", f"Delete profile '{name}'?",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            self,
+            "Delete Profile",
+            f"Delete profile '{name}'?",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
             return
         if self._active_name == name:
-            self._active_name = ''
+            self._active_name = ""
         del self._profiles[row]
         self._save_profiles()
         self._populate_list()

@@ -1,12 +1,11 @@
 """Pattern matching and grouping utilities for Pearl's File Tools."""
 
 import re
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Tuple, Optional, Dict, List, Iterable
-from difflib import SequenceMatcher
 from collections import defaultdict
-
+from dataclasses import dataclass
+from difflib import SequenceMatcher
+from pathlib import Path
+from typing import Dict, Iterable, List, Optional, Tuple
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Delimiter auto-detection
@@ -17,8 +16,8 @@ from collections import defaultdict
 # and pick the most popular. Files that contain none of these fall back to
 # ``_`` (the historical default), so single-word stems still group correctly.
 
-DELIMITER_CANDIDATES: Tuple[str, ...] = ('_', '-', ' ', '.')
-DEFAULT_DELIMITER = '_'
+DELIMITER_CANDIDATES: Tuple[str, ...] = ("_", "-", " ", ".")
+DEFAULT_DELIMITER = "_"
 
 
 def detect_dominant_delimiter(filenames: Iterable[str]) -> str:
@@ -54,9 +53,11 @@ def detect_dominant_delimiter(filenames: Iterable[str]) -> str:
 
 # ── Grouping presets ──────────────────────────────────────────────────────────
 
+
 @dataclass
 class GroupingPreset:
     """Describes how files are grouped during an organizer scan."""
+
     name: str
     description: str
 
@@ -74,27 +75,28 @@ PRESET_AE_RENDER = GroupingPreset(
 ALL_PRESETS: List[GroupingPreset] = [PRESET_STANDARD, PRESET_AE_RENDER]
 
 # Matches AE-style frame suffixes: Hero_Explosion_0001.exr → base='Hero_Explosion'
-AE_FRAME_PATTERN = re.compile(r'^(.+?)_(\d{4,8})(\.\w+)$')
+AE_FRAME_PATTERN = re.compile(r"^(.+?)_(\d{4,8})(\.\w+)$")
 
 # Matches filenames like HERO_Explosion_0001.exr, shot010.0042.dpx,
 # "HCESD11 - Card - STAR - 00000.png" (space-dash-space delimiter), or
 # "HCESD11 - Card - Star-00000.png" (plain-dash delimiter).
 # Requires an explicit delimiter (_  .  -  or  ' - ') before the frame number.
-SEQUENCE_PATTERN = re.compile(r'^(.+?)(?:[._-]| - )(\d{2,8})(\.\w+)$')
+SEQUENCE_PATTERN = re.compile(r"^(.+?)(?:[._-]| - )(\d{2,8})(\.\w+)$")
 
 # Matches filenames whose entire stem is a frame number, e.g. 000.png, 0042.exr
-PURE_NUMBER_PATTERN = re.compile(r'^(\d{2,8})(\.\w+)$')
+PURE_NUMBER_PATTERN = re.compile(r"^(\d{2,8})(\.\w+)$")
 
 
 @dataclass
 class SequenceGroup:
     """A detected image/frame sequence sharing a common base name."""
+
     base: str
     extension: str
     frames: List[int]
     missing: List[int]
     padding: int
-    files: List[str]   # filenames only (no directory component)
+    files: List[str]  # filenames only (no directory component)
 
     @property
     def label(self) -> str:
@@ -109,8 +111,7 @@ class SequenceGroup:
         return f"{base_prefix}[{first}\u2013{last}, {count} frames{missing_str}, {self.extension}]"
 
 
-def detect_image_sequences(filenames: List[str],
-                           min_frames: int = 3) -> Dict[str, 'SequenceGroup']:
+def detect_image_sequences(filenames: List[str], min_frames: int = 3) -> Dict[str, "SequenceGroup"]:
     """Group filenames that form image/frame sequences.
 
     Handles three naming conventions:
@@ -136,7 +137,7 @@ def detect_image_sequences(filenames: List[str],
         m2 = PURE_NUMBER_PATTERN.match(fname)
         if m2:
             frame_str, ext = m2.groups()
-            key = ext          # base is empty; key is just the extension
+            key = ext  # base is empty; key is just the extension
             candidates[key].append((int(frame_str), fname, len(frame_str)))
 
     sequences: Dict[str, SequenceGroup] = {}
@@ -192,7 +193,7 @@ def get_group_name(
         Tuple of ``(group_name, confidence_level)``.
     """
     if not delimiter:
-        delimiter = '_'
+        delimiter = "_"
     base_name = Path(filename).stem
     parts = base_name.split(delimiter)
 
@@ -260,7 +261,7 @@ def detect_common_prefixes(
 
     if delimiter is None:
         delimiter = detect_dominant_delimiter(filenames)
-    if delimiter == 'any':
+    if delimiter == "any":
         candidates = list(DELIMITER_CANDIDATES)
     else:
         candidates = [delimiter]
@@ -309,11 +310,7 @@ def group_files_by_pattern(
             groups[group_name].append(filename)
         else:
             # Low confidence - try fuzzy matching
-            best_group, score = find_best_group(
-                filename,
-                list(groups.keys()),
-                threshold=0.6
-            )
+            best_group, score = find_best_group(filename, list(groups.keys()), threshold=0.6)
 
             if best_group and score >= 0.6:
                 groups[best_group].append(filename)
@@ -359,7 +356,7 @@ def detect_common_suffixes(
 
     if delimiter is None:
         delimiter = detect_dominant_delimiter(filenames)
-    if delimiter == 'any':
+    if delimiter == "any":
         candidates = list(DELIMITER_CANDIDATES)
     else:
         candidates = [delimiter]

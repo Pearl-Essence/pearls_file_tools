@@ -3,11 +3,20 @@
 import sys
 
 from PySide6.QtWidgets import (
-    QCheckBox, QDialog, QDoubleSpinBox, QGroupBox, QHBoxLayout, QLabel,
-    QLineEdit, QMessageBox, QPushButton, QSpinBox, QTabWidget, QVBoxLayout,
+    QCheckBox,
+    QDialog,
+    QDoubleSpinBox,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QSpinBox,
+    QTabWidget,
+    QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import Qt
 
 
 class SettingsDialog(QDialog):
@@ -69,15 +78,11 @@ class SettingsDialog(QDialog):
         win_layout = QVBoxLayout()
 
         self.chk_remember_size = QCheckBox("Remember window size and position")
-        self.chk_remember_size.setToolTip(
-            "Restore the last window geometry on launch instead of using defaults"
-        )
+        self.chk_remember_size.setToolTip("Restore the last window geometry on launch instead of using defaults")
         win_layout.addWidget(self.chk_remember_size)
 
         self.chk_remember_tab = QCheckBox("Remember last active sidebar destination")
-        self.chk_remember_tab.setToolTip(
-            "Return to the same tab on next launch instead of starting at Offload"
-        )
+        self.chk_remember_tab.setToolTip("Return to the same tab on next launch instead of starting at Offload")
         win_layout.addWidget(self.chk_remember_tab)
 
         win_group.setLayout(win_layout)
@@ -88,9 +93,7 @@ class SettingsDialog(QDialog):
         perf_layout = QVBoxLayout()
 
         self.chk_cache_scans = QCheckBox("Cache media directory scans")
-        self.chk_cache_scans.setToolTip(
-            "Write a hidden JSON cache so repeated scans of the same folder are instant"
-        )
+        self.chk_cache_scans.setToolTip("Write a hidden JSON cache so repeated scans of the same folder are instant")
         perf_layout.addWidget(self.chk_cache_scans)
 
         perf_group.setLayout(perf_layout)
@@ -191,9 +194,7 @@ class SettingsDialog(QDialog):
         layout = QVBoxLayout()
 
         smtp_group = QGroupBox("SMTP Configuration")
-        smtp_group.setToolTip(
-            "Configure an SMTP server for sending ingest completion reports"
-        )
+        smtp_group.setToolTip("Configure an SMTP server for sending ingest completion reports")
         smtp_layout = QVBoxLayout()
 
         # Server
@@ -256,8 +257,9 @@ class SettingsDialog(QDialog):
         widget = QWidget()
         layout = QVBoxLayout()
 
-        from __init__ import __version__
         import PySide6
+
+        from __init__ import __version__
 
         info_group = QGroupBox("Application Info")
         info_layout = QVBoxLayout()
@@ -280,63 +282,51 @@ class SettingsDialog(QDialog):
 
     def _load_settings(self):
         # General
-        self.chk_remember_size.setChecked(
-            self.config.get('settings.remember_window_size', True)
-        )
-        self.chk_remember_tab.setChecked(
-            self.config.get('settings.remember_last_tab', True)
-        )
-        self.chk_cache_scans.setChecked(
-            self.config.get('settings.cache_image_scans', True)
-        )
+        self.chk_remember_size.setChecked(self.config.get("settings.remember_window_size", True))
+        self.chk_remember_tab.setChecked(self.config.get("settings.remember_last_tab", True))
+        self.chk_cache_scans.setChecked(self.config.get("settings.cache_image_scans", True))
 
         # Auto-launch — read actual OS state, not config
         from core.auto_launch import get_auto_launch
+
         self.chk_auto_launch.setChecked(get_auto_launch())
 
         # File Organizer
-        self.spin_confidence.setValue(
-            self.config.get_tab_setting('organizer', 'confidence_threshold', 0.4)
-        )
+        self.spin_confidence.setValue(self.config.get_tab_setting("organizer", "confidence_threshold", 0.4))
 
         # File Browser
-        self.spin_thumb_size.setValue(
-            self.config.get_tab_setting('image_browser', 'thumbnail_size', 200)
-        )
+        self.spin_thumb_size.setValue(self.config.get_tab_setting("image_browser", "thumbnail_size", 200))
 
         # Email
-        self.edit_smtp_server.setText(self.config.get('email.smtp_server', ''))
-        self.spin_smtp_port.setValue(self.config.get('email.smtp_port', 587))
-        self.chk_use_tls.setChecked(self.config.get('email.use_tls', True))
-        self.edit_from.setText(self.config.get('email.from_address', ''))
-        self.edit_to.setText(self.config.get('email.to_address', ''))
+        self.edit_smtp_server.setText(self.config.get("email.smtp_server", ""))
+        self.spin_smtp_port.setValue(self.config.get("email.smtp_port", 587))
+        self.chk_use_tls.setChecked(self.config.get("email.use_tls", True))
+        self.edit_from.setText(self.config.get("email.from_address", ""))
+        self.edit_to.setText(self.config.get("email.to_address", ""))
 
     def _save_settings(self):
         # General
-        self.config.set('settings.remember_window_size', self.chk_remember_size.isChecked())
-        self.config.set('settings.remember_last_tab', self.chk_remember_tab.isChecked())
-        self.config.set('settings.cache_image_scans', self.chk_cache_scans.isChecked())
+        self.config.set("settings.remember_window_size", self.chk_remember_size.isChecked())
+        self.config.set("settings.remember_last_tab", self.chk_remember_tab.isChecked())
+        self.config.set("settings.cache_image_scans", self.chk_cache_scans.isChecked())
 
         # Auto-launch — apply to OS
         from core.auto_launch import set_auto_launch
+
         set_auto_launch(self.chk_auto_launch.isChecked())
 
         # File Organizer
-        self.config.set_tab_setting(
-            'organizer', 'confidence_threshold', self.spin_confidence.value()
-        )
+        self.config.set_tab_setting("organizer", "confidence_threshold", self.spin_confidence.value())
 
         # File Browser
-        self.config.set_tab_setting(
-            'image_browser', 'thumbnail_size', self.spin_thumb_size.value()
-        )
+        self.config.set_tab_setting("image_browser", "thumbnail_size", self.spin_thumb_size.value())
 
         # Email
-        self.config.set('email.smtp_server', self.edit_smtp_server.text().strip())
-        self.config.set('email.smtp_port', self.spin_smtp_port.value())
-        self.config.set('email.use_tls', self.chk_use_tls.isChecked())
-        self.config.set('email.from_address', self.edit_from.text().strip())
-        self.config.set('email.to_address', self.edit_to.text().strip())
+        self.config.set("email.smtp_server", self.edit_smtp_server.text().strip())
+        self.config.set("email.smtp_port", self.spin_smtp_port.value())
+        self.config.set("email.use_tls", self.chk_use_tls.isChecked())
+        self.config.set("email.from_address", self.edit_from.text().strip())
+        self.config.set("email.to_address", self.edit_to.text().strip())
 
         self.config.save_to_file()
         self.settings_changed = True
@@ -346,8 +336,7 @@ class SettingsDialog(QDialog):
         reply = QMessageBox.question(
             self,
             "Restore Defaults",
-            "This will restore all settings to their default values.\n\n"
-            "Are you sure?",
+            "This will restore all settings to their default values.\n\n" "Are you sure?",
             QMessageBox.Yes | QMessageBox.No,
             QMessageBox.No,
         )
@@ -376,6 +365,5 @@ class SettingsDialog(QDialog):
         QMessageBox.information(
             self,
             "Defaults Restored",
-            "Default settings have been restored.\n\n"
-            "Click 'Save' to apply the changes.",
+            "Default settings have been restored.\n\n" "Click 'Save' to apply the changes.",
         )

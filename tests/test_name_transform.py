@@ -1,27 +1,25 @@
 """Comprehensive tests for core/name_transform.py."""
 
-import pytest
 from core.name_transform import (
+    DEFAULT_TEMPLATE,
     ProductionTemplate,
-    apply_case_transform,
     add_prefix,
     add_suffix,
-    move_suffix_to_prefix,
+    apply_case_transform,
+    bump_version,
+    detect_version,
+    generate_new_filename,
+    generate_sequential_filenames,
+    is_valid_filename,
     move_prefix_to_suffix,
+    move_suffix_to_prefix,
     rename_file,
     replace_prefix,
     replace_suffix,
-    generate_new_filename,
-    generate_sequential_filenames,
-    detect_version,
-    bump_version,
-    is_valid_filename,
-    VERSION_PATTERN,
-    DEFAULT_TEMPLATE,
 )
 
-
 # ── ProductionTemplate ──────────────────────────────────────────────────────
+
 
 class TestProductionTemplate:
     def test_compose_all_tokens(self):
@@ -45,8 +43,9 @@ class TestProductionTemplate:
         assert result == "HERO_v01"
 
     def test_to_dict_from_dict_roundtrip(self):
-        t = ProductionTemplate(name="Custom", tokens=["A", "B"], separator="-",
-                               version_format="v{:03d}", episode_format="E{:02d}")
+        t = ProductionTemplate(
+            name="Custom", tokens=["A", "B"], separator="-", version_format="v{:03d}", episode_format="E{:02d}"
+        )
         d = t.to_dict()
         t2 = ProductionTemplate.from_dict(d)
         assert t2.name == t.name
@@ -65,6 +64,7 @@ class TestProductionTemplate:
 
 
 # ── apply_case_transform ────────────────────────────────────────────────────
+
 
 class TestApplyCaseTransform:
     def test_upper(self):
@@ -88,6 +88,7 @@ class TestApplyCaseTransform:
 
 # ── add_prefix ──────────────────────────────────────────────────────────────
 
+
 class TestAddPrefix:
     def test_basic(self):
         assert add_prefix("clip.mov", "HERO_") == "HERO_clip.mov"
@@ -104,6 +105,7 @@ class TestAddPrefix:
 
 # ── add_suffix ──────────────────────────────────────────────────────────────
 
+
 class TestAddSuffix:
     def test_basic(self):
         assert add_suffix("clip.mov", "_v01") == "clip_v01.mov"
@@ -116,6 +118,7 @@ class TestAddSuffix:
 
 
 # ── move_suffix_to_prefix ───────────────────────────────────────────────────
+
 
 class TestMoveSuffixToPrefix:
     def test_basic(self):
@@ -137,6 +140,7 @@ class TestMoveSuffixToPrefix:
 
 # ── move_prefix_to_suffix ───────────────────────────────────────────────────
 
+
 class TestMovePrefixToSuffix:
     def test_basic(self):
         result = move_prefix_to_suffix("DRAFT_interview.mov", "DRAFT_")
@@ -153,6 +157,7 @@ class TestMovePrefixToSuffix:
 
 # ── rename_file ─────────────────────────────────────────────────────────────
 
+
 class TestRenameFile:
     def test_basic(self):
         assert rename_file("old_clip.mov", "new_clip") == "new_clip.mov"
@@ -165,6 +170,7 @@ class TestRenameFile:
 
 
 # ── replace_prefix ──────────────────────────────────────────────────────────
+
 
 class TestReplacePrefix:
     def test_basic(self):
@@ -182,6 +188,7 @@ class TestReplacePrefix:
 
 # ── replace_suffix ──────────────────────────────────────────────────────────
 
+
 class TestReplaceSuffix:
     def test_basic(self):
         assert replace_suffix("clip_v01.mov", "_v01", "_v02") == "clip_v02.mov"
@@ -197,6 +204,7 @@ class TestReplaceSuffix:
 
 
 # ── generate_new_filename ───────────────────────────────────────────────────
+
 
 class TestGenerateNewFilename:
     def test_rename_to_takes_priority(self):
@@ -226,6 +234,7 @@ class TestGenerateNewFilename:
 
 # ── generate_sequential_filenames ───────────────────────────────────────────
 
+
 class TestGenerateSequentialFilenames:
     def test_basic(self):
         files = ["clip01.mov", "clip02.mov"]
@@ -249,6 +258,7 @@ class TestGenerateSequentialFilenames:
 
 
 # ── VERSION_PATTERN and detect_version ──────────────────────────────────────
+
 
 class TestDetectVersion:
     def test_underscore_lowercase(self):
@@ -288,6 +298,7 @@ class TestDetectVersion:
 
 # ── bump_version ────────────────────────────────────────────────────────────
 
+
 class TestBumpVersion:
     def test_basic_bump(self):
         assert bump_version("HERO_v01.mov") == "HERO_v02.mov"
@@ -318,6 +329,7 @@ class TestBumpVersion:
 
 
 # ── is_valid_filename ───────────────────────────────────────────────────────
+
 
 class TestIsValidFilename:
     def test_valid(self):

@@ -20,52 +20,51 @@ def _long_path(p: Path) -> str:
     even when LongPathsEnabled is off in the registry — a common situation
     on locked-down studio Windows boxes.
     """
-    if sys.platform != 'win32':
+    if sys.platform != "win32":
         return str(p)
     s = os.fspath(p)
-    if s.startswith('\\\\?\\'):
+    if s.startswith("\\\\?\\"):
         return s
     abspath = os.path.abspath(s)
-    if abspath.startswith('\\\\'):
-        return '\\\\?\\UNC\\' + abspath.lstrip('\\')
-    return '\\\\?\\' + abspath
+    if abspath.startswith("\\\\"):
+        return "\\\\?\\UNC\\" + abspath.lstrip("\\")
+    return "\\\\?\\" + abspath
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Data models
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 @dataclass
 class DeliveryProfile:
     name: str = "Default"
-    require_version_suffix: bool = True   # video must have _FINAL or _v##
+    require_version_suffix: bool = True  # video must have _FINAL or _v##
     min_video_size_bytes: int = 1024 * 1024  # 1 MB
-    banned_terms: List[str] = field(default_factory=lambda: [
-        '_WIP', '_DRAFT', '_TEMP', '_v00', 'OFFLINE'
-    ])
+    banned_terms: List[str] = field(default_factory=lambda: ["_WIP", "_DRAFT", "_TEMP", "_v00", "OFFLINE"])
     check_hidden_files: bool = True
     check_case_duplicates: bool = True
-    handoff_rules: List['HandoffRule'] = field(default_factory=list)
+    handoff_rules: List["HandoffRule"] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
-            'name': self.name,
-            'require_version_suffix': self.require_version_suffix,
-            'min_video_size_bytes': self.min_video_size_bytes,
-            'banned_terms': self.banned_terms,
-            'check_hidden_files': self.check_hidden_files,
-            'check_case_duplicates': self.check_case_duplicates,
+            "name": self.name,
+            "require_version_suffix": self.require_version_suffix,
+            "min_video_size_bytes": self.min_video_size_bytes,
+            "banned_terms": self.banned_terms,
+            "check_hidden_files": self.check_hidden_files,
+            "check_case_duplicates": self.check_case_duplicates,
         }
 
     @classmethod
-    def from_dict(cls, d: dict) -> 'DeliveryProfile':
+    def from_dict(cls, d: dict) -> "DeliveryProfile":
         p = cls()
-        p.name = d.get('name', p.name)
-        p.require_version_suffix = d.get('require_version_suffix', p.require_version_suffix)
-        p.min_video_size_bytes = d.get('min_video_size_bytes', p.min_video_size_bytes)
-        p.banned_terms = d.get('banned_terms', p.banned_terms)
-        p.check_hidden_files = d.get('check_hidden_files', p.check_hidden_files)
-        p.check_case_duplicates = d.get('check_case_duplicates', p.check_case_duplicates)
+        p.name = d.get("name", p.name)
+        p.require_version_suffix = d.get("require_version_suffix", p.require_version_suffix)
+        p.min_video_size_bytes = d.get("min_video_size_bytes", p.min_video_size_bytes)
+        p.banned_terms = d.get("banned_terms", p.banned_terms)
+        p.check_hidden_files = d.get("check_hidden_files", p.check_hidden_files)
+        p.check_case_duplicates = d.get("check_case_duplicates", p.check_case_duplicates)
         return p
 
 
@@ -74,7 +73,7 @@ class ValidationIssue:
     filepath: Path
     rule: str
     description: str
-    severity: str = "error"   # "error" or "warning"
+    severity: str = "error"  # "error" or "warning"
 
 
 @dataclass
@@ -134,27 +133,26 @@ class HandoffResult:
 # Built-in handoff rules factory
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def default_handoff_rules() -> List[HandoffRule]:
     """Return the standard colorist/delivery handoff rules."""
 
     def has_luts_folder(d: Path) -> bool:
-        return any(p.is_dir() and p.name.lower() == 'luts' for p in d.iterdir())
+        return any(p.is_dir() and p.name.lower() == "luts" for p in d.iterdir())
 
     def has_audio_stems(d: Path) -> bool:
-        for name in ('audio', 'stems', 'audio_stems', 'audio stems'):
+        for name in ("audio", "stems", "audio_stems", "audio stems"):
             if any(p.is_dir() and p.name.lower() == name for p in d.iterdir()):
                 return True
         return False
 
     def no_offline_files(d: Path) -> bool:
-        return not any(
-            'OFFLINE' in p.name.upper()
-            for p in d.rglob('*') if p.is_file()
-        )
+        return not any("OFFLINE" in p.name.upper() for p in d.rglob("*") if p.is_file())
 
     def no_tiny_video_files(d: Path) -> bool:
         from constants import VIDEO_EXTENSIONS
-        for p in d.rglob('*'):
+
+        for p in d.rglob("*"):
             if p.is_file() and p.suffix.lower() in VIDEO_EXTENSIONS:
                 try:
                     if p.stat().st_size < 1024 * 1024:
@@ -195,8 +193,8 @@ def default_handoff_rules() -> List[HandoffRule]:
 # DeliveryValidator
 # ─────────────────────────────────────────────────────────────────────────────
 
-_VERSION_RE = re.compile(r'_v\d+', re.IGNORECASE)
-_FINAL_RE = re.compile(r'_FINAL', re.IGNORECASE)
+_VERSION_RE = re.compile(r"_v\d+", re.IGNORECASE)
+_FINAL_RE = re.compile(r"_FINAL", re.IGNORECASE)
 
 
 class DeliveryValidator:
@@ -209,7 +207,7 @@ class DeliveryValidator:
         issues: List[ValidationIssue] = []
         all_files: List[Path] = []
 
-        for p in directory.rglob('*'):
+        for p in directory.rglob("*"):
             if p.is_file():
                 all_files.append(p)
 
@@ -218,25 +216,30 @@ class DeliveryValidator:
             name_upper = fp.name.upper()
             for term in profile.banned_terms:
                 if term.upper() in name_upper:
-                    issues.append(ValidationIssue(
-                        filepath=fp,
-                        rule="banned_term",
-                        description=f"Contains banned term '{term}'",
-                    ))
+                    issues.append(
+                        ValidationIssue(
+                            filepath=fp,
+                            rule="banned_term",
+                            description=f"Contains banned term '{term}'",
+                        )
+                    )
                     break
 
         # 2. Video files must have _FINAL or _v## suffix
         if profile.require_version_suffix:
             from constants import VIDEO_EXTENSIONS
+
             for fp in all_files:
                 if fp.suffix.lower() in VIDEO_EXTENSIONS:
                     stem = fp.stem
                     if not (_VERSION_RE.search(stem) or _FINAL_RE.search(stem)):
-                        issues.append(ValidationIssue(
-                            filepath=fp,
-                            rule="missing_version_suffix",
-                            description="Video file lacks _FINAL or _v## suffix",
-                        ))
+                        issues.append(
+                            ValidationIssue(
+                                filepath=fp,
+                                rule="missing_version_suffix",
+                                description="Video file lacks _FINAL or _v## suffix",
+                            )
+                        )
 
         # 3. Case-insensitive name collisions
         if profile.check_case_duplicates:
@@ -244,44 +247,51 @@ class DeliveryValidator:
             for fp in all_files:
                 key = fp.name.lower()
                 if key in seen:
-                    issues.append(ValidationIssue(
-                        filepath=fp,
-                        rule="case_duplicate",
-                        description=f"Case-insensitive name collision with '{seen[key].name}'",
-                    ))
+                    issues.append(
+                        ValidationIssue(
+                            filepath=fp,
+                            rule="case_duplicate",
+                            description=f"Case-insensitive name collision with '{seen[key].name}'",
+                        )
+                    )
                 else:
                     seen[key] = fp
 
         # 4. Video files smaller than threshold
         if profile.min_video_size_bytes > 0:
             from constants import VIDEO_EXTENSIONS
+
             for fp in all_files:
                 if fp.suffix.lower() in VIDEO_EXTENSIONS:
                     try:
                         size = fp.stat().st_size
                         if size < profile.min_video_size_bytes:
                             thresh_mb = profile.min_video_size_bytes / (1024 * 1024)
-                            issues.append(ValidationIssue(
-                                filepath=fp,
-                                rule="small_file",
-                                description=(
-                                    f"Video is {size / 1024:.1f} KB "
-                                    f"(threshold {thresh_mb:.0f} MB — possible corrupt render)"
-                                ),
-                            ))
+                            issues.append(
+                                ValidationIssue(
+                                    filepath=fp,
+                                    rule="small_file",
+                                    description=(
+                                        f"Video is {size / 1024:.1f} KB "
+                                        f"(threshold {thresh_mb:.0f} MB — possible corrupt render)"
+                                    ),
+                                )
+                            )
                     except OSError:
                         pass
 
         # 5. Hidden files
         if profile.check_hidden_files:
             for fp in all_files:
-                if fp.name.startswith('.'):
-                    issues.append(ValidationIssue(
-                        filepath=fp,
-                        rule="hidden_file",
-                        description="Hidden file (name starts with '.')",
-                        severity="warning",
-                    ))
+                if fp.name.startswith("."):
+                    issues.append(
+                        ValidationIssue(
+                            filepath=fp,
+                            rule="hidden_file",
+                            description="Hidden file (name starts with '.')",
+                            severity="warning",
+                        )
+                    )
 
         return ValidationReport(
             directory=directory,
@@ -294,12 +304,13 @@ class DeliveryValidator:
 # Delivery package
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def list_delivery_files(source_dir: Path) -> List[Path]:
     """Return files that would be included in a delivery zip (no hidden files)."""
     out: List[Path] = []
-    for fp in source_dir.rglob('*'):
+    for fp in source_dir.rglob("*"):
         try:
-            if fp.is_file() and not fp.is_symlink() and not fp.name.startswith('.'):
+            if fp.is_file() and not fp.is_symlink() and not fp.name.startswith("."):
                 out.append(fp)
         except OSError:
             continue
@@ -323,8 +334,8 @@ def create_delivery_zip(
     * If *cancel_check* returns True between files the partial zip is deleted
       and ``InterruptedError`` is raised.
     """
-    date_str = datetime.date.today().strftime('%Y%m%d')
-    safe_name = re.sub(r'[^\w\-]', '_', project_name)
+    date_str = datetime.date.today().strftime("%Y%m%d")
+    safe_name = re.sub(r"[^\w\-]", "_", project_name)
     zip_name = f"{safe_name}_DELIVERY_{date_str}.zip"
     zip_path = output_dir / zip_name
 
@@ -332,7 +343,7 @@ def create_delivery_zip(
     total = len(files)
 
     try:
-        with zipfile.ZipFile(_long_path(zip_path), 'w', zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
+        with zipfile.ZipFile(_long_path(zip_path), "w", zipfile.ZIP_DEFLATED, allowZip64=True) as zf:
             for idx, fp in enumerate(files):
                 if cancel_check is not None and cancel_check():
                     raise InterruptedError("Cancelled mid-zip")
@@ -362,10 +373,11 @@ def create_delivery_zip(
 # Duplicate detection
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _md5(filepath: Path) -> str:
     h = hashlib.md5()
-    with open(_long_path(filepath), 'rb') as f:
-        for chunk in iter(lambda: f.read(65536), b''):
+    with open(_long_path(filepath), "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
             h.update(chunk)
     return h.hexdigest()
 
@@ -387,7 +399,7 @@ def find_duplicates(
 
     # Pass 1 — bucket by size
     size_buckets: Dict[int, List[Path]] = defaultdict(list)
-    for fp in directory.rglob('*'):
+    for fp in directory.rglob("*"):
         if cancel_check():
             return []
         try:
@@ -398,9 +410,7 @@ def find_duplicates(
             continue
 
     # Only files in same-size buckets are duplicate candidates
-    candidates: List[Path] = [
-        fp for files in size_buckets.values() if len(files) > 1 for fp in files
-    ]
+    candidates: List[Path] = [fp for files in size_buckets.values() if len(files) > 1 for fp in files]
     total = len(candidates)
 
     # Pass 2 — hash candidates only
@@ -416,17 +426,13 @@ def find_duplicates(
         if progress_cb is not None and (idx % 16 == 0 or idx == total - 1):
             progress_cb(f"Hashed {fp.name}", idx + 1, total)
 
-    return [
-        DuplicateGroup(hash=h, files=sorted(files))
-        for h, files in hash_map.items()
-        if len(files) > 1
-    ]
+    return [DuplicateGroup(hash=h, files=sorted(files)) for h, files in hash_map.items() if len(files) > 1]
 
 
 def find_case_collisions(directory: Path) -> List[List[Path]]:
     """Return groups of files whose names differ only by case."""
     name_map: Dict[str, List[Path]] = {}
-    for fp in directory.rglob('*'):
+    for fp in directory.rglob("*"):
         if fp.is_file():
             name_map.setdefault(fp.name.lower(), []).append(fp)
     return [sorted(group) for group in name_map.values() if len(group) > 1]
@@ -435,6 +441,7 @@ def find_case_collisions(directory: Path) -> List[List[Path]]:
 # ─────────────────────────────────────────────────────────────────────────────
 # Colorist handoff validation
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def run_handoff_checks(directory: Path, rules: Optional[List[HandoffRule]] = None) -> List[HandoffResult]:
     """Run handoff rules against *directory* and return results."""
@@ -454,6 +461,7 @@ def run_handoff_checks(directory: Path, rules: Optional[List[HandoffRule]] = Non
 # Manifest / shot list export
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def export_manifest(directory: Path, output_path: Path) -> int:
     """Write a CSV manifest of all files in *directory*. Returns file count."""
     import csv
@@ -461,7 +469,7 @@ def export_manifest(directory: Path, output_path: Path) -> int:
     from core.media_info import get_media_info
 
     rows = []
-    for fp in sorted(directory.rglob('*')):
+    for fp in sorted(directory.rglob("*")):
         if not fp.is_file():
             continue
         try:
@@ -469,43 +477,52 @@ def export_manifest(directory: Path, output_path: Path) -> int:
         except OSError:
             continue
 
-        codec = ''
-        resolution = ''
-        fps = ''
-        audio_channels = ''
-        duration_secs = ''
+        codec = ""
+        resolution = ""
+        fps = ""
+        audio_channels = ""
+        duration_secs = ""
         try:
             info = get_media_info(fp)
             if info:
                 if info.duration_secs is not None:
                     duration_secs = f"{info.duration_secs:.3f}"
-                codec = info.codec or ''
-                resolution = info.resolution_str or ''
-                fps = info.fps_str or ''
-                audio_channels = str(info.audio_channels) if info.audio_channels else ''
+                codec = info.codec or ""
+                resolution = info.resolution_str or ""
+                fps = info.fps_str or ""
+                audio_channels = str(info.audio_channels) if info.audio_channels else ""
         except Exception:
             pass
 
-        rows.append({
-            'filename': fp.name,
-            'folder': str(fp.parent.relative_to(directory)),
-            'size_bytes': stat.st_size,
-            'extension': fp.suffix.lower(),
-            'codec': codec,
-            'resolution': resolution,
-            'fps': fps,
-            'audio_channels': audio_channels,
-            'duration_secs': duration_secs,
-            'date_modified': datetime.datetime.fromtimestamp(stat.st_mtime).isoformat(),
-        })
+        rows.append(
+            {
+                "filename": fp.name,
+                "folder": str(fp.parent.relative_to(directory)),
+                "size_bytes": stat.st_size,
+                "extension": fp.suffix.lower(),
+                "codec": codec,
+                "resolution": resolution,
+                "fps": fps,
+                "audio_channels": audio_channels,
+                "duration_secs": duration_secs,
+                "date_modified": datetime.datetime.fromtimestamp(stat.st_mtime).isoformat(),
+            }
+        )
 
-    with open(output_path, 'w', newline='', encoding='utf-8') as f:
+    with open(output_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(
             f,
             fieldnames=[
-                'filename', 'folder', 'size_bytes', 'extension',
-                'codec', 'resolution', 'fps', 'audio_channels',
-                'duration_secs', 'date_modified',
+                "filename",
+                "folder",
+                "size_bytes",
+                "extension",
+                "codec",
+                "resolution",
+                "fps",
+                "audio_channels",
+                "duration_secs",
+                "date_modified",
             ],
         )
         writer.writeheader()

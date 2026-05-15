@@ -5,31 +5,32 @@ import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
-from constants import CONFIG_FILE_NAME, THEME_DARK, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT
+
+from constants import CONFIG_FILE_NAME, DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH, THEME_DARK
 
 
 def get_config_dir() -> Path:
     """Return the platform-appropriate config directory."""
-    if sys.platform == 'win32':
-        base = Path(os.environ.get('APPDATA', Path.home()))
+    if sys.platform == "win32":
+        base = Path(os.environ.get("APPDATA", Path.home()))
     else:
-        base = Path.home() / '.config'
-    return base / 'pearls_file_tools'
+        base = Path.home() / ".config"
+    return base / "pearls_file_tools"
 
 
 def get_data_dir() -> Path:
     """Return the platform-appropriate data directory (for SQLite db, etc.)."""
-    if sys.platform == 'win32':
-        base = Path(os.environ.get('APPDATA', Path.home()))
+    if sys.platform == "win32":
+        base = Path(os.environ.get("APPDATA", Path.home()))
     else:
-        base = Path.home() / '.local' / 'share'
-    return base / 'pearls_file_tools'
+        base = Path.home() / ".local" / "share"
+    return base / "pearls_file_tools"
 
 
 class Config:
     """Singleton configuration manager for application settings."""
 
-    _instance: Optional['Config'] = None
+    _instance: Optional["Config"] = None
 
     def __new__(cls):
         if cls._instance is None:
@@ -49,70 +50,60 @@ class Config:
     def _load_defaults(self):
         """Load default configuration values."""
         self._data = {
-            'version': '1.0',
-            'window': {
-                'geometry': [100, 100, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT],
-                'maximized': False,
+            "version": "1.0",
+            "window": {
+                "geometry": [100, 100, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT],
+                "maximized": False,
             },
-            'directories': {
-                'last_browse_directory': str(Path.home()),
-                'tab_specific': {
-                    'bulk_renamer': '',
-                    'organizer': '',
-                    'extractor': '',
-                    'image_browser': ''
-                }
+            "directories": {
+                "last_browse_directory": str(Path.home()),
+                "tab_specific": {"bulk_renamer": "", "organizer": "", "extractor": "", "image_browser": ""},
             },
-            'preferences': {
-                'theme': THEME_DARK,
+            "preferences": {
+                "theme": THEME_DARK,
             },
-            'naming': {
-                'profiles': [],
-                'active_profile': None,
-                'bad_patterns': ['_COPY', '_BACKUP', '_OLD', 'Copy of ', 'copy_of_'],
+            "naming": {
+                "profiles": [],
+                "active_profile": None,
+                "bad_patterns": ["_COPY", "_BACKUP", "_OLD", "Copy of ", "copy_of_"],
             },
-            'projects': [],
-            'active_project': None,
-            'settings': {
-                'remember_window_size': True,
-                'remember_last_tab': True,
-                'cache_image_scans': True,
+            "projects": [],
+            "active_project": None,
+            "settings": {
+                "remember_window_size": True,
+                "remember_last_tab": True,
+                "cache_image_scans": True,
             },
-            'email': {
-                'smtp_server': '',
-                'smtp_port': 587,
-                'use_tls': True,
-                'from_address': '',
-                'to_address': '',
+            "email": {
+                "smtp_server": "",
+                "smtp_port": 587,
+                "use_tls": True,
+                "from_address": "",
+                "to_address": "",
             },
-            'tab_settings': {
-                'bulk_renamer': {
-                    'recursive_default': False,
-                    'case_transform_default': 'none',
-                    'extension_filters': {
-                        'images': False,
-                        'documents': False,
-                        'videos': False,
-                        'audio': False,
-                        'archives': False
-                    }
+            "tab_settings": {
+                "bulk_renamer": {
+                    "recursive_default": False,
+                    "case_transform_default": "none",
+                    "extension_filters": {
+                        "images": False,
+                        "documents": False,
+                        "videos": False,
+                        "audio": False,
+                        "archives": False,
+                    },
                 },
-                'organizer': {
-                    'confidence_threshold': 0.4,
+                "organizer": {
+                    "confidence_threshold": 0.4,
                 },
-                'extractor': {
-                    'delete_after_extraction': False,
-                    'supported_formats': {
-                        'zip': True,
-                        'tar': True,
-                        'rar': True,
-                        '7z': True
-                    }
+                "extractor": {
+                    "delete_after_extraction": False,
+                    "supported_formats": {"zip": True, "tar": True, "rar": True, "7z": True},
                 },
-                'image_browser': {
-                    'thumbnail_size': 200,
-                }
-            }
+                "image_browser": {
+                    "thumbnail_size": 200,
+                },
+            },
         }
 
     def load_from_file(self, path: Optional[Path] = None):
@@ -122,7 +113,7 @@ class Config:
 
         try:
             if path.exists():
-                with open(path, 'r', encoding='utf-8') as f:
+                with open(path, "r", encoding="utf-8") as f:
                     loaded_data = json.load(f)
                     # Merge loaded data with defaults (in case new settings were added)
                     self._merge_config(loaded_data)
@@ -142,7 +133,7 @@ class Config:
             # Ensure directory exists
             path.parent.mkdir(parents=True, exist_ok=True)
 
-            with open(path, 'w', encoding='utf-8') as f:
+            with open(path, "w", encoding="utf-8") as f:
                 json.dump(self._data, f, indent=2)
             return True
         except Exception as e:
@@ -151,6 +142,7 @@ class Config:
 
     def _merge_config(self, loaded_data: Dict[str, Any]):
         """Merge loaded configuration with defaults."""
+
         def merge_dict(default: dict, loaded: dict) -> dict:
             """Recursively merge dictionaries."""
             result = default.copy()
@@ -165,7 +157,7 @@ class Config:
 
     def get(self, key: str, default: Any = None) -> Any:
         """Get configuration value by dot-notation key (e.g., 'window.geometry')."""
-        keys = key.split('.')
+        keys = key.split(".")
         value = self._data
 
         try:
@@ -177,7 +169,7 @@ class Config:
 
     def set(self, key: str, value: Any):
         """Set configuration value by dot-notation key (e.g., 'window.geometry')."""
-        keys = key.split('.')
+        keys = key.split(".")
         data = self._data
 
         # Navigate to the parent dictionary
@@ -191,21 +183,21 @@ class Config:
 
     def get_tab_setting(self, tab_name: str, setting_key: str, default: Any = None) -> Any:
         """Get a specific tab setting."""
-        return self.get(f'tab_settings.{tab_name}.{setting_key}', default)
+        return self.get(f"tab_settings.{tab_name}.{setting_key}", default)
 
     def set_tab_setting(self, tab_name: str, setting_key: str, value: Any):
         """Set a specific tab setting."""
-        self.set(f'tab_settings.{tab_name}.{setting_key}', value)
+        self.set(f"tab_settings.{tab_name}.{setting_key}", value)
 
     def get_tab_directory(self, tab_name: str) -> str:
         """Get the last used directory for a specific tab."""
-        return self.get(f'directories.tab_specific.{tab_name}', '')
+        return self.get(f"directories.tab_specific.{tab_name}", "")
 
     def set_tab_directory(self, tab_name: str, directory: str):
         """Set the last used directory for a specific tab."""
-        self.set(f'directories.tab_specific.{tab_name}', directory)
+        self.set(f"directories.tab_specific.{tab_name}", directory)
         # Also update the general last browse directory
-        self.set('directories.last_browse_directory', directory)
+        self.set("directories.last_browse_directory", directory)
 
     @property
     def config_path(self) -> Path:
