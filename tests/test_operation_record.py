@@ -124,7 +124,7 @@ class TestSerialization:
         d = record.to_dict()
         assert d["operation_type"] == OP_TYPE_RENAME
         assert len(d["files_affected"]) == 1
-        assert d["files_affected"][0] == ("/new/file.txt", "/old/file.txt")
+        assert d["files_affected"][0] == (str(Path("/new/file.txt")), str(Path("/old/file.txt")))
         assert d["metadata"] == {"key": "value"}
         assert "timestamp" in d
 
