@@ -59,6 +59,9 @@ from workers.base_worker import BaseWorker
 # Shared helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
+_CFG_NLE_SCAN_DIR = "nle_backup.scan_dir"
+_CFG_NLE_BACKUP_DIR = "nle_backup.backup_dir"
+
 _STALE_MARKERS = re.compile(r"_WIP|_DRAFT|_TEST|_TEMP", re.IGNORECASE)
 
 _CATEGORY_EXTS: Dict[str, set] = {cat: {e.lower() for e in exts} for cat, exts in ALL_EXTENSION_CATEGORIES.items()}
@@ -1605,15 +1608,15 @@ class _NLEBackupPane(QWidget):
             self.log.addItem(item)
         self.log.scrollToBottom()
 
-        self.config.set("nle_backup.scan_dir", self.scan_selector.get_directory())
-        self.config.set("nle_backup.backup_dir", self.dest_selector.get_directory())
+        self.config.set(_CFG_NLE_SCAN_DIR, self.scan_selector.get_directory())
+        self.config.set(_CFG_NLE_BACKUP_DIR, self.dest_selector.get_directory())
         self.config.set("nle_backup.last_backup", now_str)
 
     def load_settings(self):
-        scan = self.config.get("nle_backup.scan_dir", "")
+        scan = self.config.get(_CFG_NLE_SCAN_DIR, "")
         if scan:
             self.scan_selector.set_directory(scan)
-        dest = self.config.get("nle_backup.backup_dir", "")
+        dest = self.config.get(_CFG_NLE_BACKUP_DIR, "")
         if dest:
             self.dest_selector.set_directory(dest)
         last = self.config.get("nle_backup.last_backup", "")
@@ -1630,10 +1633,10 @@ class _NLEBackupPane(QWidget):
     def save_settings(self):
         scan = self.scan_selector.get_directory()
         if scan:
-            self.config.set("nle_backup.scan_dir", scan)
+            self.config.set(_CFG_NLE_SCAN_DIR, scan)
         dest = self.dest_selector.get_directory()
         if dest:
-            self.config.set("nle_backup.backup_dir", dest)
+            self.config.set(_CFG_NLE_BACKUP_DIR, dest)
         enabled = [n for n, chk in self._nle_checkboxes.items() if chk.isChecked()]
         self.config.set("nle_backup.enabled_nles", enabled)
         self.config.set("nle_backup.custom_exts", self.custom_ext_edit.text())

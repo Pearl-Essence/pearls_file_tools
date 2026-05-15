@@ -60,6 +60,9 @@ from ui.widgets.panel import Panel
 from ui.widgets.path_card import PathCard
 from ui.widgets.tab_header import TabHeader
 
+_CFG_PROFILES = "naming.profiles"
+_CFG_ACTIVE_PROFILE = "naming.active_profile"
+
 
 def _make_section(eyebrow: str) -> Tuple[Panel, QVBoxLayout]:
     """Return (panel, content-layout) — panel has an eyebrow header at top."""
@@ -385,7 +388,7 @@ class BulkRenamerTab(BaseTab):
         current = self.profile_combo.currentText()
         self.profile_combo.clear()
         self.profile_combo.addItem("(None)")
-        for d in self.config.get("naming.profiles", []):
+        for d in self.config.get(_CFG_PROFILES, []):
             name = d.get("name", "")
             if name:
                 self.profile_combo.addItem(name)
@@ -397,13 +400,13 @@ class BulkRenamerTab(BaseTab):
         name = self.profile_combo.currentText()
         if name == "(None)":
             return None
-        for d in self.config.get("naming.profiles", []):
+        for d in self.config.get(_CFG_PROFILES, []):
             if d.get("name") == name:
                 return ProductionTemplate.from_dict(d)
         return None
 
     def _on_profile_changed(self, name: str):
-        self.config.set("naming.active_profile", name if name != "(None)" else None)
+        self.config.set(_CFG_ACTIVE_PROFILE, name if name != "(None)" else None)
         self._rebuild_template_panel(self._get_active_profile())
 
     def _save_as_profile(self):
@@ -414,7 +417,7 @@ class BulkRenamerTab(BaseTab):
         if not ok or not name.strip():
             return
         name = name.strip()
-        profiles = list(self.config.get("naming.profiles", []))
+        profiles = list(self.config.get(_CFG_PROFILES, []))
         if any(p.get("name") == name for p in profiles):
             self.show_warning("Duplicate Name", f"A profile named '{name}' already exists.")
             return
@@ -427,7 +430,7 @@ class BulkRenamerTab(BaseTab):
                 "episode_format": profile.episode_format,
             }
         )
-        self.config.set("naming.profiles", profiles)
+        self.config.set(_CFG_PROFILES, profiles)
         self._load_profile_combo()
         idx = self.profile_combo.findText(name)
         if idx >= 0:
@@ -438,7 +441,7 @@ class BulkRenamerTab(BaseTab):
 
         dialog = ProfileDialog(self.config, self)
         dialog.exec()
-        active = self.config.get("naming.active_profile")
+        active = self.config.get(_CFG_ACTIVE_PROFILE)
         self._load_profile_combo()
         if active:
             idx = self.profile_combo.findText(active)
@@ -1552,7 +1555,7 @@ class BulkRenamerTab(BaseTab):
 
         # Restore active profile
         self._load_profile_combo()
-        active = self.config.get("naming.active_profile")
+        active = self.config.get(_CFG_ACTIVE_PROFILE)
         if active:
             idx = self.profile_combo.findText(active)
             if idx >= 0:
