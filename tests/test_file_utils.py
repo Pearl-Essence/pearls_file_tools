@@ -1,24 +1,20 @@
 """Comprehensive tests for core/file_utils.py."""
 
-import os
-import time
-import pytest
 from pathlib import Path
-from unittest.mock import patch
-from core.file_utils import (
-    is_hidden_file,
-    split_compound_suffix,
-    same_inode,
-    has_keyword,
-    get_extension_category,
-    resolve_name_conflict,
-    format_file_size,
-    calculate_directory_hash,
-    safe_rename,
-    safe_move,
-    get_files_in_directory,
-)
 
+from core.file_utils import (
+    calculate_directory_hash,
+    format_file_size,
+    get_extension_category,
+    get_files_in_directory,
+    has_keyword,
+    is_hidden_file,
+    resolve_name_conflict,
+    safe_move,
+    safe_rename,
+    same_inode,
+    split_compound_suffix,
+)
 
 # ── is_hidden_file ──────────────────────────────────────────────────────────
 

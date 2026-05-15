@@ -17,17 +17,19 @@ panes into the v0.17 layout (24/20 padding, 16 spacing).
 """
 
 from pathlib import Path
-from typing import Optional
 
 from PySide6.QtWidgets import QVBoxLayout, QWidget
 
 from ui.tabs.base_tab import BaseTab
 from ui.tabs.studio_tools_tab import (
-    _ArchivePane, _ExportWatcherPane, _NLEBackupPane, _StaleFilesPane,
-    _StoragePane, _TrashPane,
+    _ArchivePane,
+    _ExportWatcherPane,
+    _NLEBackupPane,
+    _StaleFilesPane,
+    _StoragePane,
+    _TrashPane,
 )
 from ui.widgets.tab_header import TabHeader
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Wrapper helpers

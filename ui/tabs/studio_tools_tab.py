@@ -15,7 +15,6 @@ import hashlib
 import json
 import re
 import shutil
-import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -23,19 +22,38 @@ from typing import Dict, List, Optional, Tuple
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor, QPainter
 from PySide6.QtWidgets import (
-    QAbstractItemView, QApplication, QButtonGroup, QCheckBox, QComboBox,
-    QFileDialog, QFormLayout, QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-    QListWidget, QListWidgetItem, QMessageBox, QProgressBar, QPushButton,
-    QRadioButton, QSizePolicy, QSpinBox, QTabWidget,
-    QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget, QWizard, QWizardPage,
+    QAbstractItemView,
+    QButtonGroup,
+    QCheckBox,
+    QComboBox,
+    QFileDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QRadioButton,
+    QSizePolicy,
+    QSpinBox,
+    QTabWidget,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWidget,
+    QWizard,
+    QWizardPage,
 )
 
+from constants import ALL_EXTENSION_CATEGORIES
+from core.trash import StudioTrash, TrashItem
 from ui.tabs.base_tab import BaseTab
 from ui.widgets.directory_selector import DirectorySelectorWidget
 from workers.base_worker import BaseWorker
-from core.trash import StudioTrash, TrashItem
-from constants import ALL_EXTENSION_CATEGORIES
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Shared helpers
@@ -1769,8 +1787,8 @@ class _ExportWatcherPane(QWidget):
             for p in self.config.get('naming.profiles', []):
                 if p.get('name') == profile_name:
                     try:
-                        from core.name_transform import ProductionTemplate
                         from core.linter import FilenameLint
+                        from core.name_transform import ProductionTemplate
                         template = ProductionTemplate.from_dict(p)
                         issues = FilenameLint().lint_directory(fp.parent, profile=template)
                         file_issues = [i for i in issues if i.filename == fp.name]
@@ -1786,7 +1804,7 @@ class _ExportWatcherPane(QWidget):
         # Optional delivery validation
         if self.chk_validate.isChecked():
             try:
-                from core.delivery import DeliveryValidator, DeliveryProfile
+                from core.delivery import DeliveryProfile, DeliveryValidator
                 report = DeliveryValidator().validate(watch_dir, DeliveryProfile())
                 color = '#c3e88d' if report.passed else '#ff5370'
                 status = "PASSED" if report.passed else "FAILED"

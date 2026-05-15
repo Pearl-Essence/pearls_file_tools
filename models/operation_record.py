@@ -2,8 +2,9 @@
 
 from datetime import datetime
 from pathlib import Path
-from typing import List, Tuple, Dict, Any, Optional
-from constants import OP_TYPE_RENAME, OP_TYPE_ORGANIZE, OP_TYPE_EXTRACT, OP_TYPE_COPY
+from typing import Any, Dict, List, Optional, Tuple
+
+from constants import OP_TYPE_COPY, OP_TYPE_EXTRACT, OP_TYPE_ORGANIZE, OP_TYPE_RENAME
 
 
 class OperationRecord:

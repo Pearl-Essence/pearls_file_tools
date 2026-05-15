@@ -9,11 +9,18 @@ from typing import Dict, List
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QScrollArea, QSpinBox, QVBoxLayout, QWidget,
+    QCheckBox,
+    QComboBox,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QScrollArea,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
 )
 
-from constants import VIDEO_EXTENSIONS
 from ui.tabs.base_tab import BaseTab
 from ui.widgets.panel import Panel
 from ui.widgets.path_card import PathCard
@@ -318,7 +325,8 @@ class ImageBrowserTab(BaseTab):
         dialog.exec()
 
     def _open_video_externally(self, path: str):
-        import subprocess, sys
+        import subprocess
+        import sys
         try:
             if sys.platform == 'darwin':
                 subprocess.Popen(['open', path])

@@ -1,6 +1,5 @@
 """Comprehensive tests for models/project.py."""
 
-import pytest
 from models.project import Project
 
 

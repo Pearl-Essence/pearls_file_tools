@@ -8,19 +8,25 @@ pills + sticky footer with progress).
 from pathlib import Path
 from typing import Dict
 
-from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QCheckBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QProgressBar,
-    QPushButton, QTextEdit, QVBoxLayout, QWidget,
+    QCheckBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QProgressBar,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
 
+from constants import PHOTO_KEYWORDS
 from ui.tabs.base_tab import BaseTab
 from ui.widgets.panel import Panel
 from ui.widgets.path_card import PathCard
 from ui.widgets.tab_header import TabHeader
-from constants import PHOTO_KEYWORDS
-
 
 # Optional libraries — same probes as before
 try:

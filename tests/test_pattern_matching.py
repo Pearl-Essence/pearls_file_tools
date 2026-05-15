@@ -1,23 +1,21 @@
 """Comprehensive tests for core/pattern_matching.py."""
 
-import pytest
 from core.pattern_matching import (
-    detect_dominant_delimiter,
-    PRESET_STANDARD,
     PRESET_AE_RENDER,
+    PRESET_STANDARD,
     SequenceGroup,
-    detect_image_sequences,
-    get_group_name,
-    find_best_group,
     detect_common_prefixes,
-    group_files_by_pattern,
-    match_prefix,
     detect_common_suffixes,
-    match_suffix,
+    detect_dominant_delimiter,
+    detect_image_sequences,
+    find_best_group,
+    get_group_name,
     get_group_name_ae,
+    group_files_by_pattern,
     group_files_by_preset,
+    match_prefix,
+    match_suffix,
 )
-
 
 # ── detect_dominant_delimiter ───────────────────────────────────────────────
 

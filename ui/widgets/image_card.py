@@ -1,11 +1,12 @@
 """Image/video card widget for displaying thumbnails."""
 
 import base64
-from PySide6.QtWidgets import QFrame, QVBoxLayout, QLabel
-from PySide6.QtCore import Qt, QRectF, QPointF, Signal
-from PySide6.QtGui import QBrush, QPixmap, QColor, QPainter, QFont, QPolygonF
 from pathlib import Path
 from typing import Dict
+
+from PySide6.QtCore import QPointF, QRectF, Qt, Signal
+from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPixmap, QPolygonF
+from PySide6.QtWidgets import QFrame, QLabel, QVBoxLayout
 
 
 class ImageCard(QFrame):

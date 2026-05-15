@@ -1,8 +1,7 @@
 """Comprehensive tests for core/mhl.py."""
 
 import xml.etree.ElementTree as ET
-import pytest
-from pathlib import Path
+
 from core.mhl import write_mhl_with_hashes
 
 

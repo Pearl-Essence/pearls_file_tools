@@ -6,18 +6,26 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import Qt, Signal, QDate
+from PySide6.QtCore import QDate, Qt, Signal
 from PySide6.QtGui import QAction, QColor
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTreeWidget, QTreeWidgetItem, QCheckBox, QDateEdit, QHeaderView,
-    QMenu, QSizePolicy, QApplication, QMessageBox,
+    QCheckBox,
+    QDateEdit,
+    QDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMenu,
+    QMessageBox,
+    QPushButton,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
 )
 
 from core.sync_check import SyncEntry, SyncReport, compare_directories
 from ui.widgets.directory_selector import DirectorySelectorWidget
 from workers.base_worker import BaseWorker
-
 
 # ---------------------------------------------------------------------------
 # Background worker

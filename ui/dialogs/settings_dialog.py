@@ -3,11 +3,20 @@
 import sys
 
 from PySide6.QtWidgets import (
-    QCheckBox, QDialog, QDoubleSpinBox, QGroupBox, QHBoxLayout, QLabel,
-    QLineEdit, QMessageBox, QPushButton, QSpinBox, QTabWidget, QVBoxLayout,
+    QCheckBox,
+    QDialog,
+    QDoubleSpinBox,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QSpinBox,
+    QTabWidget,
+    QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import Qt
 
 
 class SettingsDialog(QDialog):
@@ -256,8 +265,9 @@ class SettingsDialog(QDialog):
         widget = QWidget()
         layout = QVBoxLayout()
 
-        from __init__ import __version__
         import PySide6
+
+        from __init__ import __version__
 
         info_group = QGroupBox("Application Info")
         info_layout = QVBoxLayout()

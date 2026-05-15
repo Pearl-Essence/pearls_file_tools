@@ -10,22 +10,23 @@ and the validation rules + results panels swap in.
 """
 
 from pathlib import Path
-from typing import Optional
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtWidgets import (
-    QCheckBox, QFrame, QHBoxLayout, QLabel, QListWidget, QPushButton,
-    QSpinBox, QStackedWidget, QVBoxLayout, QWidget,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
 from branding import ICONS_DIR
 from ui.tabs.base_tab import BaseTab
 from ui.tabs.delivery_tab import _ValidatorPane
-from ui.widgets.panel import Panel
 from ui.widgets.path_card import PathCard
 from ui.widgets.tab_header import TabHeader
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Empty-state hero

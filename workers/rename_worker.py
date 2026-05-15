@@ -4,16 +4,27 @@ import csv
 import datetime
 from pathlib import Path
 from typing import List, Optional, Tuple
+
 from PySide6.QtCore import Signal
-from workers.base_worker import BaseWorker
-from core.name_transform import generate_new_filename, move_prefix_to_suffix, move_suffix_to_prefix, replace_prefix, replace_suffix
+
+from constants import CAPTION_EXTENSIONS, OP_TYPE_COPY, OP_TYPE_RENAME, SIDECAR_EXTENSIONS
 from core.file_utils import (
-    resolve_name_conflict, safe_rename, same_inode,
-    split_compound_suffix, is_hidden_file,
+    is_hidden_file,
+    resolve_name_conflict,
+    safe_rename,
+    same_inode,
+    split_compound_suffix,
+)
+from core.name_transform import (
+    generate_new_filename,
+    move_prefix_to_suffix,
+    move_suffix_to_prefix,
+    replace_prefix,
+    replace_suffix,
 )
 from core.pattern_matching import match_prefix, match_suffix
 from models.operation_record import OperationRecord
-from constants import OP_TYPE_RENAME, OP_TYPE_COPY, SIDECAR_EXTENSIONS, CAPTION_EXTENSIONS
+from workers.base_worker import BaseWorker
 
 
 class RenameWorker(BaseWorker):

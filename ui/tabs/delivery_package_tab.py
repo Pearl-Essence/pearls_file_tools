@@ -11,14 +11,15 @@ already pre-filled.
 """
 
 from pathlib import Path
-from typing import Optional
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QTabWidget, QVBoxLayout, QWidget
 
 from ui.tabs.base_tab import BaseTab
 from ui.tabs.delivery_tab import (
-    _DuplicatesPane, _ExportPane, _HandoffPane, _PackagePane,
+    _DuplicatesPane,
+    _ExportPane,
+    _HandoffPane,
+    _PackagePane,
 )
 from ui.widgets.tab_header import TabHeader
 

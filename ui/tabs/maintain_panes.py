@@ -10,7 +10,7 @@ TabHeader-decorated shell. The dialogs' internal Close buttons are hidden
 since there's nothing to close — the user navigates away via the sidebar.
 """
 
-from typing import Callable, Optional
+from typing import Callable
 
 from PySide6.QtWidgets import QPushButton, QVBoxLayout, QWidget
 

@@ -7,8 +7,8 @@ format used by Silverstack, ShotPut Pro, Hedge, and other DIT tools.
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, List
-from xml.etree.ElementTree import Element, SubElement, tostring
 from xml.dom.minidom import parseString
+from xml.etree.ElementTree import Element, SubElement, tostring
 
 if TYPE_CHECKING:
     from workers.ingest_worker import IngestResult

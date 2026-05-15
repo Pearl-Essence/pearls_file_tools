@@ -11,23 +11,46 @@ from typing import Dict, List, Optional, Tuple
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QApplication, QButtonGroup, QCheckBox, QComboBox, QFormLayout, QFrame,
-    QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QPushButton,
-    QRadioButton, QScrollArea, QSpinBox, QStackedWidget, QVBoxLayout, QWidget,
+    QApplication,
+    QButtonGroup,
+    QCheckBox,
+    QComboBox,
+    QFormLayout,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QRadioButton,
+    QScrollArea,
+    QSpinBox,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
 from constants import (
-    ALL_EXTENSION_CATEGORIES, CASE_LOWER, CASE_NONE, CASE_TITLE, CASE_UPPER,
-    OP_TYPE_RENAME,
+    ALL_EXTENSION_CATEGORIES,
+    CASE_LOWER,
+    CASE_NONE,
+    CASE_TITLE,
+    CASE_UPPER,
 )
 from core.file_utils import get_files_in_directory
 from core.name_transform import (
-    DEFAULT_TEMPLATE, ProductionTemplate, bump_version,
-    generate_new_filename, generate_sequential_filenames, move_suffix_to_prefix,
-    replace_prefix, replace_suffix,
+    DEFAULT_TEMPLATE,
+    ProductionTemplate,
+    bump_version,
+    generate_new_filename,
+    generate_sequential_filenames,
+    replace_prefix,
+    replace_suffix,
 )
 from core.pattern_matching import (
-    detect_common_prefixes, detect_common_suffixes, match_prefix, match_suffix,
+    detect_common_prefixes,
+    detect_common_suffixes,
 )
 from models.operation_record import OperationRecord
 from ui.tabs.base_tab import BaseTab
@@ -984,6 +1007,7 @@ class BulkRenamerTab(BaseTab):
             return
 
         from PySide6.QtWidgets import QProgressDialog
+
         from workers.rename_worker import RenameWorker
 
         active_extensions = self.get_active_extensions()
@@ -1438,9 +1462,9 @@ class BulkRenamerTab(BaseTab):
     # ── CSV log ───────────────────────────────────────────────────────────
 
     def open_latest_csv(self):
+        import glob
         import subprocess
         import sys
-        import glob
         if not self.current_directory:
             self.show_warning("No Directory", "No directory selected.")
             return

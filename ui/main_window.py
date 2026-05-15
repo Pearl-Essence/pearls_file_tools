@@ -6,19 +6,28 @@ sidebar items that point to dialogs (Sync Check, Watch Folders) intercept
 the activation and open the dialog without changing the current pane.
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QAction, QCursor, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
-    QApplication, QFrame, QHBoxLayout, QLabel, QMainWindow, QMenu,
-    QMessageBox, QPushButton, QSplitter, QStackedWidget, QVBoxLayout,
+    QApplication,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMenu,
+    QMessageBox,
+    QPushButton,
+    QSplitter,
+    QStackedWidget,
+    QVBoxLayout,
     QWidget,
 )
 
 from branding import APP_NAME, APP_TAGLINE, ICONS_DIR, NAV_TREE
 from config import Config
-from constants import DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT
+from constants import DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH
 from ui.widgets.sidebar_nav import SidebarNav
 
 
@@ -207,19 +216,23 @@ class MainWindow(QMainWindow):
     def _mount_tabs(self):
         """Construct every tab class and register them in the stack."""
         # Lazy imports keep startup time predictable and avoid circular deps.
-        from ui.tabs.ingest_tab import IngestTab
-        from ui.tabs.proxy_tab import ProxyTab
-        from ui.tabs.bulk_renamer_tab import BulkRenamerTab
-        from ui.tabs.file_organizer_tab import FileOrganizerTab
         from ui.tabs.archive_extractor_tab import ArchiveExtractorTab
-        from ui.tabs.image_browser_tab import ImageBrowserTab
-        from ui.tabs.studio_tabs import (
-            ColdStorageTab, ExportWatcherTab, NLEBackupTab,
-            StaleFilesTab, StorageReportTab, TrashTab,
-        )
-        from ui.tabs.maintain_panes import SyncCheckTab, WatchFoldersTab
-        from ui.tabs.delivery_validator_tab import SpecValidatorTab
+        from ui.tabs.bulk_renamer_tab import BulkRenamerTab
         from ui.tabs.delivery_package_tab import PackageExportTab
+        from ui.tabs.delivery_validator_tab import SpecValidatorTab
+        from ui.tabs.file_organizer_tab import FileOrganizerTab
+        from ui.tabs.image_browser_tab import ImageBrowserTab
+        from ui.tabs.ingest_tab import IngestTab
+        from ui.tabs.maintain_panes import SyncCheckTab, WatchFoldersTab
+        from ui.tabs.proxy_tab import ProxyTab
+        from ui.tabs.studio_tabs import (
+            ColdStorageTab,
+            ExportWatcherTab,
+            NLEBackupTab,
+            StaleFilesTab,
+            StorageReportTab,
+            TrashTab,
+        )
 
         # factory_key -> tab instance
         validator_tab = SpecValidatorTab(self.config)
@@ -345,7 +358,8 @@ class MainWindow(QMainWindow):
             y = screen.y() + (screen.height() - h) // 2
         max_w = int(screen.width() * 0.90)
         max_h = int(screen.height() * 0.85)
-        w = min(w, max_w); h = min(h, max_h)
+        w = min(w, max_w)
+        h = min(h, max_h)
         x = max(screen.x(), min(x, screen.x() + screen.width() - w))
         y = max(screen.y(), min(y, screen.y() + screen.height() - h))
         self.setGeometry(x, y, w, h)

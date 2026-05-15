@@ -1,15 +1,16 @@
 """Extract worker thread for Pearl's File Tools."""
 
-import os
 import datetime
+import os
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
+
 from PySide6.QtCore import Signal
-from workers.base_worker import BaseWorker
-from core.file_utils import has_keyword
-from core.archive_utils import extract_archive
+
 from constants import PHOTO_KEYWORDS
-from typing import List
+from core.archive_utils import extract_archive
+from core.file_utils import has_keyword
+from workers.base_worker import BaseWorker
 
 BACKUP_DIR_NAME = ".archive_extractor_backups"
 

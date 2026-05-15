@@ -2,12 +2,11 @@
 
 import hashlib
 import os
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Tuple
-from datetime import datetime
-from constants import (
-    ALL_EXTENSION_CATEGORIES, CONFLICT_COUNTER, CONFLICT_TIMESTAMP, CONFLICT_SKIP
-)
+
+from constants import ALL_EXTENSION_CATEGORIES, CONFLICT_COUNTER, CONFLICT_SKIP, CONFLICT_TIMESTAMP
 
 
 def is_hidden_file(filename: str) -> bool:

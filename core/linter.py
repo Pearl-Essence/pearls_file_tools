@@ -3,7 +3,7 @@
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 ILLEGAL_CHARS_WIN = frozenset('<>:"/\\|?*\x00')
 WINDOWS_RESERVED = frozenset({

@@ -1,9 +1,10 @@
 """Base tab class for Pearl's File Tools."""
 
 from abc import ABCMeta, abstractmethod
-from PySide6.QtWidgets import QWidget, QMessageBox
-from PySide6.QtCore import Signal, QObject
 from typing import Optional
+
+from PySide6.QtCore import QObject, Signal
+from PySide6.QtWidgets import QMessageBox, QWidget
 
 
 # Create a metaclass that combines PySide6's metaclass with ABCMeta

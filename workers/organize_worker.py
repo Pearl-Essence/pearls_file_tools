@@ -2,9 +2,11 @@
 
 from pathlib import Path
 from typing import Dict, List, Optional
+
 from PySide6.QtCore import Signal
-from workers.base_worker import BaseWorker
+
 from core.file_utils import resolve_name_conflict, safe_move
+from workers.base_worker import BaseWorker
 
 
 class OrganizeWorker(BaseWorker):

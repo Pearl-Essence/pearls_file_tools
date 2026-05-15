@@ -5,7 +5,6 @@ Windows — HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run
 Linux  — .desktop file in ~/.config/autostart/
 """
 
-import os
 import sys
 from pathlib import Path
 

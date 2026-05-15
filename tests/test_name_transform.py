@@ -1,25 +1,22 @@
 """Comprehensive tests for core/name_transform.py."""
 
-import pytest
 from core.name_transform import (
+    DEFAULT_TEMPLATE,
     ProductionTemplate,
-    apply_case_transform,
     add_prefix,
     add_suffix,
-    move_suffix_to_prefix,
+    apply_case_transform,
+    bump_version,
+    detect_version,
+    generate_new_filename,
+    generate_sequential_filenames,
+    is_valid_filename,
     move_prefix_to_suffix,
+    move_suffix_to_prefix,
     rename_file,
     replace_prefix,
     replace_suffix,
-    generate_new_filename,
-    generate_sequential_filenames,
-    detect_version,
-    bump_version,
-    is_valid_filename,
-    VERSION_PATTERN,
-    DEFAULT_TEMPLATE,
 )
-
 
 # ── ProductionTemplate ──────────────────────────────────────────────────────
 

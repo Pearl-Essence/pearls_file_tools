@@ -1,10 +1,8 @@
 """Comprehensive tests for core/qc_report.py."""
 
-import pytest
-from pathlib import Path
 from unittest.mock import patch
-from core.qc_report import _flag_file, _fmt_size, generate_qc_report
 
+from core.qc_report import _flag_file, _fmt_size, generate_qc_report
 
 # ── _fmt_size ───────────────────────────────────────────────────────────────
 
