@@ -34,12 +34,12 @@ class ExtractWorker(BaseWorker):
         super().__init__()
         self.root_dir = Path(root_dir)
         self.settings = settings
-        self.keywords: List[str] = settings.get('keywords', list(PHOTO_KEYWORDS))
+        self.keywords: List[str] = settings.get("keywords", list(PHOTO_KEYWORDS))
         self.extraction_record = {
-            'timestamp': datetime.datetime.now().isoformat(),
-            'root_dir': str(root_dir),
-            'extractions': [],
-            'failed_extractions': []
+            "timestamp": datetime.datetime.now().isoformat(),
+            "root_dir": str(root_dir),
+            "extractions": [],
+            "failed_extractions": [],
         }
 
     def emit_finished(self, success: bool, message: str, record=None):
@@ -59,20 +59,20 @@ class ExtractWorker(BaseWorker):
         filepath_lower = str(filepath).lower()
 
         # Check enabled formats from settings
-        if self.settings['zip'] and filepath_lower.endswith('.zip'):
-            return 'zip'
+        if self.settings["zip"] and filepath_lower.endswith(".zip"):
+            return "zip"
 
-        if self.settings['tar']:
-            tar_extensions = ['.tar', '.tar.gz', '.tgz', '.tar.bz2', '.tbz2', '.tar.xz', '.txz']
+        if self.settings["tar"]:
+            tar_extensions = [".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz"]
             for ext in tar_extensions:
                 if filepath_lower.endswith(ext):
-                    return 'tar'
+                    return "tar"
 
-        if self.settings['rar'] and filepath_lower.endswith('.rar'):
-            return 'rar'
+        if self.settings["rar"] and filepath_lower.endswith(".rar"):
+            return "rar"
 
-        if self.settings['7z'] and filepath_lower.endswith('.7z'):
-            return '7z'
+        if self.settings["7z"] and filepath_lower.endswith(".7z"):
+            return "7z"
 
         return None
 
@@ -81,10 +81,10 @@ class ExtractWorker(BaseWorker):
         try:
             self.log_message.emit(f"Searching in: {self.root_dir}")
 
-            if self.settings['keyword_filter']:
+            if self.settings["keyword_filter"]:
                 self.log_message.emit(f"Keywords (case-insensitive): {', '.join(self.keywords)}")
 
-            if self.settings['smart_extract']:
+            if self.settings["smart_extract"]:
                 self.log_message.emit("Smart extraction: Removing intermediate folders when possible")
 
             self.log_message.emit("-" * 70)
@@ -100,7 +100,7 @@ class ExtractWorker(BaseWorker):
                     filepath = Path(dirpath) / filename
 
                     # Check keyword filter
-                    if self.settings['keyword_filter']:
+                    if self.settings["keyword_filter"]:
                         if not has_keyword(filename, self.keywords):
                             continue
 
@@ -130,10 +130,7 @@ class ExtractWorker(BaseWorker):
 
                 archive_type = self.get_archive_type(filepath)
                 extracted_items = extract_archive(
-                    filepath,
-                    extract_to,
-                    archive_type,
-                    use_smart_extract=self.settings['smart_extract']
+                    filepath, extract_to, archive_type, use_smart_extract=self.settings["smart_extract"]
                 )
 
                 if extracted_items:
@@ -142,15 +139,15 @@ class ExtractWorker(BaseWorker):
 
                     # Record the extraction
                     extraction_entry = {
-                        'archive_path': str(filepath),
-                        'extract_dir': str(extract_to),
-                        'extracted_items': [str(item) for item in extracted_items],
-                        'archive_deleted': False,
-                        'backup_path': None
+                        "archive_path": str(filepath),
+                        "extract_dir": str(extract_to),
+                        "extracted_items": [str(item) for item in extracted_items],
+                        "archive_deleted": False,
+                        "backup_path": None,
                     }
 
                     # Backup and delete archive if requested
-                    if self.settings['delete_after']:
+                    if self.settings["delete_after"]:
                         try:
                             import shutil
 
@@ -164,23 +161,22 @@ class ExtractWorker(BaseWorker):
                             backup_path = backup_dir / backup_name
 
                             shutil.copy2(filepath, backup_path)
-                            extraction_entry['backup_path'] = str(backup_path)
+                            extraction_entry["backup_path"] = str(backup_path)
 
                             # Delete original
                             filepath.unlink()
-                            extraction_entry['archive_deleted'] = True
+                            extraction_entry["archive_deleted"] = True
                             self.log_message.emit("  ✓ Archive backed up and deleted")
                         except Exception as e:
                             self.log_message.emit(f"  ✗ Failed to backup/delete: {e}")
 
-                    self.extraction_record['extractions'].append(extraction_entry)
+                    self.extraction_record["extractions"].append(extraction_entry)
                 else:
                     self.log_message.emit("  ✗ Failed to extract")
                     # Record the failure
-                    self.extraction_record['failed_extractions'].append({
-                        'archive_path': str(filepath),
-                        'extract_dir': str(extract_to)
-                    })
+                    self.extraction_record["failed_extractions"].append(
+                        {"archive_path": str(filepath), "extract_dir": str(extract_to)}
+                    )
 
                 # Update progress
                 self.progress.emit("", idx + 1, found_count)

@@ -18,8 +18,8 @@ class WatchWorker(BaseWorker):
         file_arrived(str, str): (absolute path string, profile_name)
     """
 
-    finished = Signal(bool, str, object)   # shadows BaseWorker.finished
-    file_arrived = Signal(str, str)        # path, profile_name
+    finished = Signal(bool, str, object)  # shadows BaseWorker.finished
+    file_arrived = Signal(str, str)  # path, profile_name
 
     def __init__(self, rules: List[WatchRule], poll_interval_secs: int = 30):
         super().__init__()

@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from workers.ingest_worker import IngestResult
 
 
-def write_mhl(results: 'List[IngestResult]', dest_dir: Path) -> Path:
+def write_mhl(results: "List[IngestResult]", dest_dir: Path) -> Path:
     """Write an MHL v1 sidecar for verified ingest results.
 
     Args:
@@ -55,9 +55,7 @@ def write_mhl(results: 'List[IngestResult]', dest_dir: Path) -> Path:
     return output
 
 
-def write_mhl_with_hashes(
-    entries: 'List[dict]', dest_dir: Path
-) -> Path:
+def write_mhl_with_hashes(entries: "List[dict]", dest_dir: Path) -> Path:
     """Write an MHL with pre-computed hashes.
 
     Each entry dict: {'filename': str, 'size': int, 'md5': str}

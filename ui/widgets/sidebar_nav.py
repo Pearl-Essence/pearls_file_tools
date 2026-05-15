@@ -11,14 +11,14 @@ from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QFrame, QListWidget, QListWidgetItem
 
-_ROLE_KEY     = Qt.UserRole + 1   # the factory_key string, or "" for headers
-_ROLE_ISHEAD  = Qt.UserRole + 2   # bool
+_ROLE_KEY = Qt.UserRole + 1  # the factory_key string, or "" for headers
+_ROLE_ISHEAD = Qt.UserRole + 2  # bool
 
 
 class SidebarNav(QListWidget):
     """Left-rail navigation for the sidebar shell."""
 
-    activated = Signal(str)   # factory_key
+    activated = Signal(str)  # factory_key
 
     def __init__(self, nav_tree, icons_dir, parent=None):
         super().__init__(parent)

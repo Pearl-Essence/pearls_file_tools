@@ -37,7 +37,7 @@ class TestSendToTrash:
         trash.send_to_trash(sample_file)
         items = list(trash.trash_dir.iterdir())
         # Should have the trashed file + .meta.json
-        file_items = [i for i in items if not i.name.startswith('.')]
+        file_items = [i for i in items if not i.name.startswith(".")]
         assert len(file_items) == 1
 
     def test_metadata_recorded(self, trash, sample_file):
@@ -135,7 +135,7 @@ class TestPurge:
         item = trash.list_trash()[0]
         # Verify file in trash dir is deleted
         trash.purge(item)
-        trash_files = [p for p in trash.trash_dir.iterdir() if not p.name.startswith('.')]
+        trash_files = [p for p in trash.trash_dir.iterdir() if not p.name.startswith(".")]
         assert len(trash_files) == 0
 
 

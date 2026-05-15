@@ -48,13 +48,16 @@ class _ProxyPane(QWidget):
 
     def _build_header(self) -> QWidget:
         from ui.widgets.tab_header import TabHeader
+
         header = TabHeader(
             eyebrow="01 · INGEST · PROXY GENERATION",
             title="Proxy Generation",
             subtitle="Pair full-resolution clips with their proxy counterparts and align filenames.",
         )
         self.btn_match = header.add_action(
-            "Match files", on_click=self._run_match, primary=True,
+            "Match files",
+            on_click=self._run_match,
+            primary=True,
             tooltip="Pair full-resolution and proxy files by matching stems",
         )
         return header
@@ -99,8 +102,7 @@ class _ProxyPane(QWidget):
         self.btn_rename = QPushButton("Rename proxies to match full-resolution")
         self.btn_rename.setEnabled(False)
         self.btn_rename.setToolTip(
-            "Renames each proxy file to match its paired full-res filename, "
-            "preserving the proxy extension."
+            "Renames each proxy file to match its paired full-res filename, preserving the proxy extension."
         )
         self.btn_rename.clicked.connect(self._rename_proxies)
         row.addWidget(self.btn_rename)
@@ -131,12 +133,11 @@ class _ProxyPane(QWidget):
         full_only = set(self._full_res_files) - set(self._proxy_files)
         proxy_only = set(self._proxy_files) - set(self._full_res_files)
 
-        OK     = QColor(Palette.OK)
-        WARN   = QColor(Palette.WARN)
-        ERROR  = QColor(Palette.ERROR)
+        OK = QColor(Palette.OK)
+        WARN = QColor(Palette.WARN)
+        ERROR = QColor(Palette.ERROR)
 
-        def add_section(title: str, stems, color: QColor,
-                        fr_files: Dict[str, Path], px_files: Dict[str, Path]):
+        def add_section(title: str, stems, color: QColor, fr_files: Dict[str, Path], px_files: Dict[str, Path]):
             section = QTreeWidgetItem([title, "", ""])
             section.setFont(0, QFont("", -1, QFont.Bold))
             section.setForeground(0, QBrush(color))
@@ -150,16 +151,12 @@ class _ProxyPane(QWidget):
             self.tree.addTopLevelItem(section)
             section.setExpanded(True)
 
-        add_section(f"Matched pairs ({len(matched)})", matched, OK,
-                    self._full_res_files, self._proxy_files)
-        add_section(f"Full-res with no proxy ({len(full_only)})", full_only, WARN,
-                    self._full_res_files, {})
-        add_section(f"Proxies with no full-res ({len(proxy_only)})", proxy_only, ERROR,
-                    {}, self._proxy_files)
+        add_section(f"Matched pairs ({len(matched)})", matched, OK, self._full_res_files, self._proxy_files)
+        add_section(f"Full-res with no proxy ({len(full_only)})", full_only, WARN, self._full_res_files, {})
+        add_section(f"Proxies with no full-res ({len(proxy_only)})", proxy_only, ERROR, {}, self._proxy_files)
 
         self.lbl_summary.setText(
-            f"{len(matched)} matched · {len(full_only)} full-res orphans "
-            f"· {len(proxy_only)} proxy orphans"
+            f"{len(matched)} matched · {len(full_only)} full-res orphans · {len(proxy_only)} proxy orphans"
         )
         self.btn_rename.setEnabled(bool(matched))
         self._emit_status(f"Proxy match: {len(matched)} pairs found")
@@ -179,8 +176,9 @@ class _ProxyPane(QWidget):
                 plan.append((px, new_path))
 
         if not plan:
-            QMessageBox.information(self, "No renames needed",
-                                    "All proxy filenames already match their full-res counterparts.")
+            QMessageBox.information(
+                self, "No renames needed", "All proxy filenames already match their full-res counterparts."
+            )
             return
 
         preview = "\n".join(f"{src.name}  →  {dst.name}" for src, dst in plan[:20])
@@ -188,9 +186,11 @@ class _ProxyPane(QWidget):
             preview += f"\n… and {len(plan) - 20} more"
 
         reply = QMessageBox.question(
-            self, "Confirm proxy rename",
+            self,
+            "Confirm proxy rename",
             f"Rename {len(plan)} proxy file(s)?\n\n{preview}",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
         )
         if reply != QMessageBox.Yes:
             return
@@ -203,17 +203,16 @@ class _ProxyPane(QWidget):
                 errors.append(f"{src.name}: {exc}")
 
         if errors:
-            QMessageBox.warning(self, "Some renames failed",
-                                "The following renames failed:\n\n" + "\n".join(errors))
+            QMessageBox.warning(self, "Some renames failed", "The following renames failed:\n\n" + "\n".join(errors))
         else:
-            QMessageBox.information(self, "Done",
-                                    f"Renamed {len(plan)} proxy file(s) successfully.")
+            QMessageBox.information(self, "Done", f"Renamed {len(plan)} proxy file(s) successfully.")
         self._run_match()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Public ProxyTab
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class ProxyTab(BaseTab):
     """Proxy Generation workflow."""
@@ -228,15 +227,15 @@ class ProxyTab(BaseTab):
         layout.addWidget(self._pane)
 
     def load_settings(self):
-        last_full  = self.config.get_tab_setting('proxy', 'last_full', '')
-        last_proxy = self.config.get_tab_setting('proxy', 'last_proxy', '')
+        last_full = self.config.get_tab_setting("proxy", "last_full", "")
+        last_proxy = self.config.get_tab_setting("proxy", "last_proxy", "")
         if last_full:
             self._pane.card_full.set_path(last_full)
         if last_proxy:
             self._pane.card_proxy.set_path(last_proxy)
 
     def save_settings(self):
-        full  = self._pane.card_full.get_path()
+        full = self._pane.card_full.get_path()
         proxy = self._pane.card_proxy.get_path()
-        self.config.set_tab_setting('proxy', 'last_full',  str(full)  if full  else '')
-        self.config.set_tab_setting('proxy', 'last_proxy', str(proxy) if proxy else '')
+        self.config.set_tab_setting("proxy", "last_full", str(full) if full else "")
+        self.config.set_tab_setting("proxy", "last_proxy", str(proxy) if proxy else "")

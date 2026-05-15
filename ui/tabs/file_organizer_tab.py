@@ -131,17 +131,14 @@ class FileOrganizerTab(BaseTab):
         for p in ALL_PRESETS:
             self.preset_combo.addItem(p.name, userData=p)
         self.preset_combo.setToolTip(
-            "Standard: group by underscore prefix\n"
-            "AE Render Output: strip trailing _#### frame numbers before grouping"
+            "Standard: group by underscore prefix\nAE Render Output: strip trailing _#### frame numbers before grouping"
         )
         self.preset_combo.setMinimumWidth(200)
         row.addWidget(self.preset_combo)
 
         row.addSpacing(16)
         self.batch_mode_chk = QCheckBox("Batch mode")
-        self.batch_mode_chk.setToolTip(
-            "Process multiple first-level subdirectories in one run"
-        )
+        self.batch_mode_chk.setToolTip("Process multiple first-level subdirectories in one run")
         self.batch_mode_chk.toggled.connect(self._on_batch_mode_toggled)
         row.addWidget(self.batch_mode_chk)
 
@@ -217,6 +214,7 @@ class FileOrganizerTab(BaseTab):
         v.addLayout(head)
 
         from ui.widgets.draggable_tree import DraggableTreeWidget
+
         self.tree_widget = DraggableTreeWidget()
         self.tree_widget.setHeaderLabels(["Group / file", "Count / size", "Status"])
         self.tree_widget.setColumnWidth(0, 500)
@@ -271,7 +269,7 @@ class FileOrganizerTab(BaseTab):
         if not self._batch_root.is_dir():
             return
         for d in sorted(self._batch_root.iterdir()):
-            if d.is_dir() and not d.name.startswith('.'):
+            if d.is_dir() and not d.name.startswith("."):
                 item = QListWidgetItem(d.name)
                 item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
                 item.setCheckState(Qt.Checked)
@@ -302,9 +300,8 @@ class FileOrganizerTab(BaseTab):
             return
 
         from PySide6.QtWidgets import QApplication, QProgressDialog
-        progress = QProgressDialog(
-            "Running batch…", "Cancel", 0, len(checked_dirs), self
-        )
+
+        progress = QProgressDialog("Running batch…", "Cancel", 0, len(checked_dirs), self)
         progress.setWindowTitle("Batch Organizer")
         progress.setWindowModality(Qt.WindowModal)
         progress.show()
@@ -324,13 +321,9 @@ class FileOrganizerTab(BaseTab):
         progress.setValue(len(checked_dirs))
 
         if errors:
-            self.show_warning(
-                "Batch Errors",
-                "Some directories had errors:\n\n" + "\n".join(errors)
-            )
+            self.show_warning("Batch Errors", "Some directories had errors:\n\n" + "\n".join(errors))
         else:
-            self.show_info("Batch Complete",
-                           f"Processed {len(checked_dirs)} director(ies) successfully.")
+            self.show_info("Batch Complete", f"Processed {len(checked_dirs)} director(ies) successfully.")
 
     def _organize_single_dir(self, directory: str):
         """Synchronously scan and organize a single directory (used by batch mode)."""
@@ -340,7 +333,7 @@ class FileOrganizerTab(BaseTab):
 
         root = Path(directory)
         preset = self.preset_combo.currentData()
-        confidence_threshold = self.config.get_tab_setting('organizer', 'confidence_threshold', 0.4)
+        confidence_threshold = self.config.get_tab_setting("organizer", "confidence_threshold", 0.4)
 
         files = [f for f in root.iterdir() if f.is_file()]
         if not files:
@@ -379,7 +372,7 @@ class FileOrganizerTab(BaseTab):
         # Start scan worker
         from workers.scan_worker import ScanWorker
 
-        confidence_threshold = self.config.get_tab_setting('organizer', 'confidence_threshold', 0.4)
+        confidence_threshold = self.config.get_tab_setting("organizer", "confidence_threshold", 0.4)
         preset = self.preset_combo.currentData()
 
         self.worker_thread = ScanWorker(self.current_directory, confidence_threshold, preset=preset)
@@ -391,7 +384,9 @@ class FileOrganizerTab(BaseTab):
         """Update scan status."""
         self.status_label.setText(message)
 
-    def on_scan_finished(self, success: bool, message: str, grouped_results: Dict = None, unsorted_results: Dict = None):
+    def on_scan_finished(
+        self, success: bool, message: str, grouped_results: Dict = None, unsorted_results: Dict = None
+    ):
         """Handle scan completion."""
         self.scan_btn.setEnabled(True)
         self.progress_bar.setVisible(False)
@@ -436,8 +431,7 @@ class FileOrganizerTab(BaseTab):
             # Strip from unsorted
             if subdir_path in self.unsorted_files:
                 self.unsorted_files[subdir_path] = [
-                    f for f in self.unsorted_files[subdir_path]
-                    if f.name not in seq_filenames
+                    f for f in self.unsorted_files[subdir_path] if f.name not in seq_filenames
                 ]
 
         if not self.file_groups and not self.unsorted_files and not self.file_sequences:
@@ -448,18 +442,10 @@ class FileOrganizerTab(BaseTab):
         self.populate_tree()
 
         total_groups = sum(len(groups) for groups in self.file_groups.values())
-        total_grouped = sum(
-            len(files)
-            for groups in self.file_groups.values()
-            for files in groups.values()
-        )
+        total_grouped = sum(len(files) for groups in self.file_groups.values() for files in groups.values())
         total_unsorted = sum(len(files) for files in self.unsorted_files.values())
         total_sequences = sum(len(seqs) for seqs in self.file_sequences.values())
-        total_seq_frames = sum(
-            len(seq.files)
-            for seqs in self.file_sequences.values()
-            for seq in seqs.values()
-        )
+        total_seq_frames = sum(len(seq.files) for seqs in self.file_sequences.values() for seq in seqs.values())
 
         parts = []
         if total_groups:
@@ -507,34 +493,33 @@ class FileOrganizerTab(BaseTab):
     def populate_tree(self):
         """Populate the tree widget with groups, sequences, and files."""
         expanded = self._save_expansion_state()
-        first_populate = (self.tree_widget.invisibleRootItem().childCount() == 0)
+        first_populate = self.tree_widget.invisibleRootItem().childCount() == 0
         self.tree_widget.clear()
 
         all_subdirs = set(
-            list(self.file_groups.keys()) +
-            list(self.unsorted_files.keys()) +
-            list(self.file_sequences.keys())
+            list(self.file_groups.keys()) + list(self.unsorted_files.keys()) + list(self.file_sequences.keys())
         )
 
         for subdir_path in sorted(all_subdirs):
             subdir_name = Path(subdir_path).name
             subdir_item = QTreeWidgetItem([subdir_name, "", ""])
             subdir_item.setFont(0, QFont("", -1, QFont.Bold))
-            subdir_item.setData(0, Qt.UserRole, ('subdir', subdir_path))
+            subdir_item.setData(0, Qt.UserRole, ("subdir", subdir_path))
 
             # Add groups
             groups = self.file_groups.get(subdir_path, {})
             for group_name, files in sorted(groups.items()):
                 group_item = QTreeWidgetItem([group_name, f"{len(files)} files", "Grouped"])
                 group_item.setForeground(2, QBrush(QColor(0, 150, 0)))
-                group_item.setData(0, Qt.UserRole, ('group', subdir_path, group_name))
+                group_item.setData(0, Qt.UserRole, ("group", subdir_path, group_name))
 
                 for file_path in sorted(files, key=lambda f: f.name):
                     from core.file_utils import format_file_size
+
                     size = file_path.stat().st_size
                     size_str = format_file_size(size)
                     file_item = QTreeWidgetItem([file_path.name, size_str, ""])
-                    file_item.setData(0, Qt.UserRole, ('file', subdir_path, group_name, file_path))
+                    file_item.setData(0, Qt.UserRole, ("file", subdir_path, group_name, file_path))
                     group_item.addChild(file_item)
 
                 subdir_item.addChild(group_item)
@@ -542,29 +527,32 @@ class FileOrganizerTab(BaseTab):
             # Add image sequences
             sequences = self.file_sequences.get(subdir_path, {})
             for seq_key, seq in sorted(sequences.items()):
-                seq_item = QTreeWidgetItem([
-                    seq.label,
-                    f"{len(seq.files)} frames",
-                    "Sequence",
-                ])
-                seq_item.setForeground(0, QBrush(QColor(30, 144, 255)))   # dodger blue
+                seq_item = QTreeWidgetItem(
+                    [
+                        seq.label,
+                        f"{len(seq.files)} frames",
+                        "Sequence",
+                    ]
+                )
+                seq_item.setForeground(0, QBrush(QColor(30, 144, 255)))  # dodger blue
                 seq_item.setForeground(2, QBrush(QColor(30, 144, 255)))
-                seq_item.setData(0, Qt.UserRole, ('sequence', subdir_path, seq_key))
+                seq_item.setData(0, Qt.UserRole, ("sequence", subdir_path, seq_key))
                 if seq.missing:
                     seq_item.setToolTip(
                         0,
                         f"Missing frames: {', '.join(str(f) for f in seq.missing[:20])}"
-                        + (' …' if len(seq.missing) > 20 else '')
+                        + (" …" if len(seq.missing) > 20 else ""),
                     )
                 for fname in seq.files:
                     fpath = Path(subdir_path) / fname
                     try:
                         from core.file_utils import format_file_size
+
                         size_str = format_file_size(fpath.stat().st_size)
                     except Exception:
-                        size_str = ''
+                        size_str = ""
                     frame_item = QTreeWidgetItem([fname, size_str, ""])
-                    frame_item.setData(0, Qt.UserRole, ('file', subdir_path, seq_key, fpath))
+                    frame_item.setData(0, Qt.UserRole, ("file", subdir_path, seq_key, fpath))
                     seq_item.addChild(frame_item)
                 subdir_item.addChild(seq_item)
 
@@ -575,14 +563,15 @@ class FileOrganizerTab(BaseTab):
                 unsorted_item.setForeground(0, QBrush(QColor(200, 100, 0)))
                 unsorted_item.setForeground(2, QBrush(QColor(200, 100, 0)))
                 unsorted_item.setFont(0, QFont("", -1, QFont.Bold))
-                unsorted_item.setData(0, Qt.UserRole, ('unsorted', subdir_path))
+                unsorted_item.setData(0, Qt.UserRole, ("unsorted", subdir_path))
 
                 for file_path in sorted(unsorted, key=lambda f: f.name):
                     from core.file_utils import format_file_size
+
                     size = file_path.stat().st_size
                     size_str = format_file_size(size)
                     file_item = QTreeWidgetItem([file_path.name, size_str, ""])
-                    file_item.setData(0, Qt.UserRole, ('file', subdir_path, None, file_path))
+                    file_item.setData(0, Qt.UserRole, ("file", subdir_path, None, file_path))
                     unsorted_item.addChild(file_item)
 
                 subdir_item.addChild(unsorted_item)
@@ -603,13 +592,12 @@ class FileOrganizerTab(BaseTab):
 
         menu = QMenu()
 
-        if data[0] == 'group':
+        if data[0] == "group":
             _, subdir_path, group_name = data
 
             rename_action = menu.addAction("Rename Group")
             rename_action.triggered.connect(
-                lambda checked=False, sp=subdir_path, gn=group_name:
-                    self.rename_group(sp, gn)
+                lambda checked=False, sp=subdir_path, gn=group_name: self.rename_group(sp, gn)
             )
 
             groups = [g for g in self.file_groups.get(subdir_path, {}).keys() if g != group_name]
@@ -618,44 +606,42 @@ class FileOrganizerTab(BaseTab):
                 for other_group in sorted(groups):
                     action = merge_menu.addAction(other_group)
                     action.triggered.connect(
-                        lambda checked=False, sp=subdir_path, gn=group_name, og=other_group:
-                            self.merge_groups(sp, gn, og)
+                        lambda checked=False, sp=subdir_path, gn=group_name, og=other_group: self.merge_groups(
+                            sp, gn, og
+                        )
                     )
 
             delete_action = menu.addAction("Delete Group (move files to Unsorted)")
             delete_action.triggered.connect(
-                lambda checked=False, sp=subdir_path, gn=group_name:
-                    self.delete_group(sp, gn)
+                lambda checked=False, sp=subdir_path, gn=group_name: self.delete_group(sp, gn)
             )
 
-        elif data[0] == 'file':
+        elif data[0] == "file":
             _, file_subdir, file_group, file_path = data
 
             # Only show move options for files in regular groups or in unsorted.
             # Sequence frame items report a seq_key as file_group — skip those
             # since sequences are managed as a unit.
-            in_group = (file_group is not None and
-                        file_group in self.file_groups.get(file_subdir, {}))
-            in_unsorted = (file_group is None)
+            in_group = file_group is not None and file_group in self.file_groups.get(file_subdir, {})
+            in_unsorted = file_group is None
 
             if in_group:
                 to_unsorted = menu.addAction("Move to Unsorted")
                 to_unsorted.triggered.connect(
-                    lambda checked=False, fp=file_path, sd=file_subdir, fg=file_group:
-                        self._move_file_and_record(fp, sd, fg, None)
+                    lambda checked=False, fp=file_path, sd=file_subdir, fg=file_group: self._move_file_and_record(
+                        fp, sd, fg, None
+                    )
                 )
 
-                other_groups = sorted(
-                    g for g in self.file_groups.get(file_subdir, {}).keys()
-                    if g != file_group
-                )
+                other_groups = sorted(g for g in self.file_groups.get(file_subdir, {}).keys() if g != file_group)
                 if other_groups:
                     move_menu = menu.addMenu("Move to Group")
                     for grp in other_groups:
                         action = move_menu.addAction(grp)
                         action.triggered.connect(
-                            lambda checked=False, fp=file_path, sd=file_subdir, fg=file_group, tg=grp:
+                            lambda checked=False, fp=file_path, sd=file_subdir, fg=file_group, tg=grp: (
                                 self._move_file_and_record(fp, sd, fg, tg)
+                            )
                         )
 
             elif in_unsorted:
@@ -666,8 +652,9 @@ class FileOrganizerTab(BaseTab):
                     for grp in groups:
                         action = move_menu.addAction(grp)
                         action.triggered.connect(
-                            lambda checked=False, fp=file_path, sd=file_subdir, tg=grp:
-                                self._move_file_and_record(fp, sd, None, tg)
+                            lambda checked=False, fp=file_path, sd=file_subdir, tg=grp: self._move_file_and_record(
+                                fp, sd, None, tg
+                            )
                         )
 
         # Don't show an empty menu
@@ -678,9 +665,7 @@ class FileOrganizerTab(BaseTab):
 
     def rename_group(self, subdir_path: str, old_name: str):
         """Rename a group."""
-        new_name, ok = QInputDialog.getText(
-            self, "Rename Group", "Enter new group name:", text=old_name
-        )
+        new_name, ok = QInputDialog.getText(self, "Rename Group", "Enter new group name:", text=old_name)
 
         if ok and new_name and new_name != old_name:
             if subdir_path in self.file_groups and old_name in self.file_groups[subdir_path]:
@@ -701,10 +686,7 @@ class FileOrganizerTab(BaseTab):
 
     def delete_group(self, subdir_path: str, group_name: str):
         """Delete a group and move files to unsorted."""
-        if self.confirm_action(
-            "Confirm Delete",
-            f"Delete group '{group_name}' and move files to unsorted?"
-        ):
+        if self.confirm_action("Confirm Delete", f"Delete group '{group_name}' and move files to unsorted?"):
             if subdir_path in self.file_groups and group_name in self.file_groups[subdir_path]:
                 files = self.file_groups[subdir_path][group_name]
 
@@ -718,9 +700,15 @@ class FileOrganizerTab(BaseTab):
 
     # ── move helpers + undo ───────────────────────────────────────────────
 
-    def _move_file(self, file_path: Path, subdir: str,
-                   source_group: Optional[str], target_group: Optional[str],
-                   _refresh: bool = True, _keep_empty_source: bool = False):
+    def _move_file(
+        self,
+        file_path: Path,
+        subdir: str,
+        source_group: Optional[str],
+        target_group: Optional[str],
+        _refresh: bool = True,
+        _keep_empty_source: bool = False,
+    ):
         """Move a single file between groups / unsorted. Does NOT push to undo stack.
 
         _keep_empty_source: when True, an empty source group is NOT deleted after the
@@ -748,8 +736,9 @@ class FileOrganizerTab(BaseTab):
         if _refresh:
             self.populate_tree()
 
-    def _move_file_and_record(self, file_path: Path, subdir: str,
-                               source_group: Optional[str], target_group: Optional[str]):
+    def _move_file_and_record(
+        self, file_path: Path, subdir: str, source_group: Optional[str], target_group: Optional[str]
+    ):
         """Move a single file and push a one-item batch to the undo stack."""
         self._move_file(file_path, subdir, source_group, target_group)
         self._push_undo_batch([(file_path, subdir, source_group, target_group)])
@@ -769,8 +758,7 @@ class FileOrganizerTab(BaseTab):
         batch = self._move_undo_stack.pop()
         # Reverse all moves in the batch (in reverse order for correctness)
         for file_path, subdir, from_group, to_group in reversed(batch):
-            self._move_file(file_path, subdir, to_group, from_group,
-                            _refresh=False, _keep_empty_source=True)
+            self._move_file(file_path, subdir, to_group, from_group, _refresh=False, _keep_empty_source=True)
         self.populate_tree()
         n = len(batch)
         self.emit_status(f"Undone: moved {n} file{'s' if n > 1 else ''} back")
@@ -789,7 +777,7 @@ class FileOrganizerTab(BaseTab):
             item = item.parent()
 
         data = item.data(0, Qt.UserRole)
-        if not data or data[0] != 'subdir':
+        if not data or data[0] != "subdir":
             return
 
         subdir_path = data[1]
@@ -816,9 +804,9 @@ class FileOrganizerTab(BaseTab):
         if not target_data:
             return
 
-        if target_data[0] == 'group':
+        if target_data[0] == "group":
             _, target_subdir, target_group = target_data
-        elif target_data[0] == 'unsorted':
+        elif target_data[0] == "unsorted":
             _, target_subdir = target_data
             target_group = None
         else:
@@ -854,15 +842,13 @@ class FileOrganizerTab(BaseTab):
                 continue
 
             if source_subdir != target_subdir:
-                self.show_warning("Invalid Move",
-                                  "Cannot move files between different subdirectories.")
+                self.show_warning("Invalid Move", "Cannot move files between different subdirectories.")
                 continue
 
             if current_group == target_group:
                 continue
 
-            self._move_file(file_path, source_subdir, current_group, target_group,
-                            _refresh=False)
+            self._move_file(file_path, source_subdir, current_group, target_group, _refresh=False)
             records.append((file_path, source_subdir, current_group, target_group))
 
         if records:
@@ -884,31 +870,23 @@ class FileOrganizerTab(BaseTab):
                 folder_name = seq.base  # organize into a folder named by base
                 if folder_name in merged_groups[subdir_path]:
                     folder_name = seq_key  # fallback to full key to avoid collision
-                merged_groups[subdir_path][folder_name] = [
-                    Path(subdir_path) / fname for fname in seq.files
-                ]
+                merged_groups[subdir_path][folder_name] = [Path(subdir_path) / fname for fname in seq.files]
 
         # Count files to organize
-        total_to_organize = sum(
-            len(files)
-            for groups in merged_groups.values()
-            for files in groups.values()
-        )
+        total_to_organize = sum(len(files) for groups in merged_groups.values() for files in groups.values())
 
         if total_to_organize == 0:
             self.show_info(
-                "No Files to Organize",
-                "There are no grouped files to organize. Please group some files first."
+                "No Files to Organize", "There are no grouped files to organize. Please group some files first."
             )
             return
 
         # ── Pre-flight conflict check ─────────────────────────────────────
         root_path = Path(self.current_directory)
         from ui.dialogs.preflight_dialog import PreflightDialog, check_conflicts
+
         conflicts = check_conflicts(
-            {grp: files
-             for groups in merged_groups.values()
-             for grp, files in groups.items()},
+            {grp: files for groups in merged_groups.values() for grp, files in groups.items()},
             root_path,
         )
         if conflicts:
@@ -921,7 +899,7 @@ class FileOrganizerTab(BaseTab):
             "Confirm Organization",
             f"This will move {total_to_organize} files into organized folders.\n"
             f"Unsorted files will remain in their current location.\n\n"
-            f"Are you sure you want to proceed?"
+            f"Are you sure you want to proceed?",
         ):
             return
 
@@ -981,12 +959,12 @@ class FileOrganizerTab(BaseTab):
 
     def load_settings(self):
         """Load tab-specific settings."""
-        last_dir = self.config.get_tab_directory('organizer')
+        last_dir = self.config.get_tab_directory("organizer")
         if last_dir:
             self.path_card.set_path(last_dir)
             self.set_directory(last_dir)
 
-        saved_preset = self.config.get_tab_setting('organizer', 'grouping_preset', PRESET_STANDARD.name)
+        saved_preset = self.config.get_tab_setting("organizer", "grouping_preset", PRESET_STANDARD.name)
         for i in range(self.preset_combo.count()):
             if self.preset_combo.itemText(i) == saved_preset:
                 self.preset_combo.setCurrentIndex(i)
@@ -994,6 +972,4 @@ class FileOrganizerTab(BaseTab):
 
     def save_settings(self):
         """Save tab-specific settings."""
-        self.config.set_tab_setting(
-            'organizer', 'grouping_preset', self.preset_combo.currentText()
-        )
+        self.config.set_tab_setting("organizer", "grouping_preset", self.preset_combo.currentText())

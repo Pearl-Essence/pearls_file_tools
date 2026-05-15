@@ -15,7 +15,7 @@ from typing import Optional
 from constants import VIDEO_EXTENSIONS
 
 try:
-    _HAS_FFMPEG = shutil.which('ffmpeg') is not None
+    _HAS_FFMPEG = shutil.which("ffmpeg") is not None
 except Exception:
     _HAS_FFMPEG = False
 
@@ -24,6 +24,7 @@ except Exception:
 # Thumbnail extraction
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _extract_thumbnail_b64(filepath: Path, tmp_dir: Path) -> Optional[str]:
     """Return a base-64-encoded JPEG of the first frame, or None on failure."""
     if not _HAS_FFMPEG:
@@ -31,13 +32,14 @@ def _extract_thumbnail_b64(filepath: Path, tmp_dir: Path) -> Optional[str]:
     out = tmp_dir / f"{filepath.stem}_thumb.jpg"
     try:
         subprocess.run(
-            ['ffmpeg', '-y', '-ss', '0', '-i', str(filepath),
-             '-frames:v', '1', '-q:v', '5', str(out)],
-            capture_output=True, timeout=15,
+            ["ffmpeg", "-y", "-ss", "0", "-i", str(filepath), "-frames:v", "1", "-q:v", "5", str(out)],
+            capture_output=True,
+            timeout=15,
         )
         if out.exists() and out.stat().st_size > 0:
             import base64
-            return base64.b64encode(out.read_bytes()).decode('ascii')
+
+            return base64.b64encode(out.read_bytes()).decode("ascii")
     except Exception:
         pass
     return None
@@ -46,6 +48,7 @@ def _extract_thumbnail_b64(filepath: Path, tmp_dir: Path) -> Optional[str]:
 # ─────────────────────────────────────────────────────────────────────────────
 # File flagging
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _flag_file(filepath: Path, min_size_bytes: int) -> Optional[str]:
     """Return a short flag string if the file has an issue, else None."""
@@ -137,14 +140,15 @@ _ROW_TEMPLATE = Template("""\
 # Public API
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _fmt_size(n: int) -> str:
     if n < 1024:
         return f"{n} B"
-    if n < 1024 ** 2:
+    if n < 1024**2:
         return f"{n / 1024:.1f} KB"
-    if n < 1024 ** 3:
-        return f"{n / 1024 ** 2:.1f} MB"
-    return f"{n / 1024 ** 3:.2f} GB"
+    if n < 1024**3:
+        return f"{n / 1024**2:.1f} MB"
+    return f"{n / 1024**3:.2f} GB"
 
 
 def generate_qc_report(
@@ -156,10 +160,10 @@ def generate_qc_report(
     """Generate QC_Report_[YYYYMMDD_HHMMSS].html in *source_dir* and return its path."""
     from core.media_info import get_media_info
 
-    ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     out_path = source_dir / f"QC_Report_{ts}.html"
 
-    all_files = sorted(fp for fp in source_dir.rglob('*') if fp.is_file())
+    all_files = sorted(fp for fp in source_dir.rglob("*") if fp.is_file())
     total_size = 0
     flagged_count = 0
     rows_html = []
@@ -176,8 +180,8 @@ def generate_qc_report(
             total_size += size
 
             # Media info
-            media_str = ''
-            duration_str = ''
+            media_str = ""
+            duration_str = ""
             try:
                 info = get_media_info(fp)
                 if info:
@@ -188,7 +192,7 @@ def generate_qc_report(
                         parts.append(info.resolution_str)
                     if info.fps_str:
                         parts.append(f"{info.fps_str} fps")
-                    media_str = ', '.join(parts)
+                    media_str = ", ".join(parts)
                     if info.duration_str:
                         duration_str = info.duration_str
             except Exception:
@@ -205,31 +209,33 @@ def generate_qc_report(
             flag = _flag_file(fp, min_flag_size_bytes)
             if flag:
                 flagged_count += 1
-                flag_class = 'flag-bad'
+                flag_class = "flag-bad"
                 flag_str = flag
             else:
-                flag_class = 'flag-ok'
-                flag_str = 'OK'
+                flag_class = "flag-ok"
+                flag_str = "OK"
 
             # Relative folder
             try:
                 rel = str(fp.parent.relative_to(source_dir))
-                rel_folder = '' if rel == '.' else rel
+                rel_folder = "" if rel == "." else rel
             except ValueError:
-                rel_folder = ''
+                rel_folder = ""
 
-            rows_html.append(_ROW_TEMPLATE.substitute(
-                thumb_cell=thumb_cell,
-                filename=fp.name,
-                rel_folder=rel_folder,
-                size_str=_fmt_size(size),
-                media_str=media_str or '—',
-                duration_str=duration_str or '—',
-                flag_class=flag_class,
-                flag_str=flag_str,
-            ))
+            rows_html.append(
+                _ROW_TEMPLATE.substitute(
+                    thumb_cell=thumb_cell,
+                    filename=fp.name,
+                    rel_folder=rel_folder,
+                    size_str=_fmt_size(size),
+                    media_str=media_str or "—",
+                    duration_str=duration_str or "—",
+                    flag_class=flag_class,
+                    flag_str=flag_str,
+                )
+            )
 
-    flag_color = 'flag-bad' if flagged_count > 0 else 'flag-ok'
+    flag_color = "flag-bad" if flagged_count > 0 else "flag-ok"
     html = _PAGE_TEMPLATE.substitute(
         project_name=project_name,
         total_files=len(all_files),
@@ -237,9 +243,9 @@ def generate_qc_report(
         flagged_count=flagged_count,
         flag_color=flag_color,
         report_date=datetime.date.today().isoformat(),
-        generated_at=datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-        rows=''.join(rows_html),
+        generated_at=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        rows="".join(rows_html),
     )
 
-    out_path.write_text(html, encoding='utf-8')
+    out_path.write_text(html, encoding="utf-8")
     return out_path

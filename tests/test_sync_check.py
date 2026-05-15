@@ -13,6 +13,7 @@ from core.sync_check import (
 
 # ── _md5 ────────────────────────────────────────────────────────────────────
 
+
 class TestMd5:
     def test_consistent_hash(self, tmp_path):
         f = tmp_path / "test.txt"
@@ -41,6 +42,7 @@ class TestMd5:
 
 
 # ── _index_dir ──────────────────────────────────────────────────────────────
+
 
 class TestIndexDir:
     def test_indexes_files(self, tmp_path):
@@ -76,6 +78,7 @@ class TestIndexDir:
 
 # ── SyncReport ──────────────────────────────────────────────────────────────
 
+
 class TestSyncReport:
     def test_by_status(self):
         entries = [
@@ -90,6 +93,7 @@ class TestSyncReport:
 
 
 # ── compare_directories ────────────────────────────────────────────────────
+
 
 class TestCompareDirectories:
     def test_identical_dirs(self, tmp_path):

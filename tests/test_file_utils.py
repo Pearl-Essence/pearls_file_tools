@@ -18,6 +18,7 @@ from core.file_utils import (
 
 # ── is_hidden_file ──────────────────────────────────────────────────────────
 
+
 class TestIsHiddenFile:
     def test_dot_prefix(self):
         assert is_hidden_file(".DS_Store") is True
@@ -45,6 +46,7 @@ class TestIsHiddenFile:
 
 
 # ── split_compound_suffix ───────────────────────────────────────────────────
+
 
 class TestSplitCompoundSuffix:
     def test_simple_extension(self):
@@ -95,6 +97,7 @@ class TestSplitCompoundSuffix:
 
 # ── same_inode ──────────────────────────────────────────────────────────────
 
+
 class TestSameInode:
     def test_same_file(self, tmp_path):
         f = tmp_path / "test.txt"
@@ -120,6 +123,7 @@ class TestSameInode:
 
 # ── has_keyword ─────────────────────────────────────────────────────────────
 
+
 class TestHasKeyword:
     def test_match_case_insensitive(self):
         assert has_keyword("HERO_clip.mov", ["hero"]) is True
@@ -141,6 +145,7 @@ class TestHasKeyword:
 
 
 # ── get_extension_category ──────────────────────────────────────────────────
+
 
 class TestGetExtensionCategory:
     def test_image(self):
@@ -175,6 +180,7 @@ class TestGetExtensionCategory:
 
 
 # ── resolve_name_conflict ───────────────────────────────────────────────────
+
 
 class TestResolveNameConflict:
     def test_no_conflict(self, tmp_path):
@@ -218,6 +224,7 @@ class TestResolveNameConflict:
 
 # ── format_file_size ────────────────────────────────────────────────────────
 
+
 class TestFormatFileSize:
     def test_bytes(self):
         assert format_file_size(500) == "500.0 B"
@@ -229,13 +236,13 @@ class TestFormatFileSize:
         assert format_file_size(1024 * 1024) == "1.0 MB"
 
     def test_gigabytes(self):
-        assert format_file_size(1024 ** 3) == "1.0 GB"
+        assert format_file_size(1024**3) == "1.0 GB"
 
     def test_terabytes(self):
-        assert format_file_size(1024 ** 4) == "1.0 TB"
+        assert format_file_size(1024**4) == "1.0 TB"
 
     def test_petabytes(self):
-        assert format_file_size(1024 ** 5) == "1.0 PB"
+        assert format_file_size(1024**5) == "1.0 PB"
 
     def test_zero(self):
         assert format_file_size(0) == "0.0 B"
@@ -246,6 +253,7 @@ class TestFormatFileSize:
 
 
 # ── calculate_directory_hash ────────────────────────────────────────────────
+
 
 class TestCalculateDirectoryHash:
     def test_returns_hash_string(self, tmp_path):
@@ -276,6 +284,7 @@ class TestCalculateDirectoryHash:
 
 
 # ── safe_rename ─────────────────────────────────────────────────────────────
+
 
 class TestSafeRename:
     def test_basic_rename(self, tmp_path):
@@ -308,6 +317,7 @@ class TestSafeRename:
 
 # ── safe_move ───────────────────────────────────────────────────────────────
 
+
 class TestSafeMove:
     def test_basic_move(self, tmp_path):
         src = tmp_path / "src.txt"
@@ -336,6 +346,7 @@ class TestSafeMove:
 
 
 # ── get_files_in_directory ──────────────────────────────────────────────────
+
 
 class TestGetFilesInDirectory:
     def test_all_files(self, tmp_tree):

@@ -49,9 +49,9 @@ class PackageExportTab(BaseTab):
         self._export_pane = _ExportPane(self.config)
 
         self._inner_tabs.addTab(self._package_pane, "Package")
-        self._inner_tabs.addTab(self._dupes_pane,   "Duplicates")
+        self._inner_tabs.addTab(self._dupes_pane, "Duplicates")
         self._inner_tabs.addTab(self._handoff_pane, "Handoff")
-        self._inner_tabs.addTab(self._export_pane,  "Export")
+        self._inner_tabs.addTab(self._export_pane, "Export")
 
         root.addWidget(self._inner_tabs, stretch=1)
 
@@ -81,7 +81,7 @@ class PackageExportTab(BaseTab):
     # Persistence
     # ─────────────────────────────────────────────────────────────────────
     def load_settings(self):
-        directory = self.config.get_tab_directory('delivery')
+        directory = self.config.get_tab_directory("delivery")
         if directory and Path(directory).is_dir():
             self._dupes_pane.dir_selector.set_directory(directory)
             self._handoff_pane.dir_selector.set_directory(directory)

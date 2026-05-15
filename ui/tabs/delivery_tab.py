@@ -50,10 +50,10 @@ from workers.base_worker import BaseWorker
 # ─────────────────────────────────────────────────────────────────────────────
 # Colours
 # ─────────────────────────────────────────────────────────────────────────────
-_RED = QColor('#ff5370')
-_YELLOW = QColor('#ffcb6b')
-_GREEN = QColor('#c3e88d')
-_GREY = QColor('#888888')
+_RED = QColor("#ff5370")
+_YELLOW = QColor("#ffcb6b")
+_GREEN = QColor("#c3e88d")
+_GREY = QColor("#888888")
 
 
 def _colored_item(text: str, color: QColor) -> QListWidgetItem:
@@ -65,6 +65,7 @@ def _colored_item(text: str, color: QColor) -> QListWidgetItem:
 # ─────────────────────────────────────────────────────────────────────────────
 # Background workers
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class _ValidateWorker(BaseWorker):
     finished = Signal(bool, str, object)  # success, msg, ValidationReport|None
@@ -79,6 +80,7 @@ class _ValidateWorker(BaseWorker):
 
     def run(self):
         from core.delivery import DeliveryValidator
+
         try:
             self.emit_progress("Scanning directory…")
             report = DeliveryValidator().validate(self.directory, self.profile)
@@ -99,6 +101,7 @@ class _DuplicateWorker(BaseWorker):
 
     def run(self):
         from core.delivery import find_duplicates
+
         try:
             self.emit_progress("Bucketing files by size…")
             groups = find_duplicates(
@@ -128,6 +131,7 @@ class _ZipWorker(BaseWorker):
 
     def run(self):
         from core.delivery import create_delivery_zip
+
         try:
             self.emit_progress("Creating delivery zip…")
             path = create_delivery_zip(
@@ -158,6 +162,7 @@ class _ManifestWorker(BaseWorker):
 
     def run(self):
         from core.delivery import export_manifest
+
         try:
             self.emit_progress("Collecting file metadata…")
             count = export_manifest(self.source_dir, self.output_path)
@@ -181,6 +186,7 @@ class _QCWorker(BaseWorker):
 
     def run(self):
         from core.qc_report import generate_qc_report
+
         try:
             self.emit_progress("Generating QC report…")
             path = generate_qc_report(
@@ -198,14 +204,15 @@ class _QCWorker(BaseWorker):
 # Helper: open file/folder in system viewer
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 def _open_path(path: Path):
     try:
-        if sys.platform == 'darwin':
-            subprocess.Popen(['open', str(path)])
-        elif sys.platform == 'win32':
-            subprocess.Popen(['explorer', str(path)])
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", str(path)])
+        elif sys.platform == "win32":
+            subprocess.Popen(["explorer", str(path)])
         else:
-            subprocess.Popen(['xdg-open', str(path)])
+            subprocess.Popen(["xdg-open", str(path)])
     except Exception:
         pass
 
@@ -213,6 +220,7 @@ def _open_path(path: Path):
 # ─────────────────────────────────────────────────────────────────────────────
 # Layout helper
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _options_scroll(inner: QWidget) -> QScrollArea:
     """Wrap *inner* in a scroll area that sizes to content and scrolls when compressed."""
@@ -231,8 +239,9 @@ def _options_scroll(inner: QWidget) -> QScrollArea:
 # Validator pane
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class _ValidatorPane(QWidget):
-    validation_passed = Signal(bool)   # emitted after each run
+    validation_passed = Signal(bool)  # emitted after each run
 
     def __init__(self, config, parent=None):
         super().__init__(parent)
@@ -292,6 +301,7 @@ class _ValidatorPane(QWidget):
 
     def _build_profile(self):
         from core.delivery import DeliveryProfile
+
         p = DeliveryProfile()
         p.require_version_suffix = self.chk_version.isChecked()
         p.check_hidden_files = self.chk_hidden.isChecked()
@@ -334,9 +344,9 @@ class _ValidatorPane(QWidget):
             for issue in report.issues:
                 color = _RED if issue.severity == "error" else _YELLOW
                 label = "[ERROR]" if issue.severity == "error" else "[WARN]"
-                self.result_list.addItem(_colored_item(
-                    f"{label}  {issue.filepath.name}  —  {issue.description}", color
-                ))
+                self.result_list.addItem(
+                    _colored_item(f"{label}  {issue.filepath.name}  —  {issue.description}", color)
+                )
 
         passed = report.passed
         errs = report.error_count()
@@ -355,6 +365,7 @@ class _ValidatorPane(QWidget):
 # ─────────────────────────────────────────────────────────────────────────────
 # Package pane
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class _PackagePane(QWidget):
     def __init__(self, config, parent=None):
@@ -414,9 +425,10 @@ class _PackagePane(QWidget):
     def _update_preview(self):
         name = self.project_edit.text().strip()
         if name:
-            date_str = datetime.date.today().strftime('%Y%m%d')
+            date_str = datetime.date.today().strftime("%Y%m%d")
             import re
-            safe = re.sub(r'[^\w\-]', '_', name)
+
+            safe = re.sub(r"[^\w\-]", "_", name)
             self.preview_label.setText(f"Output file: {safe}_DELIVERY_{date_str}.zip")
         else:
             self.preview_label.setText("")
@@ -445,12 +457,15 @@ class _PackagePane(QWidget):
 
         # Preview what will be included
         from core.delivery import list_delivery_files
+
         files = list_delivery_files(src)
         total_mb = sum(f.stat().st_size for f in files if f.exists()) / (1024 * 1024)
         reply = QMessageBox.question(
-            self, "Confirm Delivery Zip",
+            self,
+            "Confirm Delivery Zip",
             f"This will include {len(files)} file(s) ({total_mb:.1f} MB).\n\nProceed?",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes,
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
         )
         if reply != QMessageBox.Yes:
             return
@@ -467,9 +482,11 @@ class _PackagePane(QWidget):
         if success and zip_path:
             self.log.append(f"✓ {message}")
             reply = QMessageBox.information(
-                self, "Zip Created",
+                self,
+                "Zip Created",
                 f"{message}\n\nOpen containing folder?",
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
             )
             if reply == QMessageBox.Yes:
                 _open_path(zip_path.parent)
@@ -481,6 +498,7 @@ class _PackagePane(QWidget):
 # ─────────────────────────────────────────────────────────────────────────────
 # Duplicates pane
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class _DuplicatesPane(QWidget):
     def __init__(self, config, parent=None):
@@ -560,6 +578,7 @@ class _DuplicatesPane(QWidget):
         from collections import defaultdict
 
         from core.pattern_matching import detect_image_sequences
+
         sequence_groups: List = []
         regular_groups: List = []
         for grp in groups:
@@ -580,26 +599,23 @@ class _DuplicatesPane(QWidget):
         def _fmt(n):
             if n < 1024:
                 return f"{n} B"
-            if n < 1024 ** 2:
+            if n < 1024**2:
                 return f"{n / 1024:.1f} KB"
-            return f"{n / 1024 ** 2:.1f} MB"
+            return f"{n / 1024**2:.1f} MB"
 
         # Render sequence-collapsed rows first so they're visually distinct
         for grp, parent_dir, seq in sequence_groups:
             sz = grp.size_bytes()
             waste = grp.wasted_bytes()
             wasted += waste
-            label = (
-                f"Image sequence ({len(grp.files)} identical frames)  —  "
-                f"{seq.label}"
-            )
+            label = f"Image sequence ({len(grp.files)} identical frames)  —  {seq.label}"
             parent_item = QTreeWidgetItem([label, _fmt(sz), grp.hash[:8]])
             parent_item.setForeground(0, QBrush(_GREY))
             parent_item.setToolTip(
                 0,
                 "All files in this duplicate group form a contiguous image "
                 "sequence with identical content — typically a hold frame "
-                "render or a stalled NLE export. Collapsed for readability."
+                "render or a stalled NLE export. Collapsed for readability.",
             )
             child = QTreeWidgetItem([str(parent_dir), "", ""])
             parent_item.addChild(child)
@@ -611,11 +627,13 @@ class _DuplicatesPane(QWidget):
             waste = grp.wasted_bytes()
             wasted += waste
 
-            parent_item = QTreeWidgetItem([
-                f"Duplicate group ({len(grp.files)} copies)",
-                _fmt(sz),
-                grp.hash[:8],
-            ])
+            parent_item = QTreeWidgetItem(
+                [
+                    f"Duplicate group ({len(grp.files)} copies)",
+                    _fmt(sz),
+                    grp.hash[:8],
+                ]
+            )
             parent_item.setForeground(0, QBrush(_YELLOW))
             for fp in grp.files:
                 child = QTreeWidgetItem([str(fp), _fmt(fp.stat().st_size if fp.exists() else 0), ""])
@@ -629,19 +647,20 @@ class _DuplicatesPane(QWidget):
             self.tree.addTopLevelItem(root)
             self.summary_label.setText("No duplicates found.")
         else:
+
             def _fmt(n):
-                if n < 1024 ** 2:
+                if n < 1024**2:
                     return f"{n / 1024:.1f} KB"
-                return f"{n / 1024 ** 2:.1f} MB"
-            self.summary_label.setText(
-                f"{len(groups)} duplicate group(s)  |  {_fmt(wasted)} wasted"
-            )
+                return f"{n / 1024**2:.1f} MB"
+
+            self.summary_label.setText(f"{len(groups)} duplicate group(s)  |  {_fmt(wasted)} wasted")
             self.summary_label.setStyleSheet("font-weight: bold; color: #ffcb6b; padding: 2px 0;")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Handoff pane
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class _HandoffPane(QWidget):
     def __init__(self, config, parent=None):
@@ -693,6 +712,7 @@ class _HandoffPane(QWidget):
             return
 
         from core.delivery import run_handoff_checks
+
         self.result_list.clear()
         try:
             results = run_handoff_checks(directory)
@@ -713,9 +733,7 @@ class _HandoffPane(QWidget):
 
             req_str = " [required]" if res.rule.required else " [optional]"
             detail = f"  — {res.detail}" if res.detail else ""
-            self.result_list.addItem(_colored_item(
-                f"{icon}  {res.rule.name}{req_str}{detail}", color
-            ))
+            self.result_list.addItem(_colored_item(f"{icon}  {res.rule.name}{req_str}{detail}", color))
 
         sep = QListWidgetItem("")
         self.result_list.addItem(sep)
@@ -730,7 +748,7 @@ class _HandoffPane(QWidget):
 # ─────────────────────────────────────────────────────────────────────────────
 
 _MODE_CSV = 0
-_MODE_QC  = 1
+_MODE_QC = 1
 
 
 class _ExportPane(QWidget):
@@ -760,11 +778,11 @@ class _ExportPane(QWidget):
         toggle_group = QGroupBox("Output format")
         toggle_layout = QHBoxLayout()
         self._radio_csv = QRadioButton("CSV Manifest")
-        self._radio_qc  = QRadioButton("HTML QC Report")
+        self._radio_qc = QRadioButton("HTML QC Report")
         self._radio_csv.setChecked(True)
         self._btn_group = QButtonGroup(self)
         self._btn_group.addButton(self._radio_csv, _MODE_CSV)
-        self._btn_group.addButton(self._radio_qc,  _MODE_QC)
+        self._btn_group.addButton(self._radio_qc, _MODE_QC)
         toggle_layout.addWidget(self._radio_csv)
         toggle_layout.addWidget(self._radio_qc)
         toggle_layout.addStretch()
@@ -802,6 +820,7 @@ class _ExportPane(QWidget):
         qc_layout.addRow(self.chk_thumbs)
 
         from core.qc_report import _HAS_FFMPEG
+
         if not _HAS_FFMPEG:
             no_ffmpeg = QLabel("ffmpeg not found — thumbnails will be skipped.")
             no_ffmpeg.setStyleSheet("color: #ffcb6b; font-size: 11px;")
@@ -864,9 +883,10 @@ class _ExportPane(QWidget):
             self._run_qc(src)
 
     def _run_csv(self, src: Path):
-        ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         dest_str, _ = QFileDialog.getSaveFileName(
-            self, "Save Manifest CSV",
+            self,
+            "Save Manifest CSV",
             str(src / f"manifest_{ts}.csv"),
             "CSV Files (*.csv)",
         )
@@ -886,8 +906,11 @@ class _ExportPane(QWidget):
         if success:
             self.log.append(f"✓ {message}")
             reply = QMessageBox.information(
-                self, "Manifest Exported", message + "\n\nOpen file?",
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+                self,
+                "Manifest Exported",
+                message + "\n\nOpen file?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
             )
             if reply == QMessageBox.Yes and output_path:
                 _open_path(output_path)
@@ -900,7 +923,8 @@ class _ExportPane(QWidget):
         self.export_btn.setEnabled(False)
         self.status_label.setText("Working…")
         self._worker = _QCWorker(
-            src, name,
+            src,
+            name,
             self.spn_min_mb.value() * 1024 * 1024,
             self.chk_thumbs.isChecked(),
         )
@@ -914,8 +938,11 @@ class _ExportPane(QWidget):
         if success:
             self.log.append(f"✓ {message}")
             reply = QMessageBox.information(
-                self, "QC Report Ready", message + "\n\nOpen in browser?",
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+                self,
+                "QC Report Ready",
+                message + "\n\nOpen in browser?",
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
             )
             if reply == QMessageBox.Yes and report_path:
                 _open_path(report_path)
@@ -927,6 +954,7 @@ class _ExportPane(QWidget):
 # ─────────────────────────────────────────────────────────────────────────────
 # Main DeliveryTab
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class DeliveryTab(BaseTab):
     """Delivery & handoff tab."""
@@ -966,7 +994,7 @@ class DeliveryTab(BaseTab):
             self.emit_status("Validation found issues — fix before packaging")
 
     def load_settings(self):
-        directory = self.config.get_tab_directory('delivery')
+        directory = self.config.get_tab_directory("delivery")
         if directory and Path(directory).is_dir():
             self._validator_pane.dir_selector.set_directory(directory)
             self._dupes_pane.dir_selector.set_directory(directory)
@@ -976,4 +1004,4 @@ class DeliveryTab(BaseTab):
     def save_settings(self):
         directory = self._validator_pane.dir_selector.get_directory()
         if directory:
-            self.config.set_tab_directory('delivery', directory)
+            self.config.set_tab_directory("delivery", directory)

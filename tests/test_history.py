@@ -27,7 +27,7 @@ def sample_record(tmp_path):
         files_affected=[
             (Path("/dest/new1.mov"), Path("/src/old1.mov")),
             (Path("/dest/new2.mov"), Path("/src/old2.mov")),
-        ]
+        ],
     )
 
 

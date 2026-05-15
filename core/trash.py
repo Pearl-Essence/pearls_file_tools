@@ -13,15 +13,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
-TRASH_DIR_NAME = '.pearls_trash'
-_META_FILENAME = '.meta.json'
+TRASH_DIR_NAME = ".pearls_trash"
+_META_FILENAME = ".meta.json"
 
 
 @dataclass
 class TrashItem:
-    trash_name: str      # filename inside .pearls_trash/
-    original_path: str   # absolute path before deletion
-    deleted_at: str      # ISO 8601 timestamp
+    trash_name: str  # filename inside .pearls_trash/
+    original_path: str  # absolute path before deletion
+    deleted_at: str  # ISO 8601 timestamp
     size_bytes: int
 
 
@@ -40,7 +40,7 @@ class StudioTrash:
         if not self._meta_file.exists():
             return []
         try:
-            return json.loads(self._meta_file.read_text(encoding='utf-8'))
+            return json.loads(self._meta_file.read_text(encoding="utf-8"))
         except Exception:
             return []
 
@@ -48,7 +48,7 @@ class StudioTrash:
         try:
             self._meta_file.write_text(
                 json.dumps(records, indent=2, ensure_ascii=False),
-                encoding='utf-8',
+                encoding="utf-8",
             )
         except Exception:
             pass
@@ -62,12 +62,14 @@ class StudioTrash:
             trash_name = f"{uuid.uuid4().hex}_{filepath.name}"
             shutil.move(str(filepath), str(self.trash_dir / trash_name))
             records = self._load()
-            records.append({
-                'trash_name': trash_name,
-                'original_path': str(filepath),
-                'deleted_at': datetime.datetime.now().isoformat(),
-                'size_bytes': size,
-            })
+            records.append(
+                {
+                    "trash_name": trash_name,
+                    "original_path": str(filepath),
+                    "deleted_at": datetime.datetime.now().isoformat(),
+                    "size_bytes": size,
+                }
+            )
             self._save(records)
             return True
         except Exception:
@@ -107,7 +109,7 @@ class StudioTrash:
                 dst = candidate
 
             shutil.move(str(src), str(dst))
-            self._save([r for r in self._load() if r['trash_name'] != item.trash_name])
+            self._save([r for r in self._load() if r["trash_name"] != item.trash_name])
             return dst
         except Exception:
             return None
@@ -120,7 +122,7 @@ class StudioTrash:
                 src.unlink()
             elif src.is_dir():
                 shutil.rmtree(str(src))
-            self._save([r for r in self._load() if r['trash_name'] != item.trash_name])
+            self._save([r for r in self._load() if r["trash_name"] != item.trash_name])
             return True
         except Exception:
             return False

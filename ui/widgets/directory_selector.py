@@ -55,11 +55,7 @@ class DirectorySelectorWidget(QWidget):
 
     def browse_directory(self):
         """Open directory browser dialog."""
-        directory = QFileDialog.getExistingDirectory(
-            self,
-            "Select Directory",
-            self.last_directory
-        )
+        directory = QFileDialog.getExistingDirectory(self, "Select Directory", self.last_directory)
 
         if directory:
             self.set_directory(directory)

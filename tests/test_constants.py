@@ -89,8 +89,7 @@ class TestExtensionSets:
             assert ext in ARCHIVE_EXTENSIONS
 
     def test_no_extension_overlap_between_categories(self):
-        cats = [IMAGE_EXTENSIONS, DOCUMENT_EXTENSIONS, VIDEO_EXTENSIONS,
-                AUDIO_EXTENSIONS, ARCHIVE_EXTENSIONS]
+        cats = [IMAGE_EXTENSIONS, DOCUMENT_EXTENSIONS, VIDEO_EXTENSIONS, AUDIO_EXTENSIONS, ARCHIVE_EXTENSIONS]
         for i, a in enumerate(cats):
             for j, b in enumerate(cats):
                 if i < j:
