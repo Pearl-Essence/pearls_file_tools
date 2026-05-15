@@ -6,12 +6,11 @@ on:
   pull_request:
     branches: [main]
 
-permissions:
-  contents: read
-
 jobs:
   sonarcloud:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v6
         with:
@@ -24,7 +23,7 @@ jobs:
 
       - name: Generate coverage for SonarCloud
         run: |
-          pip install pytest pytest-cov
+          pip install --only-binary :all: pytest==9.0.3 pytest-cov==7.1.0
           python -m pytest tests/ --cov=. --cov-report=xml -q || true
 
       - name: SonarCloud Scan
