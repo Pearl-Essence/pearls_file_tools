@@ -1,6 +1,5 @@
 """Comprehensive tests for models/project.py."""
 
-import pytest
 from models.project import Project
 
 
@@ -28,9 +27,7 @@ class TestProjectInit:
 
 class TestSerialization:
     def test_to_dict(self):
-        p = Project(name="Test", description="desc",
-                   default_paths={"media_folder": "/tmp"},
-                   profile_names=["ProfileA"])
+        p = Project(name="Test", description="desc", default_paths={"media_folder": "/tmp"}, profile_names=["ProfileA"])
         d = p.to_dict()
         assert d["name"] == "Test"
         assert d["description"] == "desc"

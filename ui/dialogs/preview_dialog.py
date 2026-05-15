@@ -5,6 +5,8 @@ a top summary bar, and visual treatment so users can scan large rename
 batches without losing track of which line maps to which.
 """
 
+from typing import List, Tuple
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (
@@ -17,12 +19,10 @@ from PySide6.QtWidgets import (
     QTreeWidgetItem,
     QVBoxLayout,
 )
-from typing import List, Tuple
 
-
-_CHANGE_COLOR = QColor('#c3e88d')   # green — actually different
-_UNCHANGED_COLOR = QColor('#888888')  # grey — no-op rows
-_HIDDEN_COLOR = QColor('#ffcb6b')   # amber — name starts with '.'
+_CHANGE_COLOR = QColor("#c3e88d")  # green — actually different
+_UNCHANGED_COLOR = QColor("#888888")  # grey — no-op rows
+_HIDDEN_COLOR = QColor("#ffcb6b")  # amber — name starts with '.'
 
 
 class PreviewDialog(QDialog):
@@ -51,17 +51,14 @@ class PreviewDialog(QDialog):
         # ── Top summary bar ─────────────────────────────────────────────────
         changed = sum(1 for o, n in self.preview_data if o != n)
         unchanged = len(self.preview_data) - changed
-        hidden = sum(1 for o, _ in self.preview_data if o.startswith('.'))
+        hidden = sum(1 for o, _ in self.preview_data if o.startswith("."))
         self.summary_label = QLabel(
             f"<b>{len(self.preview_data)}</b> file(s) selected  &nbsp;|&nbsp;  "
             f"<span style='color:#c3e88d'><b>{changed}</b> will change</span>  &nbsp;|&nbsp;  "
             f"<span style='color:#888'>{unchanged} unchanged</span>"
-            + (f"  &nbsp;|&nbsp;  <span style='color:#ffcb6b'>{hidden} hidden</span>"
-               if hidden else "")
+            + (f"  &nbsp;|&nbsp;  <span style='color:#ffcb6b'>{hidden} hidden</span>" if hidden else "")
         )
-        self.summary_label.setStyleSheet(
-            "padding: 6px 8px; background-color: #2b2b2b; border-radius: 4px;"
-        )
+        self.summary_label.setStyleSheet("padding: 6px 8px; background-color: #2b2b2b; border-radius: 4px;")
         layout.addWidget(self.summary_label)
 
         # ── Two-column tree (Old → New) ────────────────────────────────────
@@ -82,8 +79,7 @@ class PreviewDialog(QDialog):
         mono.setStyleHint(QFont.Monospace)
         self.tree.setFont(mono)
         self.tree.setStyleSheet(
-            "QTreeWidget::item { padding: 3px 6px; }"
-            "QTreeWidget::item:alternate { background-color: #2a2a2a; }"
+            "QTreeWidget::item { padding: 3px 6px; }" "QTreeWidget::item:alternate { background-color: #2a2a2a; }"
         )
         layout.addWidget(self.tree, stretch=1)
 
@@ -101,7 +97,7 @@ class PreviewDialog(QDialog):
     def populate_preview(self):
         for old_name, new_name in self.preview_data:
             changed = old_name != new_name
-            is_hidden = old_name.startswith('.')
+            is_hidden = old_name.startswith(".")
 
             arrow = "→" if changed else "="
             new_display = new_name if changed else "(unchanged)"
@@ -113,9 +109,7 @@ class PreviewDialog(QDialog):
             if is_hidden:
                 color = _HIDDEN_COLOR
                 item.setToolTip(
-                    0,
-                    "Hidden file (name starts with '.'). Will be skipped "
-                    "unless 'Include hidden files' is ticked."
+                    0, "Hidden file (name starts with '.'). Will be skipped " "unless 'Include hidden files' is ticked."
                 )
             elif changed:
                 color = _CHANGE_COLOR

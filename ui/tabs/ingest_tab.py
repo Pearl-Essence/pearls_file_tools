@@ -19,8 +19,17 @@ from typing import Dict, List, Optional, Tuple
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (
-    QCheckBox, QFrame, QHBoxLayout, QHeaderView, QLabel, QMessageBox,
-    QProgressBar, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout,
+    QCheckBox,
+    QFrame,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
     QWidget,
 )
 
@@ -28,27 +37,27 @@ from branding import Palette
 from ui.tabs.base_tab import BaseTab
 from ui.widgets.panel import Panel
 from ui.widgets.path_card import PathCard
-from ui.widgets.pill import Pill, KIND_OK, KIND_WARN, KIND_ERROR, KIND_MUTED
-
+from ui.widgets.pill import KIND_ERROR, KIND_MUTED, KIND_OK, KIND_WARN, Pill
 
 # ── Manifest row state vocabulary ───────────────────────────────────────────
-STATE_QUEUED   = "queued"
-STATE_RUNNING  = "running"
+STATE_QUEUED = "queued"
+STATE_RUNNING = "running"
 STATE_VERIFIED = "verified"
-STATE_FAILED   = "failed"
+STATE_FAILED = "failed"
 
 # (display_text, pill_kind)
 PILL_FOR_STATE = {
-    STATE_QUEUED:   ("QUEUED",   KIND_MUTED),
-    STATE_RUNNING:  ("HASHING",  KIND_WARN),
+    STATE_QUEUED: ("QUEUED", KIND_MUTED),
+    STATE_RUNNING: ("HASHING", KIND_WARN),
     STATE_VERIFIED: ("VERIFIED", KIND_OK),
-    STATE_FAILED:   ("MISMATCH", KIND_ERROR),
+    STATE_FAILED: ("MISMATCH", KIND_ERROR),
 }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Offload pane
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class _OffloadPane(QWidget):
     """The full Offload screen."""
@@ -78,6 +87,7 @@ class _OffloadPane(QWidget):
 
     def _build_header(self) -> QWidget:
         from ui.widgets.tab_header import TabHeader
+
         header = TabHeader(
             eyebrow="01 · INGEST · OFFLOAD",
             title="Offload",
@@ -89,11 +99,15 @@ class _OffloadPane(QWidget):
             tooltip="Select a delivery preset for this offload session",
         )
         self.btn_analyze = header.add_action(
-            "Analyze", on_click=self._analyze,
+            "Analyze",
+            on_click=self._analyze,
             tooltip="Scan the source folder and populate the manifest table",
         )
         self.btn_start = header.add_action(
-            "Start ingest", on_click=self._start, primary=True, enabled=False,
+            "Start ingest",
+            on_click=self._start,
+            primary=True,
+            enabled=False,
             tooltip="Copy all files from source to destination and verify by hash",
         )
         return header
@@ -123,9 +137,7 @@ class _OffloadPane(QWidget):
         row = QHBoxLayout()
         row.setSpacing(16)
         self.card_mirror = PathCard("MIRROR DESTINATION")
-        self.card_mirror.setToolTip(
-            "Secondary volume that receives a parallel copy of all ingested files"
-        )
+        self.card_mirror.setToolTip("Secondary volume that receives a parallel copy of all ingested files")
         self.card_mirror.setVisible(False)
         row.addWidget(self.card_mirror, stretch=1)
         return row
@@ -135,30 +147,20 @@ class _OffloadPane(QWidget):
         row.setSpacing(20)
         self.opt_verify = QCheckBox("Verify by hash (MD5)")
         self.opt_verify.setChecked(True)
-        self.opt_verify.setToolTip(
-            "Compute and compare MD5 hashes after copy to ensure data integrity"
-        )
+        self.opt_verify.setToolTip("Compute and compare MD5 hashes after copy to ensure data integrity")
         self.opt_mirror = QCheckBox("Mirror to secondary destination")
-        self.opt_mirror.setToolTip(
-            "Copy files to a second destination as a backup after primary ingest"
-        )
+        self.opt_mirror.setToolTip("Copy files to a second destination as a backup after primary ingest")
         self.opt_mirror.toggled.connect(self.card_mirror.setVisible)
         self.opt_mhl = QCheckBox("Generate MHL")
         self.opt_mhl.setChecked(True)
-        self.opt_mhl.setToolTip(
-            "Write an MHL (Media Hash List) sidecar for third-party verification"
-        )
+        self.opt_mhl.setToolTip("Write an MHL (Media Hash List) sidecar for third-party verification")
         self.opt_eject = QCheckBox("Eject source on completion")
-        self.opt_eject.setToolTip(
-            "Unmount the source volume once all files are copied and verified"
-        )
+        self.opt_eject.setToolTip("Unmount the source volume once all files are copied and verified")
         self.opt_email = QCheckBox("Email completion report")
         self.opt_email.setToolTip(
-            "Send a summary email when the offload finishes.\n"
-            "Configure SMTP settings in Edit → Settings → Email."
+            "Send a summary email when the offload finishes.\n" "Configure SMTP settings in Edit → Settings → Email."
         )
-        for c in (self.opt_verify, self.opt_mirror, self.opt_mhl,
-                  self.opt_eject, self.opt_email):
+        for c in (self.opt_verify, self.opt_mirror, self.opt_mhl, self.opt_eject, self.opt_email):
             row.addWidget(c)
         row.addStretch()
         return row
@@ -275,7 +277,7 @@ class _OffloadPane(QWidget):
             total_bytes += size
             self._add_manifest_row(i, f, size)
 
-        gb = total_bytes / (1024 ** 3)
+        gb = total_bytes / (1024**3)
         self.lbl_summary.setText(f"{len(files)} files · {gb:.1f} GB")
         self.card_src.set_metrics(f"{len(files)} files · {gb:.1f} GB")
         self._update_counts()
@@ -323,10 +325,14 @@ class _OffloadPane(QWidget):
                     counts[state] += 1
                     break
         bits = []
-        if counts[STATE_VERIFIED]: bits.append(f"{counts[STATE_VERIFIED]} verified")
-        if counts[STATE_RUNNING]:  bits.append(f"{counts[STATE_RUNNING]} hashing")
-        if counts[STATE_FAILED]:   bits.append(f"{counts[STATE_FAILED]} mismatch")
-        if counts[STATE_QUEUED]:   bits.append(f"{counts[STATE_QUEUED]} queued")
+        if counts[STATE_VERIFIED]:
+            bits.append(f"{counts[STATE_VERIFIED]} verified")
+        if counts[STATE_RUNNING]:
+            bits.append(f"{counts[STATE_RUNNING]} hashing")
+        if counts[STATE_FAILED]:
+            bits.append(f"{counts[STATE_FAILED]} mismatch")
+        if counts[STATE_QUEUED]:
+            bits.append(f"{counts[STATE_QUEUED]} queued")
         self.lbl_counts.setText(" · ".join(bits))
 
     def _set_row_state(self, row: int, state: str, hash_str: Optional[str] = None):
@@ -383,9 +389,7 @@ class _OffloadPane(QWidget):
                 hash_hint = message.split("hash=", 1)[1].split()[0][:16] + "…"
             except Exception:
                 hash_hint = None
-        self._set_row_state(
-            row, STATE_VERIFIED if verified else STATE_FAILED, hash_hint
-        )
+        self._set_row_state(row, STATE_VERIFIED if verified else STATE_FAILED, hash_hint)
 
     def _on_overall_progress(self, current: int, total: int):
         self.bar.setMaximum(max(total, 1))
@@ -480,11 +484,13 @@ class _OffloadPane(QWidget):
                         size = r.dst.stat().st_size
                     except OSError:
                         size = 0
-                    entries.append({
-                        "filename": r.dst.name,
-                        "size": size,
-                        "md5": getattr(r, 'md5', ''),
-                    })
+                    entries.append(
+                        {
+                            "filename": r.dst.name,
+                            "size": size,
+                            "md5": getattr(r, "md5", ""),
+                        }
+                    )
 
             if entries:
                 mhl_path = write_mhl_with_hashes(entries, dst_dir)
@@ -498,29 +504,28 @@ class _OffloadPane(QWidget):
         if not src:
             return
 
-        if sys.platform == 'darwin':
+        if sys.platform == "darwin":
             # Walk up to find the volume mount point
             volume = _find_volume_root(src)
             if volume and volume != Path("/"):
                 try:
                     result = subprocess.run(
-                        ['diskutil', 'eject', str(volume)],
-                        capture_output=True, text=True, timeout=15,
+                        ["diskutil", "eject", str(volume)],
+                        capture_output=True,
+                        text=True,
+                        timeout=15,
                     )
                     if result.returncode == 0:
                         self._emit_status(f"Source ejected: {volume.name}")
                     else:
-                        self._emit_status(
-                            f"Eject failed: {result.stderr.strip() or 'unknown error'}"
-                        )
+                        self._emit_status(f"Eject failed: {result.stderr.strip() or 'unknown error'}")
                 except Exception as exc:
                     self._emit_status(f"Eject failed: {exc}")
             else:
                 self._emit_status("Eject skipped — source is not on a removable volume")
-        elif sys.platform == 'win32':
+        elif sys.platform == "win32":
             self._emit_status(
-                "Eject on Windows requires manual action — "
-                "please safely remove the drive from the system tray"
+                "Eject on Windows requires manual action — " "please safely remove the drive from the system tray"
             )
         else:
             # Linux — try udisksctl
@@ -528,8 +533,10 @@ class _OffloadPane(QWidget):
             if volume and volume != Path("/"):
                 try:
                     result = subprocess.run(
-                        ['udisksctl', 'unmount', '-b', str(volume)],
-                        capture_output=True, text=True, timeout=15,
+                        ["udisksctl", "unmount", "-b", str(volume)],
+                        capture_output=True,
+                        text=True,
+                        timeout=15,
                     )
                     if result.returncode == 0:
                         self._emit_status(f"Source unmounted: {volume.name}")
@@ -540,16 +547,14 @@ class _OffloadPane(QWidget):
 
     def _send_email_report(self, results: list):
         """Send an email completion report using SMTP config from Settings."""
-        server = self.config.get('email.smtp_server', '')
-        port = self.config.get('email.smtp_port', 587)
-        use_tls = self.config.get('email.use_tls', True)
-        from_addr = self.config.get('email.from_address', '')
-        to_addr = self.config.get('email.to_address', '')
+        server = self.config.get("email.smtp_server", "")
+        port = self.config.get("email.smtp_port", 587)
+        use_tls = self.config.get("email.use_tls", True)
+        from_addr = self.config.get("email.from_address", "")
+        to_addr = self.config.get("email.to_address", "")
 
         if not server or not from_addr or not to_addr:
-            self._emit_status(
-                "Email skipped — configure SMTP in Settings → Email"
-            )
+            self._emit_status("Email skipped — configure SMTP in Settings → Email")
             return
 
         import os
@@ -569,7 +574,7 @@ class _OffloadPane(QWidget):
             f"Failed: {failed}\n"
         )
         if failed:
-            body += f"\nFailed files:\n"
+            body += "\nFailed files:\n"
             for r in results:
                 if not r.verified:
                     body += f"  • {r.src.name}: {r.error}\n"
@@ -595,6 +600,7 @@ class _OffloadPane(QWidget):
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 def _human_bytes(n: int) -> str:
     if n <= 0:
@@ -623,7 +629,7 @@ def _find_volume_root(path: Path) -> Optional[Path]:
     Returns the volume path, or None if *path* is on the root filesystem.
     """
     path = path.resolve()
-    if sys.platform == 'darwin':
+    if sys.platform == "darwin":
         # /Volumes/<VolumeName>/...  → /Volumes/<VolumeName>
         parts = path.parts
         if len(parts) >= 3 and parts[1] == "Volumes":
@@ -648,6 +654,7 @@ def _find_volume_root(path: Path) -> Optional[Path]:
 # Public IngestTab
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class IngestTab(BaseTab):
     """Offload workflow."""
 
@@ -661,9 +668,9 @@ class IngestTab(BaseTab):
         layout.addWidget(self._pane)
 
     def load_settings(self):
-        last_src = self.config.get_tab_setting('ingest', 'last_source', '')
-        last_dst = self.config.get_tab_setting('ingest', 'last_dest', '')
-        last_mirror = self.config.get_tab_setting('ingest', 'last_mirror', '')
+        last_src = self.config.get_tab_setting("ingest", "last_source", "")
+        last_dst = self.config.get_tab_setting("ingest", "last_dest", "")
+        last_mirror = self.config.get_tab_setting("ingest", "last_mirror", "")
         if last_src:
             self._pane.card_src.set_path(last_src)
         if last_dst:
@@ -675,6 +682,6 @@ class IngestTab(BaseTab):
         src = self._pane.card_src.get_path()
         dst = self._pane.card_dst.get_path()
         mirror = self._pane.card_mirror.get_path()
-        self.config.set_tab_setting('ingest', 'last_source', str(src) if src else '')
-        self.config.set_tab_setting('ingest', 'last_dest', str(dst) if dst else '')
-        self.config.set_tab_setting('ingest', 'last_mirror', str(mirror) if mirror else '')
+        self.config.set_tab_setting("ingest", "last_source", str(src) if src else "")
+        self.config.set_tab_setting("ingest", "last_dest", str(dst) if dst else "")
+        self.config.set_tab_setting("ingest", "last_mirror", str(mirror) if mirror else "")

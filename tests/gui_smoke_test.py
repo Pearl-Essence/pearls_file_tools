@@ -33,7 +33,6 @@ sys.path.insert(0, str(REPO_ROOT))
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QTimer  # noqa: E402
 from PySide6.QtWidgets import QApplication  # noqa: E402
 
 app = QApplication.instance() or QApplication(sys.argv)
@@ -63,11 +62,13 @@ def failed(msg: str) -> None:
 def make_app_themed():
     from branding import APP_NAME
     from main import _apply_theme
+
     QApplication.instance().setApplicationName(APP_NAME)
     _apply_theme(QApplication.instance())
 
 
 # ─── PHASE 1: Construct MainWindow + activate every nav key ────────────────
+
 
 def phase_construct_and_navigate() -> None:
     banner("PHASE 1: MainWindow constructs and every sidebar key activates")
@@ -102,30 +103,28 @@ def phase_construct_and_navigate() -> None:
 
 # ─── PHASE 2: Every menu-bar dialog constructs ────────────────────────────
 
+
 def phase_menu_dialogs() -> None:
     banner("PHASE 2: Menu-bar dialogs construct without errors")
-    from ui.dialogs.confirm_dialog import ConfirmDialog
+    from config import Config
     from ui.dialogs.history_dialog import HistoryDialog
-    from ui.dialogs.image_viewer_dialog import ImageViewerDialog
-    from ui.dialogs.lint_dialog import LintDialog
-    from ui.dialogs.normalize_dialog import NormalizeDialog
-    from ui.dialogs.preflight_dialog import PreflightDialog
-    from ui.dialogs.preview_dialog import PreviewDialog
     from ui.dialogs.profile_dialog import ProfileDialog
     from ui.dialogs.settings_dialog import SettingsDialog
-    from config import Config
+
     cfg = Config()
     cfg.load_from_file()
 
     dialogs = [
-        ("HistoryDialog",   lambda: HistoryDialog()),
-        ("SettingsDialog",  lambda: SettingsDialog(cfg)),
-        ("ProfileDialog",   lambda: ProfileDialog(cfg)),
+        ("HistoryDialog", lambda: HistoryDialog()),
+        ("SettingsDialog", lambda: SettingsDialog(cfg)),
+        ("ProfileDialog", lambda: ProfileDialog(cfg)),
     ]
     for name, factory in dialogs:
         try:
             d = factory()
-            d.show(); QApplication.processEvents(); d.close()
+            d.show()
+            QApplication.processEvents()
+            d.close()
             passed(f"{name} constructed + shown + closed")
         except Exception as e:
             failed(f"{name}: {type(e).__name__}: {e}")
@@ -134,11 +133,14 @@ def phase_menu_dialogs() -> None:
 
 # ─── PHASE 3: Settings round-trip via every tab's save/load ────────────────
 
+
 def phase_settings_roundtrip() -> None:
     banner("PHASE 3: Each tab's save_settings + load_settings completes")
     from ui.main_window import MainWindow
+
     win = MainWindow()
-    win.show(); QApplication.processEvents()
+    win.show()
+    QApplication.processEvents()
 
     save_failures = 0
     load_failures = 0
@@ -162,6 +164,7 @@ def phase_settings_roundtrip() -> None:
 
 # ─── PHASE 4: Repeated MainWindow construction (memory hygiene) ────────────
 
+
 def phase_repeated_construction() -> None:
     banner("PHASE 4: Construct + tear down MainWindow 5x (memory hygiene)")
     from ui.main_window import MainWindow
@@ -170,7 +173,8 @@ def phase_repeated_construction() -> None:
     for i in range(5):
         t0 = time.perf_counter()
         win = MainWindow()
-        win.show(); QApplication.processEvents()
+        win.show()
+        QApplication.processEvents()
         win.close()
         del win
         gc.collect()
@@ -185,13 +189,15 @@ def phase_repeated_construction() -> None:
 
 # ─── PHASE 5: Repeated tab activation ──────────────────────────────────────
 
+
 def phase_rapid_navigation() -> None:
     banner("PHASE 5: Rapid round-robin navigation across all tabs (50 cycles)")
     from branding import NAV_TREE
     from ui.main_window import MainWindow
 
     win = MainWindow()
-    win.show(); QApplication.processEvents()
+    win.show()
+    QApplication.processEvents()
 
     keys = [k for _s, items in NAV_TREE for _l, _i, k in items]
     iterations = 50
@@ -216,6 +222,7 @@ def phase_rapid_navigation() -> None:
 
 
 # ─── PHASE 6: QSS theme loaded + serif resolved ───────────────────────────
+
 
 def phase_theme_resolution() -> None:
     banner("PHASE 6: QSS load + brand serif resolution")
@@ -243,6 +250,7 @@ def phase_theme_resolution() -> None:
 
 # ─── PHASE 7: All placeholder SVGs present ─────────────────────────────────
 
+
 def phase_svg_assets() -> None:
     banner("PHASE 7: All placeholder SVGs referenced by NAV_TREE exist")
     from branding import ICONS_DIR, NAV_TREE
@@ -263,6 +271,7 @@ def phase_svg_assets() -> None:
 
 
 # ─── main ─────────────────────────────────────────────────────────────────
+
 
 def main() -> int:
     phases = [

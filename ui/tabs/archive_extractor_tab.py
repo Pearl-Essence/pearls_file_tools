@@ -8,29 +8,37 @@ pills + sticky footer with progress).
 from pathlib import Path
 from typing import Dict
 
-from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
-    QCheckBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QProgressBar,
-    QPushButton, QTextEdit, QVBoxLayout, QWidget,
+    QCheckBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QProgressBar,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
 
+from constants import PHOTO_KEYWORDS
 from ui.tabs.base_tab import BaseTab
 from ui.widgets.panel import Panel
 from ui.widgets.path_card import PathCard
 from ui.widgets.tab_header import TabHeader
-from constants import PHOTO_KEYWORDS
-
 
 # Optional libraries — same probes as before
 try:
     import rarfile  # noqa: F401
+
     HAS_RARFILE = True
 except ImportError:
     HAS_RARFILE = False
 
 try:
     import py7zr  # noqa: F401
+
     HAS_PY7ZR = True
 except ImportError:
     HAS_PY7ZR = False
@@ -69,9 +77,7 @@ class ArchiveExtractorTab(BaseTab):
             if not HAS_PY7ZR:
                 missing.append("py7zr (7Z support)")
             self.append_log(f"⚠ Missing optional libraries: {', '.join(missing)}")
-            self.append_log(
-                f"Install with: pip install {' '.join(m.split()[0] for m in missing)}\n"
-            )
+            self.append_log(f"Install with: pip install {' '.join(m.split()[0] for m in missing)}\n")
 
     # ── header ────────────────────────────────────────────────────────────
     def _build_header(self) -> QWidget:
@@ -81,7 +87,9 @@ class ArchiveExtractorTab(BaseTab):
             subtitle="Find archives under a folder and unpack them safely.",
         )
         self.start_btn = self._header.add_action(
-            "Start extraction", on_click=self.start_extraction, primary=True,
+            "Start extraction",
+            on_click=self.start_extraction,
+            primary=True,
             tooltip="Find and extract all matching archives in the selected folder",
         )
         return self._header
@@ -152,9 +160,7 @@ class ArchiveExtractorTab(BaseTab):
         )
         self.smart_extract_check = QCheckBox("Smart extraction (remove intermediate folders)")
         self.smart_extract_check.setChecked(True)
-        self.smart_extract_check.setToolTip(
-            "If archive contains only one folder, extract its contents directly"
-        )
+        self.smart_extract_check.setToolTip("If archive contains only one folder, extract its contents directly")
         for c in (self.keyword_check, self.keyword_edit, self.delete_check, self.smart_extract_check):
             oc.addWidget(c)
         cols.addLayout(oc, stretch=1)
@@ -256,20 +262,19 @@ class ArchiveExtractorTab(BaseTab):
             self.show_error("Invalid folder", "The selected folder does not exist.")
             return
 
-        keywords = [k.strip() for k in self.keyword_edit.text().split(',') if k.strip()]
+        keywords = [k.strip() for k in self.keyword_edit.text().split(",") if k.strip()]
         settings = {
-            'zip':            self.zip_check.isChecked(),
-            'tar':            self.tar_check.isChecked(),
-            'rar':            self.rar_check.isChecked(),
-            '7z':             self.sevenz_check.isChecked(),
-            'keyword_filter': self.keyword_check.isChecked(),
-            'keywords':       keywords,
-            'delete_after':   self.delete_check.isChecked(),
-            'smart_extract':  self.smart_extract_check.isChecked(),
+            "zip": self.zip_check.isChecked(),
+            "tar": self.tar_check.isChecked(),
+            "rar": self.rar_check.isChecked(),
+            "7z": self.sevenz_check.isChecked(),
+            "keyword_filter": self.keyword_check.isChecked(),
+            "keywords": keywords,
+            "delete_after": self.delete_check.isChecked(),
+            "smart_extract": self.smart_extract_check.isChecked(),
         }
-        if not any(settings[k] for k in ('zip', 'tar', 'rar', '7z')):
-            self.show_warning("No formats selected",
-                              "Pick at least one archive format to process.")
+        if not any(settings[k] for k in ("zip", "tar", "rar", "7z")):
+            self.show_warning("No formats selected", "Pick at least one archive format to process.")
             return
 
         self.start_btn.setEnabled(False)
@@ -283,6 +288,7 @@ class ArchiveExtractorTab(BaseTab):
         self.full_log_lines.clear()
 
         from workers.extract_worker import ExtractWorker
+
         self.worker_thread = ExtractWorker(self.current_directory, settings)
         self.worker_thread.progress.connect(self.update_progress)
         self.worker_thread.log_message.connect(self.append_log)
@@ -313,7 +319,7 @@ class ArchiveExtractorTab(BaseTab):
     def should_display_log_line(self, message: str) -> bool:
         if self.filter_all_check.isChecked():
             return True
-        ctx = (message.startswith(("[", "Searching", "Keywords", "Smart", "Summary", "=")))
+        ctx = message.startswith(("[", "Searching", "Keywords", "Smart", "Summary", "="))
         if self.filter_failed_check.isChecked():
             return "✗" in message or "Failed" in message or "Error" in message or ctx
         if self.filter_success_check.isChecked():
@@ -331,9 +337,11 @@ class ArchiveExtractorTab(BaseTab):
         elif sender == self.filter_success_check:
             self.filter_all_check.setChecked(False)
             self.filter_failed_check.setChecked(False)
-        if not (self.filter_all_check.isChecked() or
-                self.filter_failed_check.isChecked() or
-                self.filter_success_check.isChecked()):
+        if not (
+            self.filter_all_check.isChecked()
+            or self.filter_failed_check.isChecked()
+            or self.filter_success_check.isChecked()
+        ):
             self.filter_all_check.setChecked(True)
 
         self.log_text.clear()
@@ -343,15 +351,14 @@ class ArchiveExtractorTab(BaseTab):
         sb = self.log_text.verticalScrollBar()
         sb.setValue(sb.maximum())
 
-    def on_extraction_finished(self, success: bool, message: str,
-                               extraction_record: Dict = None):
+    def on_extraction_finished(self, success: bool, message: str, extraction_record: Dict = None):
         self.start_btn.setEnabled(True)
         self.cancel_btn.setEnabled(False)
         self.path_card.setEnabled(True)
         self.progress_bar.setVisible(False)
         self.lbl_progress.setText("Idle" if success else "Failed")
 
-        if extraction_record and extraction_record.get('extractions'):
+        if extraction_record and extraction_record.get("extractions"):
             self.extraction_history.append(extraction_record)
             self.undo_btn.setEnabled(True)
 
@@ -366,7 +373,7 @@ class ArchiveExtractorTab(BaseTab):
             self.show_info("No history", "No extractions to undo.")
             return
         last = self.extraction_history[-1]
-        n = len(last.get('extractions', []))
+        n = len(last.get("extractions", []))
         if not self.confirm_action(
             "Confirm undo",
             f"Undo the last extraction batch?\n\n"
@@ -381,11 +388,12 @@ class ArchiveExtractorTab(BaseTab):
         self.append_log("=" * 70)
 
         import shutil
+
         ok = fail = 0
-        for extraction in last.get('extractions', []):
-            archive_name = Path(extraction['archive_path']).name
+        for extraction in last.get("extractions", []):
+            archive_name = Path(extraction["archive_path"]).name
             self.append_log(f"\nUndoing: {archive_name}")
-            for item_path in extraction.get('extracted_items', []):
+            for item_path in extraction.get("extracted_items", []):
                 try:
                     item = Path(item_path)
                     if item.exists():
@@ -398,10 +406,10 @@ class ArchiveExtractorTab(BaseTab):
                 except Exception as e:
                     self.append_log(f"  ✗ Failed to remove {item_path}: {e}")
                     fail += 1
-            if extraction.get('archive_deleted') and extraction.get('backup_path'):
+            if extraction.get("archive_deleted") and extraction.get("backup_path"):
                 try:
-                    backup = Path(extraction['backup_path'])
-                    original = Path(extraction['archive_path'])
+                    backup = Path(extraction["backup_path"])
+                    original = Path(extraction["archive_path"])
                     if backup.exists():
                         shutil.copy2(backup, original)
                         backup.unlink()
@@ -434,30 +442,30 @@ class ArchiveExtractorTab(BaseTab):
     # Persistence
     # ─────────────────────────────────────────────────────────────────────
     def load_settings(self):
-        last_dir = self.config.get_tab_directory('archive_extractor')
+        last_dir = self.config.get_tab_directory("archive_extractor")
         if last_dir:
             self.path_card.set_path(last_dir)
             self.set_directory(last_dir)
 
         s = self.config.get_tab_setting
-        self.zip_check.setChecked(s('archive_extractor', 'zip_enabled', True))
-        self.tar_check.setChecked(s('archive_extractor', 'tar_enabled', True))
-        self.rar_check.setChecked(s('archive_extractor', 'rar_enabled', HAS_RARFILE))
-        self.sevenz_check.setChecked(s('archive_extractor', '7z_enabled', HAS_PY7ZR))
-        self.keyword_check.setChecked(s('archive_extractor', 'keyword_filter', True))
-        saved_keywords = s('archive_extractor', 'custom_keywords', '')
+        self.zip_check.setChecked(s("archive_extractor", "zip_enabled", True))
+        self.tar_check.setChecked(s("archive_extractor", "tar_enabled", True))
+        self.rar_check.setChecked(s("archive_extractor", "rar_enabled", HAS_RARFILE))
+        self.sevenz_check.setChecked(s("archive_extractor", "7z_enabled", HAS_PY7ZR))
+        self.keyword_check.setChecked(s("archive_extractor", "keyword_filter", True))
+        saved_keywords = s("archive_extractor", "custom_keywords", "")
         if saved_keywords:
             self.keyword_edit.setText(saved_keywords)
-        self.delete_check.setChecked(s('archive_extractor', 'delete_after', False))
-        self.smart_extract_check.setChecked(s('archive_extractor', 'smart_extract', True))
+        self.delete_check.setChecked(s("archive_extractor", "delete_after", False))
+        self.smart_extract_check.setChecked(s("archive_extractor", "smart_extract", True))
 
     def save_settings(self):
         s = self.config.set_tab_setting
-        s('archive_extractor', 'zip_enabled',    self.zip_check.isChecked())
-        s('archive_extractor', 'tar_enabled',    self.tar_check.isChecked())
-        s('archive_extractor', 'rar_enabled',    self.rar_check.isChecked())
-        s('archive_extractor', '7z_enabled',     self.sevenz_check.isChecked())
-        s('archive_extractor', 'keyword_filter', self.keyword_check.isChecked())
-        s('archive_extractor', 'custom_keywords', self.keyword_edit.text())
-        s('archive_extractor', 'delete_after',   self.delete_check.isChecked())
-        s('archive_extractor', 'smart_extract',  self.smart_extract_check.isChecked())
+        s("archive_extractor", "zip_enabled", self.zip_check.isChecked())
+        s("archive_extractor", "tar_enabled", self.tar_check.isChecked())
+        s("archive_extractor", "rar_enabled", self.rar_check.isChecked())
+        s("archive_extractor", "7z_enabled", self.sevenz_check.isChecked())
+        s("archive_extractor", "keyword_filter", self.keyword_check.isChecked())
+        s("archive_extractor", "custom_keywords", self.keyword_edit.text())
+        s("archive_extractor", "delete_after", self.delete_check.isChecked())
+        s("archive_extractor", "smart_extract", self.smart_extract_check.isChecked())

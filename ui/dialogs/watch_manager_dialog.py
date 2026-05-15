@@ -1,6 +1,5 @@
 """Watch Folder Manager dialog for Pearl's File Tools."""
 
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -8,10 +7,21 @@ from typing import List, Optional
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QListWidget, QListWidgetItem,
-    QComboBox, QCheckBox, QFileDialog, QWidget, QSizePolicy,
-    QHeaderView, QAbstractItemView,
+    QAbstractItemView,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QFileDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QSizePolicy,
+    QTableWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
 from core.watch_service import HAS_WATCHDOG, WatchRule
@@ -68,9 +78,7 @@ class WatchManagerDialog(QDialog):
             status_text = "watchdog installed — real-time monitoring"
             status_color = "#4ec94e"
         else:
-            status_text = (
-                f"watchdog not installed — using polling ({self.POLL_INTERVAL}s interval)"
-            )
+            status_text = f"watchdog not installed — using polling ({self.POLL_INTERVAL}s interval)"
             status_color = "#e0a030"
 
         wd_label = QLabel(status_text)
@@ -111,22 +119,20 @@ class WatchManagerDialog(QDialog):
 
     def _profiles(self) -> List[str]:
         """Return profile names from config."""
-        raw = self._config.get('naming.profiles', [])
+        raw = self._config.get("naming.profiles", [])
         names: List[str] = []
         for p in raw:
             if isinstance(p, dict):
-                names.append(p.get('name', ''))
+                names.append(p.get("name", ""))
             elif isinstance(p, str):
                 names.append(p)
         return [n for n in names if n]
 
     def _add_rule(self):
-        directory = QFileDialog.getExistingDirectory(
-            self, "Select Watch Folder", str(Path.home())
-        )
+        directory = QFileDialog.getExistingDirectory(self, "Select Watch Folder", str(Path.home()))
         if not directory:
             return
-        self._insert_row(directory, '', True)
+        self._insert_row(directory, "", True)
 
     def _remove_selected(self):
         rows = sorted(
@@ -152,12 +158,11 @@ class WatchManagerDialog(QDialog):
 
         def make_browse(lbl: QLabel):
             def browse():
-                d = QFileDialog.getExistingDirectory(
-                    self, "Select Watch Folder", lbl.text() or str(Path.home())
-                )
+                d = QFileDialog.getExistingDirectory(self, "Select Watch Folder", lbl.text() or str(Path.home()))
                 if d:
                     lbl.setText(d)
                     lbl.setToolTip(d)
+
             return browse
 
         browse_btn.clicked.connect(make_browse(folder_label))
@@ -212,13 +217,13 @@ class WatchManagerDialog(QDialog):
     def load_rules(self):
         """Populate table from config."""
         self._table.setRowCount(0)
-        raw_rules = self._config.get('watch.rules', [])
+        raw_rules = self._config.get("watch.rules", [])
         for r in raw_rules:
             if isinstance(r, dict):
                 self._insert_row(
-                    r.get('watch_dir', ''),
-                    r.get('profile_name', ''),
-                    bool(r.get('enabled', True)),
+                    r.get("watch_dir", ""),
+                    r.get("profile_name", ""),
+                    bool(r.get("enabled", True)),
                 )
 
     def save_rules(self):
@@ -228,16 +233,18 @@ class WatchManagerDialog(QDialog):
             lbl = self._folder_label_for_row(row)
             combo = self._combo_for_row(row)
             cb = self._checkbox_for_row(row)
-            watch_dir = lbl.text() if lbl else ''
-            profile_name = combo.currentText() if combo else ''
+            watch_dir = lbl.text() if lbl else ""
+            profile_name = combo.currentText() if combo else ""
             enabled = cb.isChecked() if cb else True
             if watch_dir:
-                rules.append({
-                    'watch_dir': watch_dir,
-                    'profile_name': profile_name,
-                    'enabled': enabled,
-                })
-        self._config.set('watch.rules', rules)
+                rules.append(
+                    {
+                        "watch_dir": watch_dir,
+                        "profile_name": profile_name,
+                        "enabled": enabled,
+                    }
+                )
+        self._config.set("watch.rules", rules)
         self._config.save_to_file()
 
     # ------------------------------------------------------------------
@@ -250,8 +257,8 @@ class WatchManagerDialog(QDialog):
             lbl = self._folder_label_for_row(row)
             combo = self._combo_for_row(row)
             cb = self._checkbox_for_row(row)
-            watch_dir = lbl.text() if lbl else ''
-            profile_name = combo.currentText() if combo else ''
+            watch_dir = lbl.text() if lbl else ""
+            profile_name = combo.currentText() if combo else ""
             enabled = cb.isChecked() if cb else True
             if watch_dir:
                 rules.append(WatchRule(watch_dir, profile_name, enabled))
@@ -297,13 +304,13 @@ class WatchManagerDialog(QDialog):
 
     def _on_arrival(self, path_str: str, profile_name: str):
         path = Path(path_str)
-        ts = datetime.now().strftime('%H:%M:%S')
+        ts = datetime.now().strftime("%H:%M:%S")
         label = f"[{ts}] \u25b6 {path.name}"
         if profile_name:
             label += f"  ({profile_name})"
 
         item = QListWidgetItem(label)
-        item.setForeground(QColor('#4ec94e'))
+        item.setForeground(QColor("#4ec94e"))
         self._log.addItem(item)
         self._log.scrollToBottom()
 
@@ -311,14 +318,13 @@ class WatchManagerDialog(QDialog):
         if profile_name:
             try:
                 from core.linter import FilenameLint
+
                 lint = FilenameLint()
                 issues = lint.lint_directory(path.parent)
                 file_issues = [i for i in issues if i.filename == path.name]
                 for issue in file_issues:
-                    warn_item = QListWidgetItem(
-                        f"    \u26a0 {issue.issue_type}: {issue.description}"
-                    )
-                    warn_item.setForeground(QColor('#e0c030'))
+                    warn_item = QListWidgetItem(f"    \u26a0 {issue.issue_type}: {issue.description}")
+                    warn_item.setForeground(QColor("#e0c030"))
                     self._log.addItem(warn_item)
                     self._log.scrollToBottom()
             except Exception:

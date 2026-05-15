@@ -37,13 +37,16 @@ class MetadataWorker(BaseWorker):
                 info = None
 
             if info is not None:
-                self.metadata_ready.emit(str(filepath), {
-                    'codec': info.codec,
-                    'width': info.width,
-                    'height': info.height,
-                    'fps': info.fps,
-                    'duration_secs': info.duration_secs,
-                    'audio_channels': info.audio_channels,
-                })
+                self.metadata_ready.emit(
+                    str(filepath),
+                    {
+                        "codec": info.codec,
+                        "width": info.width,
+                        "height": info.height,
+                        "fps": info.fps,
+                        "duration_secs": info.duration_secs,
+                        "audio_channels": info.audio_channels,
+                    },
+                )
 
         self.emit_finished(True, "Metadata loading complete")

@@ -10,26 +10,28 @@ and the validation rules + results panels swap in.
 """
 
 from pathlib import Path
-from typing import Optional
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtSvgWidgets import QSvgWidget
 from PySide6.QtWidgets import (
-    QCheckBox, QFrame, QHBoxLayout, QLabel, QListWidget, QPushButton,
-    QSpinBox, QStackedWidget, QVBoxLayout, QWidget,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
 from branding import ICONS_DIR
 from ui.tabs.base_tab import BaseTab
 from ui.tabs.delivery_tab import _ValidatorPane
-from ui.widgets.panel import Panel
 from ui.widgets.path_card import PathCard
 from ui.widgets.tab_header import TabHeader
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Empty-state hero
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class _ValidatorHero(QWidget):
     """Amber-orb centered empty state shown before a folder is chosen."""
@@ -90,6 +92,7 @@ class _ValidatorHero(QWidget):
 
     def _on_choose(self):
         from PySide6.QtWidgets import QFileDialog
+
         chosen = QFileDialog.getExistingDirectory(self, "Choose delivery folder")
         if chosen:
             self.folder_picked.emit(chosen)
@@ -98,6 +101,7 @@ class _ValidatorHero(QWidget):
 # ─────────────────────────────────────────────────────────────────────────────
 # SpecValidatorTab
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class SpecValidatorTab(BaseTab):
     """Spec Validator — v0.17 chrome around the existing validator logic."""
@@ -178,11 +182,11 @@ class SpecValidatorTab(BaseTab):
     # Persistence
     # ─────────────────────────────────────────────────────────────────────
     def load_settings(self):
-        directory = self.config.get_tab_directory('delivery')
+        directory = self.config.get_tab_directory("delivery")
         if directory and Path(directory).is_dir():
             self._on_folder_picked(directory)
 
     def save_settings(self):
         directory = self._inner.dir_selector.get_directory()
         if directory and directory != str(Path.home()):
-            self.config.set_tab_directory('delivery', directory)
+            self.config.set_tab_directory("delivery", directory)

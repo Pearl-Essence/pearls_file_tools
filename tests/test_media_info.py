@@ -1,11 +1,11 @@
 """Comprehensive tests for core/media_info.py."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from core.media_info import MediaInfo, _has_data
 
-
 # ── MediaInfo dataclass ─────────────────────────────────────────────────────
+
 
 class TestMediaInfo:
     def test_resolution_str(self):
@@ -53,8 +53,7 @@ class TestMediaInfo:
         assert info.fps_str is None
 
     def test_summary_full(self):
-        info = MediaInfo(codec="h264", width=1920, height=1080,
-                        fps=24.0, duration_secs=60.0, audio_channels=2)
+        info = MediaInfo(codec="h264", width=1920, height=1080, fps=24.0, duration_secs=60.0, audio_channels=2)
         s = info.summary()
         assert "h264" in s
         assert "1920" in s
@@ -72,6 +71,7 @@ class TestMediaInfo:
 
 
 # ── _has_data ───────────────────────────────────────────────────────────────
+
 
 class TestHasData:
     def test_empty(self):
@@ -96,30 +96,37 @@ class TestHasData:
 
 # ── get_media_info (with mocking) ──────────────────────────────────────────
 
+
 class TestGetMediaInfo:
     def test_returns_none_when_no_backends(self):
-        with patch("core.media_info.HAS_FFPROBE", False), \
-             patch("core.media_info.HAS_PYMEDIAINFO", False):
+        with patch("core.media_info.HAS_FFPROBE", False), patch("core.media_info.HAS_PYMEDIAINFO", False):
             from core.media_info import get_media_info
+
             result = get_media_info(MagicMock())
             assert result is None
 
     def test_ffprobe_fallback_to_pymediainfo(self):
-        with patch("core.media_info.HAS_FFPROBE", True), \
-             patch("core.media_info.HAS_PYMEDIAINFO", True), \
-             patch("core.media_info._via_ffprobe", return_value=None), \
-             patch("core.media_info._via_pymediainfo", return_value=MediaInfo(codec="test")):
+        with (
+            patch("core.media_info.HAS_FFPROBE", True),
+            patch("core.media_info.HAS_PYMEDIAINFO", True),
+            patch("core.media_info._via_ffprobe", return_value=None),
+            patch("core.media_info._via_pymediainfo", return_value=MediaInfo(codec="test")),
+        ):
             from core.media_info import get_media_info
+
             result = get_media_info(MagicMock())
             assert result is not None
             assert result.codec == "test"
 
     def test_ffprobe_success_skips_pymediainfo(self):
         expected = MediaInfo(codec="h264", width=1920, height=1080)
-        with patch("core.media_info.HAS_FFPROBE", True), \
-             patch("core.media_info._via_ffprobe", return_value=expected) as ffprobe_mock, \
-             patch("core.media_info._via_pymediainfo") as pymi_mock:
+        with (
+            patch("core.media_info.HAS_FFPROBE", True),
+            patch("core.media_info._via_ffprobe", return_value=expected) as ffprobe_mock,
+            patch("core.media_info._via_pymediainfo") as pymi_mock,
+        ):
             from core.media_info import get_media_info
+
             result = get_media_info(MagicMock())
             assert result == expected
             pymi_mock.assert_not_called()
