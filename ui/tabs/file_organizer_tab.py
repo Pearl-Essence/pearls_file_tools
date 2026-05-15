@@ -384,24 +384,8 @@ class FileOrganizerTab(BaseTab):
         """Update scan status."""
         self.status_label.setText(message)
 
-    def on_scan_finished(
-        self, success: bool, message: str, grouped_results: Dict = None, unsorted_results: Dict = None
-    ):
-        """Handle scan completion."""
-        self.scan_btn.setEnabled(True)
-        self.progress_bar.setVisible(False)
-
-        if not success:
-            self.show_error("Scan Failed", message)
-            self.status_label.setText("Scan failed")
-            return
-
-        self.file_groups = grouped_results or {}
-        self.unsorted_files = unsorted_results or {}
-        self.file_sequences = {}
-
-        # Detect image sequences across all files in each subdir, then remove
-        # sequence files from the regular grouped / unsorted buckets.
+    def _extract_sequences(self):
+        """Detect image sequences and strip them from grouped/unsorted buckets."""
         all_subdirs = set(list(self.file_groups.keys()) + list(self.unsorted_files.keys()))
         for subdir_path in all_subdirs:
             all_files: List[Path] = []
@@ -419,7 +403,6 @@ class FileOrganizerTab(BaseTab):
             self.file_sequences[subdir_path] = sequences
             seq_filenames = {fname for seq in sequences.values() for fname in seq.files}
 
-            # Strip sequence files from file_groups
             if subdir_path in self.file_groups:
                 cleaned: Dict[str, List[Path]] = {}
                 for grp, files in self.file_groups[subdir_path].items():
@@ -428,19 +411,13 @@ class FileOrganizerTab(BaseTab):
                         cleaned[grp] = remaining
                 self.file_groups[subdir_path] = cleaned
 
-            # Strip from unsorted
             if subdir_path in self.unsorted_files:
                 self.unsorted_files[subdir_path] = [
                     f for f in self.unsorted_files[subdir_path] if f.name not in seq_filenames
                 ]
 
-        if not self.file_groups and not self.unsorted_files and not self.file_sequences:
-            self.show_info("Scan Complete", "No files to organize were found in subdirectories.")
-            self.status_label.setText("No files found")
-            return
-
-        self.populate_tree()
-
+    def _build_scan_summary(self) -> str:
+        """Return a human-readable summary of scan results."""
         total_groups = sum(len(groups) for groups in self.file_groups.values())
         total_grouped = sum(len(files) for groups in self.file_groups.values() for files in groups.values())
         total_unsorted = sum(len(files) for files in self.unsorted_files.values())
@@ -454,7 +431,33 @@ class FileOrganizerTab(BaseTab):
             parts.append(f"{total_sequences} sequences ({total_seq_frames} frames)")
         if total_unsorted:
             parts.append(f"{total_unsorted} unsorted")
-        self.status_label.setText("Found " + ", ".join(parts) if parts else "No files found")
+        return "Found " + ", ".join(parts) if parts else "No files found"
+
+    def on_scan_finished(
+        self, success: bool, message: str, grouped_results: Dict = None, unsorted_results: Dict = None
+    ):
+        """Handle scan completion."""
+        self.scan_btn.setEnabled(True)
+        self.progress_bar.setVisible(False)
+
+        if not success:
+            self.show_error("Scan Failed", message)
+            self.status_label.setText("Scan failed")
+            return
+
+        self.file_groups = grouped_results or {}
+        self.unsorted_files = unsorted_results or {}
+        self.file_sequences = {}
+
+        self._extract_sequences()
+
+        if not self.file_groups and not self.unsorted_files and not self.file_sequences:
+            self.show_info("Scan Complete", "No files to organize were found in subdirectories.")
+            self.status_label.setText("No files found")
+            return
+
+        self.populate_tree()
+        self.status_label.setText(self._build_scan_summary())
         self.organize_btn.setEnabled(True)
         self.new_group_btn.setEnabled(True)
 

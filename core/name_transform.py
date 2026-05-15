@@ -356,7 +356,7 @@ def is_valid_filename(filename: str) -> bool:
         return False
 
     # Check for trailing dots or spaces (not allowed on Windows)
-    if filename.endswith(".") or filename.endswith(" "):
+    if filename.endswith((".", " ")):
         return False
 
     return True

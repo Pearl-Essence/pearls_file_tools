@@ -23,7 +23,7 @@ jobs:
 
       - name: Generate coverage for SonarCloud
         run: |
-          pip install --only-binary :all: pytest==9.0.3 pytest-cov==7.1.0
+          pip install --only-binary ':all:' pytest==9.0.3 pytest-cov==7.1.0
           python -m pytest tests/ --cov=. --cov-report=xml -q || true
 
       - name: SonarCloud Scan

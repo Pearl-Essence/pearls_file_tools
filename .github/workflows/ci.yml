@@ -34,7 +34,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: pip install --only-binary :all: pytest==9.0.3 pytest-cov==7.1.0
+        run: "pip install --only-binary :all: pytest==9.0.3 pytest-cov==7.1.0"
 
       - name: Run tests with coverage
         run: python -m pytest tests/ -v --tb=short --cov=. --cov-report=xml --cov-report=term-missing
@@ -74,7 +74,7 @@ jobs:
             libxcb-cursor0
 
       - name: Install Python dependencies
-        run: pip install --only-binary :all: PySide6==6.11.1
+        run: "pip install --only-binary :all: PySide6==6.11.1"
 
       - name: Run GUI smoke test
         env:
