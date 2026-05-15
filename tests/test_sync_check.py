@@ -6,39 +6,39 @@ from pathlib import Path
 from core.sync_check import (
     SyncEntry,
     SyncReport,
+    _file_hash,
     _index_dir,
-    _md5,
     compare_directories,
 )
 
-# ── _md5 ────────────────────────────────────────────────────────────────────
+# ── _file_hash ────────────────────────────────────────────────────────────────────
 
 
 class TestMd5:
     def test_consistent_hash(self, tmp_path):
         f = tmp_path / "test.txt"
         f.write_bytes(b"hello world")
-        h1 = _md5(f)
-        h2 = _md5(f)
+        h1 = _file_hash(f)
+        h2 = _file_hash(f)
         assert h1 == h2
-        assert len(h1) == 32
+        assert len(h1) == 64
 
     def test_different_content_different_hash(self, tmp_path):
         f1 = tmp_path / "a.txt"
         f2 = tmp_path / "b.txt"
         f1.write_bytes(b"aaa")
         f2.write_bytes(b"bbb")
-        assert _md5(f1) != _md5(f2)
+        assert _file_hash(f1) != _file_hash(f2)
 
     def test_nonexistent_file(self, tmp_path):
-        result = _md5(tmp_path / "nope.txt")
+        result = _file_hash(tmp_path / "nope.txt")
         assert result == ""
 
     def test_empty_file(self, tmp_path):
         f = tmp_path / "empty.txt"
         f.write_bytes(b"")
-        h = _md5(f)
-        assert len(h) == 32
+        h = _file_hash(f)
+        assert len(h) == 64
 
 
 # ── _index_dir ──────────────────────────────────────────────────────────────

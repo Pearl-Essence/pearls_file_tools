@@ -260,7 +260,7 @@ class TestCalculateDirectoryHash:
         (tmp_path / "sub1").mkdir()
         (tmp_path / "sub2").mkdir()
         result = calculate_directory_hash(tmp_path)
-        assert len(result) == 32  # MD5 hex digest
+        assert len(result) == 64  # SHA-256 hex digest
 
     def test_empty_dir(self, tmp_path):
         result = calculate_directory_hash(tmp_path)
@@ -271,7 +271,7 @@ class TestCalculateDirectoryHash:
         (tmp_path / "visible").mkdir()
         h1 = calculate_directory_hash(tmp_path)
         # Hash should only include 'visible'
-        assert len(h1) == 32
+        assert len(h1) == 64
 
     def test_nonexistent_dir(self):
         result = calculate_directory_hash(Path("/nonexistent_dir_xyz"))

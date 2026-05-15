@@ -6,6 +6,7 @@ co-renames, same lint / normalize / undo / CSV / version-bump utilities.
 Only the chrome was rewritten to v0.17 visual language.
 """
 
+import os
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -1450,7 +1451,7 @@ class BulkRenamerTab(BaseTab):
             if sys.platform == "darwin":
                 subprocess.Popen(["open", latest])
             elif sys.platform == "win32":
-                subprocess.Popen(["start", "", latest], shell=True)
+                os.startfile(latest)
             else:
                 subprocess.Popen(["xdg-open", latest])
             self.emit_status(f"Opened: {Path(latest).name}")

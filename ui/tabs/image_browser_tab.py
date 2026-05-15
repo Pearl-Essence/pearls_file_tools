@@ -4,6 +4,7 @@ Browses images and video files in a thumbnail grid. Sequence detection applies
 to images only; videos get thumbnails via ffmpeg and open in the system player.
 """
 
+import os
 from pathlib import Path
 from typing import Dict, List
 
@@ -327,7 +328,7 @@ class ImageBrowserTab(BaseTab):
             if sys.platform == "darwin":
                 subprocess.Popen(["open", path])
             elif sys.platform == "win32":
-                subprocess.Popen(["start", "", path], shell=True)
+                os.startfile(path)
             else:
                 subprocess.Popen(["xdg-open", path])
             self.emit_status(f"Opened: {Path(path).name}")

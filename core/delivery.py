@@ -374,8 +374,8 @@ def create_delivery_zip(
 # ─────────────────────────────────────────────────────────────────────────────
 
 
-def _md5(filepath: Path) -> str:
-    h = hashlib.md5()
+def _file_hash(filepath: Path) -> str:
+    h = hashlib.sha256()
     with open(_long_path(filepath), "rb") as f:
         for chunk in iter(lambda: f.read(65536), b""):
             h.update(chunk)
@@ -387,9 +387,9 @@ def find_duplicates(
     progress_cb: Optional[Callable[[str, int, int], None]] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
 ) -> List[DuplicateGroup]:
-    """Group files by MD5 hash. Returns groups with 2+ files.
+    """Group files by content hash. Returns groups with 2+ files.
 
-    Two-pass algorithm: bucket by file size first, then only MD5 files whose
+    Two-pass algorithm: bucket by file size first, then only hash files whose
     size matches at least one other file. On a 4 GB tree of mostly-unique
     files this cuts disk I/O by orders of magnitude — only same-sized
     candidates ever get hashed.
@@ -421,7 +421,7 @@ def find_duplicates(
         if cancel_check():
             return []
         try:
-            digest = _md5(fp)
+            digest = _file_hash(fp)
             hash_map[digest].append(fp)
         except OSError:
             continue
