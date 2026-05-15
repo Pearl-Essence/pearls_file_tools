@@ -1,7 +1,13 @@
 version: 2
 updates:
-  - package-ecosystem: "pip" # Tells Dependabot to look for Python packages
-    directory: "/"           # Where your requirements.txt is located
+  - package-ecosystem: "pip"
+    directory: "/"
     schedule:
-      interval: "weekly"     # How often to check for updates (daily, weekly, monthly)
-    open-pull-requests-limit: 5 # Prevents your PR tab from getting flooded
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
