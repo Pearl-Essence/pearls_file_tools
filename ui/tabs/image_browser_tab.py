@@ -9,11 +9,18 @@ from typing import Dict, List
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QGridLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QScrollArea, QSpinBox, QVBoxLayout, QWidget,
+    QCheckBox,
+    QComboBox,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QScrollArea,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
 )
 
-from constants import VIDEO_EXTENSIONS
 from ui.tabs.base_tab import BaseTab
 from ui.widgets.panel import Panel
 from ui.widgets.path_card import PathCard
@@ -59,7 +66,9 @@ class ImageBrowserTab(BaseTab):
             tooltip="Re-scan the folder from scratch, ignoring any cached results",
         )
         self.scan_btn = header.add_action(
-            "Scan", on_click=self.scan_directory, primary=True,
+            "Scan",
+            on_click=self.scan_directory,
+            primary=True,
             tooltip="Scan the selected folder for media files (uses cache when available)",
         )
         return header
@@ -188,9 +197,10 @@ class ImageBrowserTab(BaseTab):
         self.status_label.setText(msg)
 
         # Respect the global "cache scans" setting
-        cache_enabled = self.config.get('settings.cache_image_scans', True)
+        cache_enabled = self.config.get("settings.cache_image_scans", True)
 
         from workers.image_scan_worker import ImageScanWorker
+
         self.worker_thread = ImageScanWorker(
             self.current_directory,
             recursive=self.recursive_check.isChecked(),
@@ -221,7 +231,7 @@ class ImageBrowserTab(BaseTab):
 
         self.folders = {}
         for img in self.all_images:
-            self.folders[img['folder']] = self.folders.get(img['folder'], 0) + 1
+            self.folders[img["folder"]] = self.folders.get(img["folder"], 0) + 1
 
         self.folder_combo.clear()
         self.folder_combo.addItem("All folders")
@@ -230,17 +240,11 @@ class ImageBrowserTab(BaseTab):
 
         self.apply_filters()
 
-        seq_count = sum(1 for img in self.all_images if img.get('is_sequence_rep'))
-        standalone = sum(1 for img in self.all_images if not img.get('in_sequence'))
+        seq_count = sum(1 for img in self.all_images if img.get("is_sequence_rep"))
+        standalone = sum(1 for img in self.all_images if not img.get("in_sequence"))
         if seq_count:
-            seq_frames = sum(
-                img.get('sequence_total', 0)
-                for img in self.all_images if img.get('is_sequence_rep')
-            )
-            self.emit_status(
-                f"Found {standalone} image(s) + {seq_count} sequence(s) "
-                f"({seq_frames} frames)"
-            )
+            seq_frames = sum(img.get("sequence_total", 0) for img in self.all_images if img.get("is_sequence_rep"))
+            self.emit_status(f"Found {standalone} image(s) + {seq_count} sequence(s) " f"({seq_frames} frames)")
         else:
             self.emit_status(f"Found {len(self.all_images)} image(s)")
 
@@ -252,13 +256,13 @@ class ImageBrowserTab(BaseTab):
 
         self.filtered_images = []
         for img in self.all_images:
-            if img.get('in_sequence') and not img.get('is_sequence_rep'):
+            if img.get("in_sequence") and not img.get("is_sequence_rep"):
                 continue
-            if selected_folder != "All folders" and img['folder'] != selected_folder:
+            if selected_folder != "All folders" and img["folder"] != selected_folder:
                 continue
             if search_text:
-                label = img.get('sequence_label', img['name']).lower()
-                if search_text not in label and search_text not in img['name'].lower():
+                label = img.get("sequence_label", img["name"]).lower()
+                if search_text not in label and search_text not in img["name"].lower():
                     continue
             self.filtered_images.append(img)
         self.display_images()
@@ -271,6 +275,7 @@ class ImageBrowserTab(BaseTab):
         self.status_label.setText(f"Showing {len(self.filtered_images)} image(s).")
 
         from ui.widgets.image_card import ImageCard
+
         columns = 5
         thumbnail_size = self.size_spin.value()
         for i, img_data in enumerate(self.filtered_images):
@@ -288,44 +293,43 @@ class ImageBrowserTab(BaseTab):
                 w.deleteLater()
 
     def on_thumbnail_size_changed(self, value: int):
-        self.config.set_tab_setting('image_browser', 'thumbnail_size', value)
+        self.config.set_tab_setting("image_browser", "thumbnail_size", value)
         if self.filtered_images:
             self.display_images()
 
     def open_image_viewer(self, img_data: Dict):
-        if img_data.get('is_video'):
-            self._open_video_externally(img_data['path'])
+        if img_data.get("is_video"):
+            self._open_video_externally(img_data["path"])
             return
 
         from ui.dialogs.image_viewer_dialog import ImageViewerDialog
-        if img_data.get('is_sequence_rep') and img_data.get('sequence_files'):
-            folder = img_data.get('folder', '')
+
+        if img_data.get("is_sequence_rep") and img_data.get("sequence_files"):
+            folder = img_data.get("folder", "")
             frame_images = [
-                {'name': Path(p).name, 'path': p, 'folder': folder, 'size': 0}
-                for p in img_data['sequence_files']
+                {"name": Path(p).name, "path": p, "folder": folder, "size": 0} for p in img_data["sequence_files"]
             ]
             dialog = ImageViewerDialog(frame_images, 0, self)
-            dialog.setWindowTitle(
-                f"Sequence Viewer — {img_data.get('sequence_label', img_data['name'])}"
-            )
+            dialog.setWindowTitle(f"Sequence Viewer — {img_data.get('sequence_label', img_data['name'])}")
         else:
             folder_images = [
-                img for img in self.filtered_images
-                if img['folder'] == img_data['folder'] and not img.get('is_video')
+                img for img in self.filtered_images if img["folder"] == img_data["folder"] and not img.get("is_video")
             ]
             current_index = folder_images.index(img_data) if img_data in folder_images else 0
             dialog = ImageViewerDialog(folder_images, current_index, self)
         dialog.exec()
 
     def _open_video_externally(self, path: str):
-        import subprocess, sys
+        import subprocess
+        import sys
+
         try:
-            if sys.platform == 'darwin':
-                subprocess.Popen(['open', path])
-            elif sys.platform == 'win32':
-                subprocess.Popen(['start', '', path], shell=True)
+            if sys.platform == "darwin":
+                subprocess.Popen(["open", path])
+            elif sys.platform == "win32":
+                subprocess.Popen(["start", "", path], shell=True)
             else:
-                subprocess.Popen(['xdg-open', path])
+                subprocess.Popen(["xdg-open", path])
             self.emit_status(f"Opened: {Path(path).name}")
         except Exception as e:
             self.show_error("Playback Error", f"Could not open video: {e}")
@@ -333,8 +337,9 @@ class ImageBrowserTab(BaseTab):
     # ── sequence reclassification ────────────────────────────────────────
     def show_image_context_menu(self, img_data: Dict, global_pos):
         from PySide6.QtWidgets import QMenu
+
         menu = QMenu(self)
-        if img_data.get('is_sequence_rep'):
+        if img_data.get("is_sequence_rep"):
             action = menu.addAction("Break Sequence")
             action.triggered.connect(lambda: self.break_sequence(img_data))
         else:
@@ -343,24 +348,37 @@ class ImageBrowserTab(BaseTab):
         menu.exec(global_pos)
 
     def break_sequence(self, rep_data: Dict):
-        seq_paths = set(rep_data.get('sequence_files', []))
+        seq_paths = set(rep_data.get("sequence_files", []))
         for img in self.all_images:
-            if img['path'] in seq_paths or img is rep_data:
-                for k in ('in_sequence', 'is_sequence_rep', 'sequence_key',
-                          'sequence_label', 'sequence_total', 'sequence_files'):
+            if img["path"] in seq_paths or img is rep_data:
+                for k in (
+                    "in_sequence",
+                    "is_sequence_rep",
+                    "sequence_key",
+                    "sequence_label",
+                    "sequence_total",
+                    "sequence_files",
+                ):
                     img.pop(k, None)
         self.apply_filters()
 
     def force_as_sequence(self, img_data: Dict):
         from core.pattern_matching import detect_image_sequences
-        folder = img_data['folder']
-        folder_imgs = [img for img in self.all_images if img['folder'] == folder]
+
+        folder = img_data["folder"]
+        folder_imgs = [img for img in self.all_images if img["folder"] == folder]
         for img in folder_imgs:
-            for k in ('in_sequence', 'is_sequence_rep', 'sequence_key',
-                      'sequence_label', 'sequence_total', 'sequence_files'):
+            for k in (
+                "in_sequence",
+                "is_sequence_rep",
+                "sequence_key",
+                "sequence_label",
+                "sequence_total",
+                "sequence_files",
+            ):
                 img.pop(k, None)
 
-        filenames = [img['name'] for img in folder_imgs]
+        filenames = [img["name"] for img in folder_imgs]
         sequences = detect_image_sequences(filenames, min_frames=2)
         if not sequences:
             self.show_info(
@@ -373,26 +391,22 @@ class ImageBrowserTab(BaseTab):
             return
 
         clicked_in_seq = False
-        fname_to_key = {
-            fname: key
-            for key, seq in sequences.items()
-            for fname in seq.files
-        }
+        fname_to_key = {fname: key for key, seq in sequences.items() for fname in seq.files}
         for img in folder_imgs:
-            fname = img['name']
+            fname = img["name"]
             if fname not in fname_to_key:
                 continue
             clicked_in_seq = clicked_in_seq or (img is img_data)
             seq_key = fname_to_key[fname]
             seq = sequences[seq_key]
-            img['in_sequence'] = True
-            img['sequence_key'] = seq_key
+            img["in_sequence"] = True
+            img["sequence_key"] = seq_key
             if fname == seq.files[0]:
-                parent = Path(img['path']).parent
-                img['is_sequence_rep'] = True
-                img['sequence_label'] = seq.label
-                img['sequence_total'] = len(seq.files)
-                img['sequence_files'] = [str(parent / f) for f in seq.files]
+                parent = Path(img["path"]).parent
+                img["is_sequence_rep"] = True
+                img["sequence_label"] = seq.label
+                img["sequence_total"] = len(seq.files)
+                img["sequence_files"] = [str(parent / f) for f in seq.files]
 
         if not clicked_in_seq:
             self.show_info(
@@ -406,18 +420,18 @@ class ImageBrowserTab(BaseTab):
     # Persistence
     # ─────────────────────────────────────────────────────────────────────
     def load_settings(self):
-        last_dir = self.config.get_tab_directory('image_browser')
+        last_dir = self.config.get_tab_directory("image_browser")
         if last_dir:
             self.path_card.set_path(last_dir)
             self.set_directory(last_dir)
-        thumbnail_size = self.config.get_tab_setting('image_browser', 'thumbnail_size', 200)
+        thumbnail_size = self.config.get_tab_setting("image_browser", "thumbnail_size", 200)
         self.size_spin.setValue(thumbnail_size)
-        recursive = self.config.get_tab_setting('image_browser', 'recursive', True)
+        recursive = self.config.get_tab_setting("image_browser", "recursive", True)
         self.recursive_check.setChecked(recursive)
-        include_video = self.config.get_tab_setting('image_browser', 'include_video', True)
+        include_video = self.config.get_tab_setting("image_browser", "include_video", True)
         self.include_video_check.setChecked(include_video)
 
     def save_settings(self):
-        self.config.set_tab_setting('image_browser', 'thumbnail_size', self.size_spin.value())
-        self.config.set_tab_setting('image_browser', 'recursive', self.recursive_check.isChecked())
-        self.config.set_tab_setting('image_browser', 'include_video', self.include_video_check.isChecked())
+        self.config.set_tab_setting("image_browser", "thumbnail_size", self.size_spin.value())
+        self.config.set_tab_setting("image_browser", "recursive", self.recursive_check.isChecked())
+        self.config.set_tab_setting("image_browser", "include_video", self.include_video_check.isChecked())

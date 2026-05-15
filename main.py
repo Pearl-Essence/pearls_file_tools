@@ -13,12 +13,12 @@ from ui.main_window import MainWindow
 
 # Preferred serifs in order of taste; first one actually installed wins.
 _SERIF_CHAIN = [
-    "Iowan Old Style",      # macOS classic
-    "Source Serif Pro",     # if shipped via Homebrew or bundled
-    "New York",             # macOS 11+
-    "Charter",              # macOS
-    "Cambria",              # Windows
-    "Georgia",              # universal
+    "Iowan Old Style",  # macOS classic
+    "Source Serif Pro",  # if shipped via Homebrew or bundled
+    "New York",  # macOS 11+
+    "Charter",  # macOS
+    "Cambria",  # Windows
+    "Georgia",  # universal
 ]
 
 

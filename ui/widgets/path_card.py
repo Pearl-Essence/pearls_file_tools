@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QLabel, QVBoxLayout
 
 from ui.widgets.panel import Panel
-from ui.widgets.pill import Pill, KIND_MUTED, KIND_OK
+from ui.widgets.pill import KIND_MUTED, KIND_OK, Pill
 
 
 class PathCard(Panel):
@@ -91,9 +91,7 @@ class PathCard(Panel):
 
     def _browse(self):
         start = str(self._path) if self._path else str(Path.home())
-        chosen = QFileDialog.getExistingDirectory(
-            self, f"Choose {self._role.lower()}", start
-        )
+        chosen = QFileDialog.getExistingDirectory(self, f"Choose {self._role.lower()}", start)
         if chosen:
             self.set_path(chosen)
             self.path_changed.emit(chosen)

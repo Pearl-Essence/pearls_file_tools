@@ -1,9 +1,19 @@
 """Rename history viewer dialog for Pearl's File Tools."""
 
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLineEdit,
-                             QPushButton, QTableWidget, QTableWidgetItem,
-                             QHeaderView, QLabel, QAbstractItemView, QMessageBox)
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QTimer
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+)
 
 
 class HistoryDialog(QDialog):
@@ -61,6 +71,7 @@ class HistoryDialog(QDialog):
     def _load_recent(self):
         try:
             from core.history import RenameHistory
+
             records = RenameHistory().get_recent(500)
             self._populate(records)
         except Exception as e:
@@ -73,6 +84,7 @@ class HistoryDialog(QDialog):
         query = self.search_input.text().strip()
         try:
             from core.history import RenameHistory
+
             records = RenameHistory().search(query) if query else RenameHistory().get_recent(500)
             self._populate(records)
         except Exception as e:
@@ -84,28 +96,31 @@ class HistoryDialog(QDialog):
             r = self.table.rowCount()
             self.table.insertRow(r)
             # Show only the filename portion for readability; full path in tooltip
-            old_path = row.get('old_path', '')
-            new_path = row.get('new_path', '')
-            old_item = QTableWidgetItem(old_path.split('/')[-1].split('\\')[-1])
+            old_path = row.get("old_path", "")
+            new_path = row.get("new_path", "")
+            old_item = QTableWidgetItem(old_path.split("/")[-1].split("\\")[-1])
             old_item.setToolTip(old_path)
-            new_item = QTableWidgetItem(new_path.split('/')[-1].split('\\')[-1])
+            new_item = QTableWidgetItem(new_path.split("/")[-1].split("\\")[-1])
             new_item.setToolTip(new_path)
-            self.table.setItem(r, 0, QTableWidgetItem(row.get('timestamp', '')))
+            self.table.setItem(r, 0, QTableWidgetItem(row.get("timestamp", "")))
             self.table.setItem(r, 1, old_item)
             self.table.setItem(r, 2, new_item)
-            self.table.setItem(r, 3, QTableWidgetItem(row.get('operation_type', '')))
+            self.table.setItem(r, 3, QTableWidgetItem(row.get("operation_type", "")))
         count = self.table.rowCount()
         self.status_label.setText(f"{count} record{'s' if count != 1 else ''}")
 
     def _clear_history(self):
         reply = QMessageBox.question(
-            self, "Clear History",
+            self,
+            "Clear History",
             "Delete all rename history records? This cannot be undone.",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
         )
         if reply == QMessageBox.Yes:
             try:
                 from core.history import RenameHistory
+
                 RenameHistory().clear()
                 self.table.setRowCount(0)
                 self.status_label.setText("History cleared.")

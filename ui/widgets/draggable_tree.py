@@ -1,10 +1,11 @@
 """Draggable tree widget for file organization."""
 
-from PySide6.QtWidgets import QApplication, QTreeWidget, QTreeWidgetItem
-from PySide6.QtCore import Qt, Signal, QMimeData, QPoint
-from PySide6.QtGui import QDrag
 from pathlib import Path
 from typing import List, Optional
+
+from PySide6.QtCore import QMimeData, QPoint, Qt, Signal
+from PySide6.QtGui import QDrag
+from PySide6.QtWidgets import QApplication, QTreeWidget, QTreeWidgetItem
 
 
 class DraggableTreeWidget(QTreeWidget):
@@ -50,8 +51,7 @@ class DraggableTreeWidget(QTreeWidget):
                 self.clearSelection()
                 super().mousePressEvent(event)
 
-            elif (item.isSelected() and
-                  not (event.modifiers() & (Qt.ShiftModifier | Qt.ControlModifier))):
+            elif item.isSelected() and not (event.modifiers() & (Qt.ShiftModifier | Qt.ControlModifier)):
                 # Click on an already-selected item with no modifier key.
                 # This MIGHT be the start of a drag — defer the selection collapse.
                 # If no drag happens, mouseReleaseEvent will collapse to single item.
@@ -69,9 +69,7 @@ class DraggableTreeWidget(QTreeWidget):
             super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
-        if (event.button() == Qt.LeftButton and
-                not self._drag_started and
-                self._deferred_click_item is not None):
+        if event.button() == Qt.LeftButton and not self._drag_started and self._deferred_click_item is not None:
             # Deferred click: drag never started, so now apply the selection collapse
             item = self._deferred_click_item
             self.clearSelection()
@@ -115,16 +113,14 @@ class DraggableTreeWidget(QTreeWidget):
                 continue
             data = item.data(0, Qt.UserRole)
             # File item data: ('file', subdir_path, group_name, Path)
-            if (data and isinstance(data, tuple) and
-                    data[0] == 'file' and len(data) >= 4 and
-                    isinstance(data[3], Path)):
+            if data and isinstance(data, tuple) and data[0] == "file" and len(data) >= 4 and isinstance(data[3], Path):
                 file_paths.append(str(data[3]))
 
         if not file_paths:
             return
 
         mime_data = QMimeData()
-        mime_data.setText('\n'.join(file_paths))
+        mime_data.setText("\n".join(file_paths))
 
         drag = QDrag(self)
         drag.setMimeData(mime_data)
@@ -154,8 +150,7 @@ class DraggableTreeWidget(QTreeWidget):
             return
 
         # Reject drops onto file items (depth ≥ 2)
-        if (target_item.parent() is not None and
-                target_item.parent().parent() is not None):
+        if target_item.parent() is not None and target_item.parent().parent() is not None:
             event.ignore()
             return
 
@@ -163,9 +158,7 @@ class DraggableTreeWidget(QTreeWidget):
             event.ignore()
             return
 
-        file_paths = [
-            Path(p) for p in event.mimeData().text().split('\n') if p.strip()
-        ]
+        file_paths = [Path(p) for p in event.mimeData().text().split("\n") if p.strip()]
         if not file_paths:
             event.ignore()
             return

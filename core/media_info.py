@@ -12,13 +12,14 @@ from typing import Optional
 
 
 def _check_ffprobe() -> bool:
-    return shutil.which('ffprobe') is not None
+    return shutil.which("ffprobe") is not None
 
 
 HAS_FFPROBE: bool = _check_ffprobe()
 
 try:
     import pymediainfo as _pymi  # noqa: F401
+
     HAS_PYMEDIAINFO = True
 except ImportError:
     HAS_PYMEDIAINFO = False
@@ -54,7 +55,7 @@ class MediaInfo:
     def fps_str(self) -> Optional[str]:
         if self.fps is None:
             return None
-        text = f"{self.fps:.3f}".rstrip('0').rstrip('.')
+        text = f"{self.fps:.3f}".rstrip("0").rstrip(".")
         return text
 
     def summary(self) -> str:
@@ -70,7 +71,7 @@ class MediaInfo:
             parts.append(self.duration_str)
         if self.audio_channels:
             parts.append(f"{self.audio_channels}ch audio")
-        return ', '.join(parts)
+        return ", ".join(parts)
 
 
 def get_media_info(filepath: Path) -> Optional[MediaInfo]:
@@ -85,16 +86,18 @@ def get_media_info(filepath: Path) -> Optional[MediaInfo]:
 
 
 def _has_data(info: MediaInfo) -> bool:
-    return any(v is not None for v in (
-        info.codec, info.width, info.duration_secs))
+    return any(v is not None for v in (info.codec, info.width, info.duration_secs))
 
 
 def _via_ffprobe(filepath: Path) -> Optional[MediaInfo]:
     try:
         cmd = [
-            'ffprobe', '-v', 'quiet',
-            '-print_format', 'json',
-            '-show_streams',
+            "ffprobe",
+            "-v",
+            "quiet",
+            "-print_format",
+            "json",
+            "-show_streams",
             str(filepath),
         ]
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
@@ -105,34 +108,34 @@ def _via_ffprobe(filepath: Path) -> Optional[MediaInfo]:
         return None
 
     info = MediaInfo()
-    for stream in data.get('streams', []):
-        kind = stream.get('codec_type', '')
-        if kind == 'video' and info.codec is None:
-            info.codec = stream.get('codec_name')
-            info.width = stream.get('width')
-            info.height = stream.get('height')
-            fps_raw = stream.get('r_frame_rate', '')
-            if '/' in fps_raw:
+    for stream in data.get("streams", []):
+        kind = stream.get("codec_type", "")
+        if kind == "video" and info.codec is None:
+            info.codec = stream.get("codec_name")
+            info.width = stream.get("width")
+            info.height = stream.get("height")
+            fps_raw = stream.get("r_frame_rate", "")
+            if "/" in fps_raw:
                 try:
-                    num, den = fps_raw.split('/')
+                    num, den = fps_raw.split("/")
                     if int(den):
                         info.fps = round(int(num) / int(den), 3)
                 except (ValueError, ZeroDivisionError):
                     pass
-            dur = stream.get('duration')
+            dur = stream.get("duration")
             if dur:
                 try:
                     info.duration_secs = float(dur)
                 except ValueError:
                     pass
-        elif kind == 'audio':
-            ch = stream.get('channels')
+        elif kind == "audio":
+            ch = stream.get("channels")
             if ch:
                 info.audio_channels = int(ch)
             if info.codec is None:
-                info.codec = stream.get('codec_name')
+                info.codec = stream.get("codec_name")
             if info.duration_secs is None:
-                dur = stream.get('duration')
+                dur = stream.get("duration")
                 if dur:
                     try:
                         info.duration_secs = float(dur)
@@ -145,39 +148,40 @@ def _via_ffprobe(filepath: Path) -> Optional[MediaInfo]:
 def _via_pymediainfo(filepath: Path) -> Optional[MediaInfo]:
     try:
         import pymediainfo
+
         mi = pymediainfo.MediaInfo.parse(str(filepath))
     except Exception:
         return None
 
     info = MediaInfo()
     for track in mi.tracks:
-        if track.track_type == 'Video' and info.codec is None:
-            info.codec = getattr(track, 'codec_id', None) or getattr(track, 'format', None)
-            info.width = getattr(track, 'width', None)
-            info.height = getattr(track, 'height', None)
-            fps_raw = getattr(track, 'frame_rate', None)
+        if track.track_type == "Video" and info.codec is None:
+            info.codec = getattr(track, "codec_id", None) or getattr(track, "format", None)
+            info.width = getattr(track, "width", None)
+            info.height = getattr(track, "height", None)
+            fps_raw = getattr(track, "frame_rate", None)
             if fps_raw:
                 try:
                     info.fps = float(fps_raw)
                 except ValueError:
                     pass
-            dur = getattr(track, 'duration', None)
+            dur = getattr(track, "duration", None)
             if dur:
                 try:
                     info.duration_secs = float(dur) / 1000.0
                 except ValueError:
                     pass
-        elif track.track_type == 'Audio':
-            ch = getattr(track, 'channel_s', None)
+        elif track.track_type == "Audio":
+            ch = getattr(track, "channel_s", None)
             if ch:
                 try:
                     info.audio_channels = int(ch)
                 except (ValueError, TypeError):
                     pass
             if info.codec is None:
-                info.codec = getattr(track, 'codec_id', None) or getattr(track, 'format', None)
+                info.codec = getattr(track, "codec_id", None) or getattr(track, "format", None)
             if info.duration_secs is None:
-                dur = getattr(track, 'duration', None)
+                dur = getattr(track, "duration", None)
                 if dur:
                     try:
                         info.duration_secs = float(dur) / 1000.0

@@ -5,15 +5,24 @@ from typing import List, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QApplication, QHBoxLayout, QHeaderView, QLabel,
-    QMenu, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QApplication,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMenu,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
 
 try:
     from core.file_utils import format_file_size
 except ImportError:
+
     def format_file_size(size: int) -> str:  # type: ignore[misc]
-        for unit, threshold in (('GB', 1 << 30), ('MB', 1 << 20), ('KB', 1 << 10)):
+        for unit, threshold in (("GB", 1 << 30), ("MB", 1 << 20), ("KB", 1 << 10)):
             if size >= threshold:
                 return f"{size / threshold:.1f} {unit}"
         return f"{size} B"
@@ -21,7 +30,7 @@ except ImportError:
 
 def _fmt_duration(secs: Optional[float]) -> str:
     if secs is None:
-        return '\u2014'
+        return "\u2014"
     total = int(secs)
     h, rem = divmod(total, 3600)
     m, s = divmod(rem, 60)
@@ -50,7 +59,7 @@ class FileListWidget(QWidget):
     COL_DURATION = 4
     COL_FPS = 5
 
-    _HEADERS = ['Filename', 'Size', 'Codec', 'Resolution', 'Duration', 'FPS']
+    _HEADERS = ["Filename", "Size", "Codec", "Resolution", "Duration", "FPS"]
     _META_COLS = [COL_CODEC, COL_RESOLUTION, COL_DURATION, COL_FPS]
 
     def __init__(self, parent=None):
@@ -132,9 +141,7 @@ class FileListWidget(QWidget):
 
             # Filename cell with native checkbox
             fn_item = QTableWidgetItem(display)
-            fn_item.setFlags(
-                Qt.ItemIsEnabled | Qt.ItemIsUserCheckable | Qt.ItemIsSelectable
-            )
+            fn_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable | Qt.ItemIsSelectable)
             fn_item.setCheckState(Qt.Checked)
             fn_item.setData(Qt.UserRole, filepath)
             fn_item.setToolTip(str(filepath))
@@ -144,14 +151,14 @@ class FileListWidget(QWidget):
             try:
                 size_str = format_file_size(filepath.stat().st_size)
             except OSError:
-                size_str = '\u2014'
+                size_str = "\u2014"
             size_item = QTableWidgetItem(size_str)
             size_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             self.table.setItem(row, self.COL_SIZE, size_item)
 
             # Placeholder metadata cells
             for col in self._META_COLS:
-                ph = QTableWidgetItem('\u2014')
+                ph = QTableWidgetItem("\u2014")
                 ph.setTextAlignment(Qt.AlignCenter)
                 self.table.setItem(row, col, ph)
 
@@ -198,9 +205,7 @@ class FileListWidget(QWidget):
         for row in range(self.table.rowCount()):
             item = self.table.item(row, self.COL_FILENAME)
             if item:
-                item.setCheckState(
-                    Qt.Unchecked if item.checkState() == Qt.Checked else Qt.Checked
-                )
+                item.setCheckState(Qt.Unchecked if item.checkState() == Qt.Checked else Qt.Checked)
         self.table.blockSignals(False)
         self._update_count()
 
@@ -212,9 +217,7 @@ class FileListWidget(QWidget):
             action = menu.addAction(self._HEADERS[col])
             action.setCheckable(True)
             action.setChecked(not self.table.isColumnHidden(col))
-            action.triggered.connect(
-                lambda checked, c=col: self._toggle_meta_col(c, checked)
-            )
+            action.triggered.connect(lambda checked, c=col: self._toggle_meta_col(c, checked))
         menu.exec(self.table.horizontalHeader().mapToGlobal(pos))
 
     def _toggle_meta_col(self, col: int, show: bool):
@@ -225,6 +228,7 @@ class FileListWidget(QWidget):
     def _start_metadata_loading(self):
         self._cancel_metadata_worker()
         from workers.metadata_worker import MetadataWorker
+
         self._metadata_worker = MetadataWorker(list(self._files))
         self._metadata_worker.metadata_ready.connect(self._on_metadata_ready)
         self._metadata_worker.start()
@@ -241,12 +245,12 @@ class FileListWidget(QWidget):
             if not fn_item or fn_item.data(Qt.UserRole) != target:
                 continue
 
-            codec = info.get('codec') or '\u2014'
-            w, h = info.get('width'), info.get('height')
-            res = f"{w}\u00d7{h}" if w and h else '\u2014'
-            dur = _fmt_duration(info.get('duration_secs'))
-            fps_raw = info.get('fps')
-            fps = f"{fps_raw:.2f}" if fps_raw else '\u2014'
+            codec = info.get("codec") or "\u2014"
+            w, h = info.get("width"), info.get("height")
+            res = f"{w}\u00d7{h}" if w and h else "\u2014"
+            dur = _fmt_duration(info.get("duration_secs"))
+            fps_raw = info.get("fps")
+            fps = f"{fps_raw:.2f}" if fps_raw else "\u2014"
 
             self.table.item(row, self.COL_CODEC).setText(codec)
             self.table.item(row, self.COL_RESOLUTION).setText(res)
@@ -254,12 +258,16 @@ class FileListWidget(QWidget):
             self.table.item(row, self.COL_FPS).setText(fps)
 
             # Enrich tooltip even when columns are hidden
-            meta_parts = [p for p in (
-                codec if codec != '\u2014' else None,
-                res if res != '\u2014' else None,
-                f"{fps_raw:.2f} fps" if fps_raw else None,
-                dur if dur != '\u2014' else None,
-            ) if p]
+            meta_parts = [
+                p
+                for p in (
+                    codec if codec != "\u2014" else None,
+                    res if res != "\u2014" else None,
+                    f"{fps_raw:.2f} fps" if fps_raw else None,
+                    dur if dur != "\u2014" else None,
+                )
+                if p
+            ]
             if meta_parts:
                 fn_item.setToolTip(f"{target}\n{', '.join(meta_parts)}")
             break
@@ -272,9 +280,7 @@ class FileListWidget(QWidget):
         row = item.row()
         # Extend selection on shift-click
         mods = QApplication.keyboardModifiers()
-        if (mods & Qt.ShiftModifier and
-                self._last_clicked is not None and
-                self._last_clicked != row):
+        if mods & Qt.ShiftModifier and self._last_clicked is not None and self._last_clicked != row:
             new_state = item.checkState()
             self.table.blockSignals(True)
             lo, hi = sorted((self._last_clicked, row))
@@ -298,8 +304,9 @@ class FileListWidget(QWidget):
     def _update_count(self):
         total = self.table.rowCount()
         selected = sum(
-            1 for r in range(total)
-            if self.table.item(r, self.COL_FILENAME) and
-            self.table.item(r, self.COL_FILENAME).checkState() == Qt.Checked
+            1
+            for r in range(total)
+            if self.table.item(r, self.COL_FILENAME)
+            and self.table.item(r, self.COL_FILENAME).checkState() == Qt.Checked
         )
         self.count_label.setText(f"{selected}/{total} files selected")

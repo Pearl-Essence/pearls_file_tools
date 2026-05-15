@@ -1,11 +1,12 @@
 """Comprehensive tests for core/qdirstat_cache.py."""
 
 import gzip
+
 import pytest
-from pathlib import Path
+
 from core.qdirstat_cache import (
-    write_qdirstat_cache,
     parse_qdirstat_cache,
+    write_qdirstat_cache,
 )
 
 

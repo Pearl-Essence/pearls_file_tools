@@ -1,28 +1,28 @@
 """Comprehensive tests for core/delivery.py."""
 
 import zipfile
-import pytest
 from pathlib import Path
-from unittest.mock import patch
+
+import pytest
+
 from core.delivery import (
     DeliveryProfile,
+    DeliveryValidator,
+    DuplicateGroup,
+    HandoffResult,
+    HandoffRule,
     ValidationIssue,
     ValidationReport,
-    DuplicateGroup,
-    HandoffRule,
-    HandoffResult,
-    DeliveryValidator,
-    default_handoff_rules,
-    list_delivery_files,
     create_delivery_zip,
-    find_duplicates,
+    default_handoff_rules,
     find_case_collisions,
+    find_duplicates,
+    list_delivery_files,
     run_handoff_checks,
-    export_manifest,
 )
 
-
 # ── DeliveryProfile ─────────────────────────────────────────────────────────
+
 
 class TestDeliveryProfile:
     def test_defaults(self):
@@ -33,8 +33,7 @@ class TestDeliveryProfile:
         assert "_WIP" in p.banned_terms
 
     def test_to_dict_from_dict_roundtrip(self):
-        p = DeliveryProfile(name="Custom", banned_terms=["BAD"],
-                           min_video_size_bytes=500, check_hidden_files=False)
+        p = DeliveryProfile(name="Custom", banned_terms=["BAD"], min_video_size_bytes=500, check_hidden_files=False)
         d = p.to_dict()
         p2 = DeliveryProfile.from_dict(d)
         assert p2.name == "Custom"
@@ -49,20 +48,19 @@ class TestDeliveryProfile:
 
 # ── ValidationReport ────────────────────────────────────────────────────────
 
+
 class TestValidationReport:
     def test_passed_no_errors(self):
         report = ValidationReport(directory=Path("/test"), issues=[], total_files=5)
         assert report.passed is True
 
     def test_passed_with_warnings_only(self):
-        issues = [ValidationIssue(filepath=Path("a"), rule="test",
-                                  description="warn", severity="warning")]
+        issues = [ValidationIssue(filepath=Path("a"), rule="test", description="warn", severity="warning")]
         report = ValidationReport(directory=Path("/test"), issues=issues, total_files=5)
         assert report.passed is True
 
     def test_failed_with_errors(self):
-        issues = [ValidationIssue(filepath=Path("a"), rule="test",
-                                  description="err", severity="error")]
+        issues = [ValidationIssue(filepath=Path("a"), rule="test", description="err", severity="error")]
         report = ValidationReport(directory=Path("/test"), issues=issues, total_files=5)
         assert report.passed is False
 
@@ -89,6 +87,7 @@ class TestValidationReport:
 
 # ── DuplicateGroup ──────────────────────────────────────────────────────────
 
+
 class TestDuplicateGroup:
     def test_size_bytes(self, tmp_path):
         f = tmp_path / "file.txt"
@@ -110,6 +109,7 @@ class TestDuplicateGroup:
 
 
 # ── DeliveryValidator ───────────────────────────────────────────────────────
+
 
 class TestDeliveryValidator:
     @pytest.fixture
@@ -188,6 +188,7 @@ class TestDeliveryValidator:
 
 # ── list_delivery_files ─────────────────────────────────────────────────────
 
+
 class TestListDeliveryFiles:
     def test_excludes_hidden(self, tmp_path):
         (tmp_path / "visible.txt").write_text("ok")
@@ -216,6 +217,7 @@ class TestListDeliveryFiles:
 
 
 # ── create_delivery_zip ─────────────────────────────────────────────────────
+
 
 class TestCreateDeliveryZip:
     def test_creates_zip(self, tmp_path):
@@ -247,8 +249,7 @@ class TestCreateDeliveryZip:
         out = tmp_path / "out"
         out.mkdir()
         progress_calls = []
-        create_delivery_zip(src, "Test", out,
-                           progress_cb=lambda msg, cur, tot: progress_calls.append((msg, cur, tot)))
+        create_delivery_zip(src, "Test", out, progress_cb=lambda msg, cur, tot: progress_calls.append((msg, cur, tot)))
         assert len(progress_calls) > 0
 
     def test_cancel_check(self, tmp_path):
@@ -271,6 +272,7 @@ class TestCreateDeliveryZip:
 
 
 # ── find_duplicates ─────────────────────────────────────────────────────────
+
 
 class TestFindDuplicates:
     def test_finds_exact_duplicates(self, tmp_path):
@@ -315,6 +317,7 @@ class TestFindDuplicates:
 
 # ── find_case_collisions ───────────────────────────────────────────────────
 
+
 class TestFindCaseCollisions:
     def test_detects_collisions(self, tmp_path):
         (tmp_path / "File.txt").write_text("a")
@@ -332,6 +335,7 @@ class TestFindCaseCollisions:
 
 
 # ── default_handoff_rules ──────────────────────────────────────────────────
+
 
 class TestDefaultHandoffRules:
     def test_returns_list(self):
@@ -364,6 +368,7 @@ class TestDefaultHandoffRules:
 
 # ── run_handoff_checks ──────────────────────────────────────────────────────
 
+
 class TestRunHandoffChecks:
     def test_all_pass(self, tmp_path):
         (tmp_path / "luts").mkdir()
@@ -379,7 +384,7 @@ class TestRunHandoffChecks:
         assert results[0].passed is True
 
     def test_exception_in_rule(self, tmp_path):
-        rule = HandoffRule(name="bad_rule", check_fn=lambda d: 1/0)
+        rule = HandoffRule(name="bad_rule", check_fn=lambda d: 1 / 0)
         results = run_handoff_checks(tmp_path, rules=[rule])
         assert results[0].passed is False
         assert "division by zero" in results[0].detail

@@ -10,7 +10,7 @@ TabHeader-decorated shell. The dialogs' internal Close buttons are hidden
 since there's nothing to close — the user navigates away via the sidebar.
 """
 
-from typing import Callable, Optional
+from typing import Callable
 
 from PySide6.QtWidgets import QPushButton, QVBoxLayout, QWidget
 
@@ -25,8 +25,7 @@ def _hide_close_button(widget: QWidget) -> None:
             btn.hide()
 
 
-def _shell(host: QWidget, eyebrow: str, title: str, subtitle: str,
-           inner: QWidget) -> QVBoxLayout:
+def _shell(host: QWidget, eyebrow: str, title: str, subtitle: str, inner: QWidget) -> QVBoxLayout:
     """Standard v0.17 outer layout — same helper used in studio_tabs."""
     root = QVBoxLayout(host)
     root.setContentsMargins(24, 20, 24, 20)
@@ -40,6 +39,7 @@ def _shell(host: QWidget, eyebrow: str, title: str, subtitle: str,
 # Sync Check
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class SyncCheckTab(BaseTab):
     """Multi-site sync diff between two directory trees."""
 
@@ -50,6 +50,7 @@ class SyncCheckTab(BaseTab):
         # Lazy import keeps cycle-free imports between maintain_panes and the
         # dialogs (which don't depend on this file).
         from ui.dialogs.sync_dialog import SyncDialog
+
         # Pass parent=None so it doesn't become modal-anchored to the main window.
         self._inner = SyncDialog(self.config)
         _hide_close_button(self._inner)
@@ -73,6 +74,7 @@ class SyncCheckTab(BaseTab):
 # Watch Folders
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class WatchFoldersTab(BaseTab):
     """Manage watch-folder rules and view the arrival log."""
 
@@ -81,6 +83,7 @@ class WatchFoldersTab(BaseTab):
 
     def setup_ui(self):
         from ui.dialogs.watch_manager_dialog import WatchManagerDialog
+
         self._inner = WatchManagerDialog(self.config)
         _hide_close_button(self._inner)
         _shell(
@@ -103,7 +106,7 @@ class WatchFoldersTab(BaseTab):
     def save_settings(self):
         # Persist the watch rules table on app shutdown — the dialog's
         # closeEvent normally does this, but we never close it now.
-        if hasattr(self._inner, 'save_rules'):
+        if hasattr(self._inner, "save_rules"):
             try:
                 self._inner.save_rules()
             except Exception:

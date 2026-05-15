@@ -7,39 +7,40 @@ Reference these everywhere instead of hardcoding strings or colors.
 from pathlib import Path
 
 # ── Identity ────────────────────────────────────────────────────────────────
-APP_NAME       = "Pearl Post Suite"
+APP_NAME = "Pearl Post Suite"
 APP_NAME_SHORT = "Pearl"
-APP_TAGLINE    = "POST SUITE · V0.20"
-ORG_NAME       = "Pearl"
+APP_TAGLINE = "POST SUITE · V0.20"
+ORG_NAME = "Pearl"
 
 # ── Resource paths ──────────────────────────────────────────────────────────
 RESOURCES_DIR = Path(__file__).parent / "resources"
-STYLES_DIR    = RESOURCES_DIR / "styles"
-ICONS_DIR     = RESOURCES_DIR / "icons"
-QSS_PATH      = STYLES_DIR / "pearl_dark.qss"
+STYLES_DIR = RESOURCES_DIR / "styles"
+ICONS_DIR = RESOURCES_DIR / "icons"
+QSS_PATH = STYLES_DIR / "pearl_dark.qss"
+
 
 # ── Palette (mirror of pearl_dark.qss — for code that needs raw QColor) ─────
 class Palette:
-    BG_VOID       = "#0B0B0D"   # app shell, behind everything
-    BG_PANEL      = "#15161A"   # floating panel base
-    BG_PANEL_HI   = "#1C1E24"   # hovered row, raised surface
-    BG_INPUT      = "#0F1013"   # text fields, log
+    BG_VOID = "#0B0B0D"  # app shell, behind everything
+    BG_PANEL = "#15161A"  # floating panel base
+    BG_PANEL_HI = "#1C1E24"  # hovered row, raised surface
+    BG_INPUT = "#0F1013"  # text fields, log
 
-    STROKE_SOFT   = "#2A2C33"
+    STROKE_SOFT = "#2A2C33"
     STROKE_STRONG = "#3A3D46"
 
-    TEXT_PRIMARY   = "#E8E6DF"
+    TEXT_PRIMARY = "#E8E6DF"
     TEXT_SECONDARY = "#9A958A"
-    TEXT_MUTED     = "#5C5950"
+    TEXT_MUTED = "#5C5950"
 
-    GOLD     = "#E8B547"
-    GOLD_HI  = "#F0C766"
-    GOLD_LO  = "#B8862E"
+    GOLD = "#E8B547"
+    GOLD_HI = "#F0C766"
+    GOLD_LO = "#B8862E"
 
-    OK    = "#6FBF73"
-    WARN  = "#E8B547"   # reuse gold
+    OK = "#6FBF73"
+    WARN = "#E8B547"  # reuse gold
     ERROR = "#E5484D"
-    INFO  = "#7C9CBF"
+    INFO = "#7C9CBF"
 
 
 # ── Sidebar navigation tree (sections + items) ──────────────────────────────
@@ -47,30 +48,45 @@ class Palette:
 # factory_key is consumed by main_window.py to look up which tab class /
 # dialog opener to mount. Keeping it as a string keeps this file dependency-free.
 NAV_TREE = [
-    ("01 · INGEST", [
-        ("Offload",            "ingest.svg",          "offload"),
-        ("Proxy Generation",   "proxy.svg",           "proxy"),
-    ]),
-    ("02 · ORGANIZE", [
-        ("Bulk Rename",        "rename.svg",          "rename"),
-        ("Group by Pattern",   "group.svg",           "organize"),
-        ("Extract Archives",   "archive-extract.svg", "extract"),
-        ("File Browser",       "stills.svg",          "stills"),
-    ]),
-    ("03 · MAINTAIN", [
-        ("Stale Files",        "health.svg",          "stale"),
-        ("Storage Report",     "storage.svg",         "storage"),
-        ("NLE Backup",         "nle-backup.svg",      "nle_backup"),
-        ("Export Watcher",     "watch.svg",           "export_watcher"),
-        ("Trash",              "trash.svg",           "trash"),
-        ("Sync Check",         "sync.svg",            "sync_check"),
-        ("Watch Folders",      "watch.svg",           "watch_folders"),
-    ]),
-    ("04 · DELIVER", [
-        ("Spec Validator",     "validator.svg",       "validator"),
-        ("Package & Export",   "package.svg",         "package"),
-    ]),
-    ("05 · ARCHIVE", [
-        ("Cold Storage",       "archive-cold.svg",    "cold_storage"),
-    ]),
+    (
+        "01 · INGEST",
+        [
+            ("Offload", "ingest.svg", "offload"),
+            ("Proxy Generation", "proxy.svg", "proxy"),
+        ],
+    ),
+    (
+        "02 · ORGANIZE",
+        [
+            ("Bulk Rename", "rename.svg", "rename"),
+            ("Group by Pattern", "group.svg", "organize"),
+            ("Extract Archives", "archive-extract.svg", "extract"),
+            ("File Browser", "stills.svg", "stills"),
+        ],
+    ),
+    (
+        "03 · MAINTAIN",
+        [
+            ("Stale Files", "health.svg", "stale"),
+            ("Storage Report", "storage.svg", "storage"),
+            ("NLE Backup", "nle-backup.svg", "nle_backup"),
+            ("Export Watcher", "watch.svg", "export_watcher"),
+            ("Trash", "trash.svg", "trash"),
+            ("Sync Check", "sync.svg", "sync_check"),
+            ("Watch Folders", "watch.svg", "watch_folders"),
+        ],
+    ),
+    (
+        "04 · DELIVER",
+        [
+            ("Spec Validator", "validator.svg", "validator"),
+            ("Package & Export", "package.svg", "package"),
+        ],
+    ),
+    (
+        "05 · ARCHIVE",
+        [
+            ("Cold Storage", "archive-cold.svg", "cold_storage"),
+        ],
+    ),
 ]

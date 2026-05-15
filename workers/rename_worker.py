@@ -4,16 +4,27 @@ import csv
 import datetime
 from pathlib import Path
 from typing import List, Optional, Tuple
+
 from PySide6.QtCore import Signal
-from workers.base_worker import BaseWorker
-from core.name_transform import generate_new_filename, move_prefix_to_suffix, move_suffix_to_prefix, replace_prefix, replace_suffix
+
+from constants import CAPTION_EXTENSIONS, OP_TYPE_COPY, OP_TYPE_RENAME, SIDECAR_EXTENSIONS
 from core.file_utils import (
-    resolve_name_conflict, safe_rename, same_inode,
-    split_compound_suffix, is_hidden_file,
+    is_hidden_file,
+    resolve_name_conflict,
+    safe_rename,
+    same_inode,
+    split_compound_suffix,
+)
+from core.name_transform import (
+    generate_new_filename,
+    move_prefix_to_suffix,
+    move_suffix_to_prefix,
+    replace_prefix,
+    replace_suffix,
 )
 from core.pattern_matching import match_prefix, match_suffix
 from models.operation_record import OperationRecord
-from constants import OP_TYPE_RENAME, OP_TYPE_COPY, SIDECAR_EXTENSIONS, CAPTION_EXTENSIONS
+from workers.base_worker import BaseWorker
 
 
 class RenameWorker(BaseWorker):
@@ -125,7 +136,7 @@ class RenameWorker(BaseWorker):
             if sib_stem != primary_stem or not sib_suffix:
                 continue
             # Final dot-segment must be a registered sidecar/caption extension
-            final_tail = '.' + sib_suffix.rsplit('.', 1)[-1]
+            final_tail = "." + sib_suffix.rsplit(".", 1)[-1]
             if final_tail.lower() not in valid_tails:
                 continue
             companions.append((sibling, parent / f"{new_stem}{sib_suffix}"))
@@ -136,9 +147,9 @@ class RenameWorker(BaseWorker):
         try:
             ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
             csv_path = target_dir / f"_pearls_rename_log_{ts}.csv"
-            with open(csv_path, 'w', newline='', encoding='utf-8') as f:
+            with open(csv_path, "w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
-                writer.writerow(['old_name', 'new_name', 'timestamp'])
+                writer.writerow(["old_name", "new_name", "timestamp"])
                 writer.writerows(log_rows)
         except Exception as e:
             self.emit_progress(f"Warning: could not write rename log — {e}")
@@ -159,7 +170,7 @@ class RenameWorker(BaseWorker):
         success_count = 0
         error_count = 0
         errors = []
-        copy_operations = []   # (copied_path, original_path) for OperationRecord
+        copy_operations = []  # (copied_path, original_path) for OperationRecord
         manifest_rows = []
 
         if self.direct_renames is not None:
@@ -184,7 +195,7 @@ class RenameWorker(BaseWorker):
                         continue
 
                 shutil.copy2(filepath, dest_path)
-                ts_str = datetime.datetime.now().isoformat(timespec='seconds')
+                ts_str = datetime.datetime.now().isoformat(timespec="seconds")
                 copy_operations.append((dest_path, filepath))
                 manifest_rows.append((filepath.name, dest_path.name, ts_str))
                 success_count += 1
@@ -205,7 +216,7 @@ class RenameWorker(BaseWorker):
             operation_record = OperationRecord(
                 operation_type=OP_TYPE_COPY,
                 files_affected=copy_operations,
-                metadata={'copy_dest': str(dest)},
+                metadata={"copy_dest": str(dest)},
             )
 
         message = f"Successfully copied {success_count} file(s)."
@@ -221,8 +232,8 @@ class RenameWorker(BaseWorker):
         success_count = 0
         error_count = 0
         errors = []
-        rename_operations = []   # (new_path, old_path) for OperationRecord / undo
-        manifest_rows = []       # (old_name, new_name, timestamp) for CSV
+        rename_operations = []  # (new_path, old_path) for OperationRecord / undo
+        manifest_rows = []  # (old_name, new_name, timestamp) for CSV
 
         # Build the work list: [(Path, new_name_str), ...]
         if self.direct_renames is not None:
@@ -249,11 +260,7 @@ class RenameWorker(BaseWorker):
                 # treat that as a conflict — same_inode confirms it's the same
                 # file viewed under a different case, and safe_rename handles
                 # the two-step rename.
-                if (
-                    new_path.exists()
-                    and new_path != filepath
-                    and not same_inode(new_path, filepath)
-                ):
+                if new_path.exists() and new_path != filepath and not same_inode(new_path, filepath):
                     new_path = resolve_name_conflict(new_path)
                     if new_path is None:
                         errors.append(f"{filepath.name}: target already exists")
@@ -266,7 +273,7 @@ class RenameWorker(BaseWorker):
                     error_count += 1
                     continue
 
-                ts_str = datetime.datetime.now().isoformat(timespec='seconds')
+                ts_str = datetime.datetime.now().isoformat(timespec="seconds")
                 rename_operations.append((new_path, filepath))
                 manifest_rows.append((filepath.name, new_path.name, ts_str))
                 success_count += 1
@@ -275,11 +282,7 @@ class RenameWorker(BaseWorker):
                 # Rename companion sidecar / caption files
                 new_stem, _ = split_compound_suffix(new_path.name)
                 for old_comp, new_comp in self._find_companions(filepath, new_stem):
-                    if (
-                        new_comp.exists()
-                        and new_comp != old_comp
-                        and not same_inode(new_comp, old_comp)
-                    ):
+                    if new_comp.exists() and new_comp != old_comp and not same_inode(new_comp, old_comp):
                         new_comp = resolve_name_conflict(new_comp)
                     if new_comp and safe_rename(old_comp, new_comp):
                         rename_operations.append((new_comp, old_comp))
@@ -307,11 +310,11 @@ class RenameWorker(BaseWorker):
                 operation_type=OP_TYPE_RENAME,
                 files_affected=rename_operations,
                 metadata={
-                    'prefix': self.prefix,
-                    'suffix': self.suffix,
-                    'rename_to': self.rename_to,
-                    'case_transform': self.case_transform,
-                }
+                    "prefix": self.prefix,
+                    "suffix": self.suffix,
+                    "rename_to": self.rename_to,
+                    "case_transform": self.case_transform,
+                },
             )
 
         message = f"Successfully renamed {success_count} file(s)."
