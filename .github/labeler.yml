@@ -1,0 +1,34 @@
+core:
+  - changed-files:
+      - any-glob-to-any-file: "core/**"
+
+ui:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "ui/**"
+          - "resources/**"
+
+workers:
+  - changed-files:
+      - any-glob-to-any-file: "workers/**"
+
+tests:
+  - changed-files:
+      - any-glob-to-any-file: "tests/**"
+
+ci:
+  - changed-files:
+      - any-glob-to-any-file: ".github/**"
+
+config:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "config.py"
+          - "constants.py"
+          - "branding.py"
+
+dependencies:
+  - changed-files:
+      - any-glob-to-any-file:
+          - "requirements.txt"
+          - "pyproject.toml"
