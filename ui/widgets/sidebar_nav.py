@@ -7,10 +7,9 @@ selection without this widget knowing anything about tabs or dialogs.
 
 from typing import Dict, Optional
 
-from PySide6.QtCore import Qt, QSize, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QFrame, QListWidget, QListWidgetItem
-
 
 _ROLE_KEY     = Qt.UserRole + 1   # the factory_key string, or "" for headers
 _ROLE_ISHEAD  = Qt.UserRole + 2   # bool

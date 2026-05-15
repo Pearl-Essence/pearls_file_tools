@@ -4,10 +4,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List
 
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QComboBox, QDialog, QDialogButtonBox, QGroupBox, QHBoxLayout,
-    QHeaderView, QLabel, QPushButton, QTableWidget, QTableWidgetItem,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
 )
 

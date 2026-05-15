@@ -8,7 +8,7 @@ Source files are NEVER deleted — ingest is always copy-only.
 import hashlib
 import shutil
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Tuple
 

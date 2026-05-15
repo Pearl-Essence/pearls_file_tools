@@ -5,7 +5,8 @@ import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
-from constants import CONFIG_FILE_NAME, THEME_DARK, DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT
+
+from constants import CONFIG_FILE_NAME, DEFAULT_WINDOW_HEIGHT, DEFAULT_WINDOW_WIDTH, THEME_DARK
 
 
 def get_config_dir() -> Path:

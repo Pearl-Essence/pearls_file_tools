@@ -5,11 +5,17 @@ from typing import List
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QHeaderView,
+    QDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
 )
 
-from core.linter import LintIssue, ISSUE_LABELS
+from core.linter import ISSUE_LABELS, LintIssue
 
 _SEVERITY_ORDER = [
     'illegal_char', 'reserved_name', 'too_long',

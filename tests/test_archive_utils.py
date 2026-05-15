@@ -1,24 +1,21 @@
 """Comprehensive tests for core/archive_utils.py."""
 
-import os
-import zipfile
 import tarfile
-import struct
-import pytest
+import zipfile
 from pathlib import Path
+
 from core.archive_utils import (
     _is_unsafe_archive_path,
     _safe_path_under,
-    _validate_zip_entries,
-    _validate_tar_entries,
     _scrub_extracted,
+    _validate_tar_entries,
+    _validate_zip_entries,
+    extract_archive,
+    extract_tar,
+    extract_zip,
     get_archive_type,
     smart_extract,
-    extract_zip,
-    extract_tar,
-    extract_archive,
 )
-
 
 # ── _is_unsafe_archive_path ─────────────────────────────────────────────────
 

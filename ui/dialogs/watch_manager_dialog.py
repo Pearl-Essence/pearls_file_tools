@@ -1,6 +1,5 @@
 """Watch Folder Manager dialog for Pearl's File Tools."""
 
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -8,10 +7,21 @@ from typing import List, Optional
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QListWidget, QListWidgetItem,
-    QComboBox, QCheckBox, QFileDialog, QWidget, QSizePolicy,
-    QHeaderView, QAbstractItemView,
+    QAbstractItemView,
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QFileDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QPushButton,
+    QSizePolicy,
+    QTableWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
 from core.watch_service import HAS_WATCHDOG, WatchRule

@@ -3,8 +3,9 @@
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
-from constants import CASE_NONE, CASE_UPPER, CASE_LOWER, CASE_TITLE
+from typing import Dict, List, Optional, Tuple
+
+from constants import CASE_LOWER, CASE_NONE, CASE_TITLE, CASE_UPPER
 
 
 @dataclass

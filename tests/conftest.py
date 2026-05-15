@@ -1,9 +1,11 @@
 """Shared fixtures for Pearl Post Suite tests."""
 
-import os
 import sys
-import pytest
 from pathlib import Path
+
+import pytest
+
+collect_ignore = ["gui_smoke_test.py"]
 
 # Ensure the package root is on sys.path so `import constants` etc. work
 # the same way they do when the app runs from pearls_file_tools/.

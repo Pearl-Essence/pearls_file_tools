@@ -11,14 +11,27 @@ from typing import Dict, List, Optional
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QFrame, QHBoxLayout, QInputDialog, QLabel,
-    QListWidget, QListWidgetItem, QMenu, QProgressBar, QPushButton,
-    QSizePolicy, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
+    QCheckBox,
+    QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QMenu,
+    QProgressBar,
+    QPushButton,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
 
 from core.pattern_matching import (
-    ALL_PRESETS, PRESET_STANDARD, SequenceGroup, detect_image_sequences,
-    group_files_by_pattern,
+    ALL_PRESETS,
+    PRESET_STANDARD,
+    SequenceGroup,
+    detect_image_sequences,
 )
 from ui.tabs.base_tab import BaseTab
 from ui.widgets.panel import Panel
@@ -288,7 +301,7 @@ class FileOrganizerTab(BaseTab):
             self.show_warning("None Selected", "Check at least one subdirectory.")
             return
 
-        from PySide6.QtWidgets import QProgressDialog, QApplication
+        from PySide6.QtWidgets import QApplication, QProgressDialog
         progress = QProgressDialog(
             "Running batch…", "Cancel", 0, len(checked_dirs), self
         )
@@ -321,9 +334,9 @@ class FileOrganizerTab(BaseTab):
 
     def _organize_single_dir(self, directory: str):
         """Synchronously scan and organize a single directory (used by batch mode)."""
-        from core.pattern_matching import group_files_by_preset, detect_image_sequences
-        from core.file_utils import safe_move_file
         import shutil
+
+        from core.pattern_matching import group_files_by_preset
 
         root = Path(directory)
         preset = self.preset_combo.currentData()
@@ -891,7 +904,7 @@ class FileOrganizerTab(BaseTab):
 
         # ── Pre-flight conflict check ─────────────────────────────────────
         root_path = Path(self.current_directory)
-        from ui.dialogs.preflight_dialog import check_conflicts, PreflightDialog
+        from ui.dialogs.preflight_dialog import PreflightDialog, check_conflicts
         conflicts = check_conflicts(
             {grp: files
              for groups in merged_groups.values()

@@ -1,13 +1,13 @@
 """Comprehensive tests for core/linter.py."""
 
+
 import pytest
-from pathlib import Path
+
 from core.linter import (
-    FilenameLint,
-    LintIssue,
     ILLEGAL_CHARS_WIN,
-    WINDOWS_RESERVED,
     ISSUE_LABELS,
+    WINDOWS_RESERVED,
+    FilenameLint,
 )
 from core.name_transform import ProductionTemplate
 
@@ -140,7 +140,6 @@ class TestFilenameLint:
     def test_permission_error_handled(self, linter, tmp_path):
         # The linter catches PermissionError but not FileNotFoundError,
         # so we test with a directory that exists but has restricted perms
-        import os
         restricted = tmp_path / "restricted"
         restricted.mkdir()
         (restricted / "file.txt").write_text("data")

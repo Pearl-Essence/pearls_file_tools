@@ -15,19 +15,37 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QBrush, QColor, QFont
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
-    QButtonGroup, QCheckBox, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
-    QLabel, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QProgressBar,
-    QPushButton, QRadioButton, QScrollArea, QSizePolicy, QSpinBox, QStackedWidget,
-    QTabWidget, QTextEdit, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
+    QButtonGroup,
+    QCheckBox,
+    QFileDialog,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QRadioButton,
+    QScrollArea,
+    QSizePolicy,
+    QSpinBox,
+    QStackedWidget,
+    QTabWidget,
+    QTextEdit,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
 
 from ui.tabs.base_tab import BaseTab
 from ui.widgets.directory_selector import DirectorySelectorWidget
 from workers.base_worker import BaseWorker
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Colours
@@ -540,6 +558,7 @@ class _DuplicatesPane(QWidget):
         # have the same primitive intuition: that's a sequence, not 36
         # accidentally-duplicate files.
         from collections import defaultdict
+
         from core.pattern_matching import detect_image_sequences
         sequence_groups: List = []
         regular_groups: List = []

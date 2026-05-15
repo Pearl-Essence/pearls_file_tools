@@ -19,8 +19,17 @@ from typing import Dict, List, Optional, Tuple
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (
-    QCheckBox, QFrame, QHBoxLayout, QHeaderView, QLabel, QMessageBox,
-    QProgressBar, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout,
+    QCheckBox,
+    QFrame,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
     QWidget,
 )
 
@@ -28,8 +37,7 @@ from branding import Palette
 from ui.tabs.base_tab import BaseTab
 from ui.widgets.panel import Panel
 from ui.widgets.path_card import PathCard
-from ui.widgets.pill import Pill, KIND_OK, KIND_WARN, KIND_ERROR, KIND_MUTED
-
+from ui.widgets.pill import KIND_ERROR, KIND_MUTED, KIND_OK, KIND_WARN, Pill
 
 # ── Manifest row state vocabulary ───────────────────────────────────────────
 STATE_QUEUED   = "queued"
@@ -323,10 +331,14 @@ class _OffloadPane(QWidget):
                     counts[state] += 1
                     break
         bits = []
-        if counts[STATE_VERIFIED]: bits.append(f"{counts[STATE_VERIFIED]} verified")
-        if counts[STATE_RUNNING]:  bits.append(f"{counts[STATE_RUNNING]} hashing")
-        if counts[STATE_FAILED]:   bits.append(f"{counts[STATE_FAILED]} mismatch")
-        if counts[STATE_QUEUED]:   bits.append(f"{counts[STATE_QUEUED]} queued")
+        if counts[STATE_VERIFIED]:
+            bits.append(f"{counts[STATE_VERIFIED]} verified")
+        if counts[STATE_RUNNING]:
+            bits.append(f"{counts[STATE_RUNNING]} hashing")
+        if counts[STATE_FAILED]:
+            bits.append(f"{counts[STATE_FAILED]} mismatch")
+        if counts[STATE_QUEUED]:
+            bits.append(f"{counts[STATE_QUEUED]} queued")
         self.lbl_counts.setText(" · ".join(bits))
 
     def _set_row_state(self, row: int, state: str, hash_str: Optional[str] = None):
@@ -569,7 +581,7 @@ class _OffloadPane(QWidget):
             f"Failed: {failed}\n"
         )
         if failed:
-            body += f"\nFailed files:\n"
+            body += "\nFailed files:\n"
             for r in results:
                 if not r.verified:
                     body += f"  • {r.src.name}: {r.error}\n"

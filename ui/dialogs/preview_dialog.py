@@ -5,6 +5,8 @@ a top summary bar, and visual treatment so users can scan large rename
 batches without losing track of which line maps to which.
 """
 
+from typing import List, Tuple
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor, QFont
 from PySide6.QtWidgets import (
@@ -17,8 +19,6 @@ from PySide6.QtWidgets import (
     QTreeWidgetItem,
     QVBoxLayout,
 )
-from typing import List, Tuple
-
 
 _CHANGE_COLOR = QColor('#c3e88d')   # green — actually different
 _UNCHANGED_COLOR = QColor('#888888')  # grey — no-op rows

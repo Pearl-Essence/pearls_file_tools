@@ -1,9 +1,19 @@
 """Rename history viewer dialog for Pearl's File Tools."""
 
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLineEdit,
-                             QPushButton, QTableWidget, QTableWidgetItem,
-                             QHeaderView, QLabel, QAbstractItemView, QMessageBox)
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QTimer
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QDialog,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+)
 
 
 class HistoryDialog(QDialog):

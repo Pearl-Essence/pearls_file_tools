@@ -1,17 +1,15 @@
 """Comprehensive tests for core/sync_check.py."""
 
-import time
 import datetime
-import pytest
 from pathlib import Path
+
 from core.sync_check import (
     SyncEntry,
     SyncReport,
-    _md5,
     _index_dir,
+    _md5,
     compare_directories,
 )
-
 
 # ── _md5 ────────────────────────────────────────────────────────────────────
 

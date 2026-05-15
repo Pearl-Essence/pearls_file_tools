@@ -5,8 +5,16 @@ from typing import List, Optional
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QApplication, QHBoxLayout, QHeaderView, QLabel,
-    QMenu, QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
+    QApplication,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QMenu,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
 
 try:

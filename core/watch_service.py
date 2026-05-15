@@ -4,13 +4,13 @@ Wraps watchdog (real-time) with a polling fallback when watchdog is not installe
 """
 
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional
 
 try:
-    from watchdog.observers import Observer
     from watchdog.events import FileSystemEventHandler
+    from watchdog.observers import Observer
     HAS_WATCHDOG = True
 except ImportError:
     HAS_WATCHDOG = False

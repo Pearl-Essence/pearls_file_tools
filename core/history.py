@@ -2,7 +2,8 @@
 
 import sqlite3
 from pathlib import Path
-from typing import List, Dict
+from typing import Dict, List
+
 from config import get_data_dir
 from models.operation_record import OperationRecord
 

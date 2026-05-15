@@ -1,8 +1,8 @@
 """Comprehensive tests for config.py."""
 
 import json
-import pytest
 from pathlib import Path
+
 from config import Config, get_config_dir, get_data_dir
 
 

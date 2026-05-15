@@ -1,26 +1,25 @@
 """Comprehensive tests for core/delivery.py."""
 
 import zipfile
-import pytest
 from pathlib import Path
-from unittest.mock import patch
+
+import pytest
+
 from core.delivery import (
     DeliveryProfile,
+    DeliveryValidator,
+    DuplicateGroup,
+    HandoffResult,
+    HandoffRule,
     ValidationIssue,
     ValidationReport,
-    DuplicateGroup,
-    HandoffRule,
-    HandoffResult,
-    DeliveryValidator,
-    default_handoff_rules,
-    list_delivery_files,
     create_delivery_zip,
-    find_duplicates,
+    default_handoff_rules,
     find_case_collisions,
+    find_duplicates,
+    list_delivery_files,
     run_handoff_checks,
-    export_manifest,
 )
-
 
 # ── DeliveryProfile ─────────────────────────────────────────────────────────
 

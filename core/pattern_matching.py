@@ -1,12 +1,11 @@
 """Pattern matching and grouping utilities for Pearl's File Tools."""
 
 import re
-from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Tuple, Optional, Dict, List, Iterable
-from difflib import SequenceMatcher
 from collections import defaultdict
-
+from dataclasses import dataclass
+from difflib import SequenceMatcher
+from pathlib import Path
+from typing import Dict, Iterable, List, Optional, Tuple
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Delimiter auto-detection

@@ -1,10 +1,11 @@
 """Draggable tree widget for file organization."""
 
-from PySide6.QtWidgets import QApplication, QTreeWidget, QTreeWidgetItem
-from PySide6.QtCore import Qt, Signal, QMimeData, QPoint
-from PySide6.QtGui import QDrag
 from pathlib import Path
 from typing import List, Optional
+
+from PySide6.QtCore import QMimeData, QPoint, Qt, Signal
+from PySide6.QtGui import QDrag
+from PySide6.QtWidgets import QApplication, QTreeWidget, QTreeWidgetItem
 
 
 class DraggableTreeWidget(QTreeWidget):

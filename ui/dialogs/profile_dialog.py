@@ -1,10 +1,19 @@
 """Naming profile management dialog for Pearl's File Tools."""
 
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QPushButton,
-    QGroupBox, QFormLayout, QLineEdit, QLabel, QDialogButtonBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QListWidget,
     QMessageBox,
+    QPushButton,
+    QVBoxLayout,
 )
+
 from core.name_transform import ProductionTemplate
 
 

@@ -1,11 +1,10 @@
 """Comprehensive tests for core/trash.py."""
 
-import json
-import time
 import datetime
+
 import pytest
-from pathlib import Path
-from core.trash import StudioTrash, TrashItem, TRASH_DIR_NAME
+
+from core.trash import TRASH_DIR_NAME, StudioTrash, TrashItem
 
 
 @pytest.fixture

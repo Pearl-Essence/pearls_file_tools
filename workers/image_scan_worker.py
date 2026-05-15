@@ -1,16 +1,18 @@
 """Image/video scan worker thread for Pearl's File Tools."""
 
 import base64
-import os
-import json
 import hashlib
+import json
+import os
 import subprocess
-from pathlib import Path
 from datetime import datetime
-from typing import List, Dict, Optional
+from pathlib import Path
+from typing import Dict, List, Optional
+
 from PySide6.QtCore import Signal
-from workers.base_worker import BaseWorker
+
 from constants import IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
+from workers.base_worker import BaseWorker
 
 CACHE_FILE_NAME = '.image_browser_cache.json'
 

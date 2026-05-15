@@ -383,7 +383,8 @@ def find_duplicates(
     candidates ever get hashed.
     """
     if cancel_check is None:
-        cancel_check = lambda: False
+        def cancel_check():
+            return False
 
     # Pass 1 — bucket by size
     size_buckets: Dict[int, List[Path]] = defaultdict(list)

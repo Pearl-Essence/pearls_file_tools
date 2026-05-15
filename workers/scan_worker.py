@@ -2,9 +2,11 @@
 
 from pathlib import Path
 from typing import Dict, List, Optional
+
 from PySide6.QtCore import Signal
+
+from core.pattern_matching import PRESET_STANDARD, GroupingPreset, group_files_by_preset
 from workers.base_worker import BaseWorker
-from core.pattern_matching import group_files_by_pattern, group_files_by_preset, GroupingPreset, PRESET_STANDARD
 
 
 class ScanWorker(BaseWorker):

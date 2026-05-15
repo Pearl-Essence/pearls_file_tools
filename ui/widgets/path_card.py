@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QFileDialog, QHBoxLayout, QLabel, QVBoxLayout
 
 from ui.widgets.panel import Panel
-from ui.widgets.pill import Pill, KIND_MUTED, KIND_OK
+from ui.widgets.pill import KIND_MUTED, KIND_OK, Pill
 
 
 class PathCard(Panel):

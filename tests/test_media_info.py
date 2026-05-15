@@ -1,9 +1,8 @@
 """Comprehensive tests for core/media_info.py."""
 
-import pytest
-from unittest.mock import patch, MagicMock
-from core.media_info import MediaInfo, _has_data
+from unittest.mock import MagicMock, patch
 
+from core.media_info import MediaInfo, _has_data
 
 # ── MediaInfo dataclass ─────────────────────────────────────────────────────
 
@@ -117,7 +116,7 @@ class TestGetMediaInfo:
     def test_ffprobe_success_skips_pymediainfo(self):
         expected = MediaInfo(codec="h264", width=1920, height=1080)
         with patch("core.media_info.HAS_FFPROBE", True), \
-             patch("core.media_info._via_ffprobe", return_value=expected) as ffprobe_mock, \
+             patch("core.media_info._via_ffprobe", return_value=expected), \
              patch("core.media_info._via_pymediainfo") as pymi_mock:
             from core.media_info import get_media_info
             result = get_media_info(MagicMock())

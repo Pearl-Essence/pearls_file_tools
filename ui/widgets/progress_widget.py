@@ -1,7 +1,7 @@
 """Progress widget for Pearl's File Tools."""
 
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QProgressBar, QLabel
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QLabel, QProgressBar, QVBoxLayout, QWidget
 
 
 class ProgressWidget(QWidget):
@@ -54,7 +54,6 @@ class ProgressWidget(QWidget):
             total: Total/maximum progress value
         """
         if total > 0:
-            percentage = int((current / total) * 100)
             self.progress_bar.setMaximum(total)
             self.progress_bar.setValue(current)
         else:

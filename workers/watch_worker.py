@@ -6,8 +6,8 @@ from typing import List
 
 from PySide6.QtCore import Signal
 
+from core.watch_service import HAS_WATCHDOG, WatchRule, WatchService
 from workers.base_worker import BaseWorker
-from core.watch_service import WatchRule, WatchService, HAS_WATCHDOG
 
 
 class WatchWorker(BaseWorker):

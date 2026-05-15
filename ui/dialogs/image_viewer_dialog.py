@@ -1,11 +1,11 @@
 """Image viewer dialog for full-size image viewing."""
 
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-                            QPushButton)
+from pathlib import Path
+from typing import Dict, List
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap
-from pathlib import Path
-from typing import List, Dict
+from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
 
 class ImageViewerDialog(QDialog):
