@@ -255,7 +255,12 @@ def extract_rar(archive_path: Path, extract_to: Path, use_smart_extract: bool = 
     try:
         temp_dir = tempfile.mkdtemp(prefix="extract_")
         with rarfile.RarFile(archive_path, "r") as rar_ref:
+            for member in rar_ref.infolist():
+                if _is_unsafe_archive_path(member.filename):
+                    print(f"Error extracting RAR {archive_path}: unsafe path {member.filename!r}")
+                    return None
             rar_ref.extractall(temp_dir)
+        _scrub_extracted(Path(temp_dir))
         extracted_items = smart_extract(Path(temp_dir), extract_to, use_smart_extract)
         return extracted_items if extracted_items else None
     except Exception as e:
@@ -275,7 +280,12 @@ def extract_7z(archive_path: Path, extract_to: Path, use_smart_extract: bool = T
     try:
         temp_dir = tempfile.mkdtemp(prefix="extract_")
         with py7zr.SevenZipFile(archive_path, "r") as sz_ref:
+            for name in sz_ref.getnames():
+                if _is_unsafe_archive_path(name):
+                    print(f"Error extracting 7Z {archive_path}: unsafe path {name!r}")
+                    return None
             sz_ref.extractall(temp_dir)
+        _scrub_extracted(Path(temp_dir))
         extracted_items = smart_extract(Path(temp_dir), extract_to, use_smart_extract)
         return extracted_items if extracted_items else None
     except Exception as e:

@@ -7,8 +7,7 @@ format used by Silverstack, ShotPut Pro, Hedge, and other DIT tools.
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, List
-from xml.dom.minidom import parseString
-from xml.etree.ElementTree import Element, SubElement, tostring
+from xml.etree.ElementTree import Element, SubElement, indent, tostring
 
 if TYPE_CHECKING:
     from workers.ingest_worker import IngestResult
@@ -47,8 +46,8 @@ def write_mhl(results: "List[IngestResult]", dest_dir: Path) -> Path:
         # file_status signal's message format.  If no hash is available, omit.
         SubElement(h, "md5").text = ""
 
-    rough = tostring(root, encoding="unicode")
-    pretty = parseString(rough).toprettyxml(indent="  ", encoding="UTF-8")
+    indent(root, space="  ")
+    pretty = tostring(root, encoding="UTF-8", xml_declaration=True)
 
     dest_dir.mkdir(parents=True, exist_ok=True)
     output.write_bytes(pretty)
@@ -82,8 +81,8 @@ def write_mhl_with_hashes(entries: "List[dict]", dest_dir: Path) -> Path:
         SubElement(h, "lastmodificationdate").text = timestamp
         SubElement(h, "md5").text = entry.get("md5", "")
 
-    rough = tostring(root, encoding="unicode")
-    pretty = parseString(rough).toprettyxml(indent="  ", encoding="UTF-8")
+    indent(root, space="  ")
+    pretty = tostring(root, encoding="UTF-8", xml_declaration=True)
 
     dest_dir.mkdir(parents=True, exist_ok=True)
     output.write_bytes(pretty)
