@@ -1181,9 +1181,7 @@ class BulkRenamerTab(BaseTab):
         sep = self._current_template.separator if self._current_template else "_"
         if len(selected_files) == 1:
             return [(selected_files[0].name, f"{base}{selected_files[0].suffix}")]
-        return [
-            (f.name, f"{base}{sep}{str(i + 1).zfill(3)}{f.suffix}") for i, f in enumerate(selected_files)
-        ]
+        return [(f.name, f"{base}{sep}{str(i + 1).zfill(3)}{f.suffix}") for i, f in enumerate(selected_files)]
 
     def _preview_standard(self, selected_files) -> List[Tuple[str, str]]:
         """Build preview data for Standard mode.
@@ -1205,8 +1203,9 @@ class BulkRenamerTab(BaseTab):
         preview_data: List[Tuple[str, str]] = []
         for filepath in selected_files:
             current = filepath.name
-            current = self._apply_transposition(current, tokens, is_p2s, match_prefix, match_suffix,
-                                                 move_prefix_to_suffix, move_suffix_to_prefix)
+            current = self._apply_transposition(
+                current, tokens, is_p2s, match_prefix, match_suffix, move_prefix_to_suffix, move_suffix_to_prefix
+            )
             if fp_find:
                 current = replace_prefix(current, fp_find, fp_repl)
             if fs_find:
@@ -1222,8 +1221,7 @@ class BulkRenamerTab(BaseTab):
         return preview_data
 
     @staticmethod
-    def _apply_transposition(current, tokens, is_p2s, match_prefix_fn, match_suffix_fn,
-                              move_p2s_fn, move_s2p_fn):
+    def _apply_transposition(current, tokens, is_p2s, match_prefix_fn, match_suffix_fn, move_p2s_fn, move_s2p_fn):
         """Apply prefix-to-suffix or suffix-to-prefix transposition to a filename."""
         if not tokens:
             return current
