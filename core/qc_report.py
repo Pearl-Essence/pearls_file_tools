@@ -20,9 +20,7 @@ except Exception:
     _HAS_FFMPEG = False
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Thumbnail extraction
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 def _extract_thumbnail_b64(filepath: Path, tmp_dir: Path) -> Optional[str]:
@@ -45,9 +43,7 @@ def _extract_thumbnail_b64(filepath: Path, tmp_dir: Path) -> Optional[str]:
     return None
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # File flagging
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 def _flag_file(filepath: Path, min_size_bytes: int) -> Optional[str]:
@@ -64,9 +60,7 @@ def _flag_file(filepath: Path, min_size_bytes: int) -> Optional[str]:
     return None
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # HTML templates
-# ─────────────────────────────────────────────────────────────────────────────
 
 _PAGE_TEMPLATE = Template("""\
 <!DOCTYPE html>
@@ -136,9 +130,7 @@ _ROW_TEMPLATE = Template("""\
 """)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Public API
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 def _fmt_size(n: int) -> str:

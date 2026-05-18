@@ -11,7 +11,7 @@ import shutil
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 TRASH_DIR_NAME = ".pearls_trash"
 _META_FILENAME = ".meta.json"
@@ -78,7 +78,7 @@ class StudioTrash:
     def list_trash(self) -> List[TrashItem]:
         return [TrashItem(**r) for r in self._load()]
 
-    def restore(self, item: TrashItem) -> Path:
+    def restore(self, item: TrashItem) -> Optional[Path]:
         """Move item back to its original location.
 
         Returns the actual restored path (which may differ from the

@@ -70,6 +70,40 @@ def write_qdirstat_cache(data: Dict[str, Dict[str, int]], root_dir: Path, output
         f.write(raw)
 
 
+def _build_ext_to_cat() -> Dict[str, str]:
+    from constants import ALL_EXTENSION_CATEGORIES
+
+    ext_to_cat = {}
+    for cat, exts in ALL_EXTENSION_CATEGORIES.items():
+        for ext in exts:
+            ext_to_cat[ext.lower()] = cat
+    return ext_to_cat
+
+
+def _parse_dir_line(dir_path: str, root_path: Optional[str]):
+    if root_path is None:
+        return "__root__", dir_path
+    try:
+        rel = os.path.relpath(dir_path, root_path)
+        return (rel if rel != "." else "__root__"), root_path
+    except ValueError:
+        return dir_path, root_path
+
+
+def _parse_file_line(parts, current_folder, ext_to_cat, data):
+    if len(parts) < 3:
+        return
+    fname = parts[1]
+    try:
+        size = int(parts[2])
+    except ValueError:
+        return
+    ext = os.path.splitext(fname)[1].lower()
+    cat = ext_to_cat.get(ext, "other")
+    data.setdefault(current_folder, {})
+    data[current_folder][cat] = data[current_folder].get(cat, 0) + size
+
+
 def parse_qdirstat_cache(cache_path: Path) -> Dict[str, Dict[str, int]]:
     """Parse a qDirStat .cache.gz file into Pearl's storage data format.
 
@@ -83,13 +117,7 @@ def parse_qdirstat_cache(cache_path: Path) -> Dict[str, Dict[str, int]]:
     if not lines or not lines[0].startswith("[qdirstat"):
         raise ValueError("Not a valid qDirStat cache file")
 
-    from constants import ALL_EXTENSION_CATEGORIES
-
-    ext_to_cat = {}
-    for cat, exts in ALL_EXTENSION_CATEGORIES.items():
-        for ext in exts:
-            ext_to_cat[ext.lower()] = cat
-
+    ext_to_cat = _build_ext_to_cat()
     data: Dict[str, Dict[str, int]] = {}
     root_path: Optional[str] = None
     current_folder = "__root__"
@@ -97,27 +125,8 @@ def parse_qdirstat_cache(cache_path: Path) -> Dict[str, Dict[str, int]]:
     for line in lines[1:]:
         line = line.rstrip("\n")
         if line.startswith("D "):
-            dir_path = line[2:].strip()
-            if root_path is None:
-                root_path = dir_path
-                current_folder = "__root__"
-            else:
-                try:
-                    rel = os.path.relpath(dir_path, root_path)
-                    current_folder = rel if rel != "." else "__root__"
-                except ValueError:
-                    current_folder = dir_path
+            current_folder, root_path = _parse_dir_line(line[2:].strip(), root_path)
         elif line.startswith("F\t"):
-            parts = line.split("\t")
-            if len(parts) >= 3:
-                fname = parts[1]
-                try:
-                    size = int(parts[2])
-                except ValueError:
-                    continue
-                ext = os.path.splitext(fname)[1].lower()
-                cat = ext_to_cat.get(ext, "other")
-                data.setdefault(current_folder, {})
-                data[current_folder][cat] = data[current_folder].get(cat, 0) + size
+            _parse_file_line(line.split("\t"), current_folder, ext_to_cat, data)
 
     return data

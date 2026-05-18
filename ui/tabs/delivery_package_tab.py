@@ -30,9 +30,7 @@ class PackageExportTab(BaseTab):
     def get_tab_name(self) -> str:
         return "Package & Export"
 
-    # ─────────────────────────────────────────────────────────────────────
     # UI
-    # ─────────────────────────────────────────────────────────────────────
     def setup_ui(self):
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
@@ -63,9 +61,7 @@ class PackageExportTab(BaseTab):
         )
         return header
 
-    # ─────────────────────────────────────────────────────────────────────
     # Cross-tab API
-    # ─────────────────────────────────────────────────────────────────────
     def set_source_from_validator(self, path: str):
         """Pre-fill all four panes' source directory + activate Package tab."""
         if not path or not Path(path).is_dir():
@@ -77,9 +73,7 @@ class PackageExportTab(BaseTab):
         self._inner_tabs.setCurrentWidget(self._package_pane)
         self.emit_status("Validation passed — delivery zip is now available")
 
-    # ─────────────────────────────────────────────────────────────────────
     # Persistence
-    # ─────────────────────────────────────────────────────────────────────
     def load_settings(self):
         directory = self.config.get_tab_directory("delivery")
         if directory and Path(directory).is_dir():

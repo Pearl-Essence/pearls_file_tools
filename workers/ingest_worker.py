@@ -123,63 +123,22 @@ class IngestWorker(BaseWorker):
 
             self.overall_progress.emit(idx, total)
 
-            # 1. Wait for the source to stop growing (handles NLE renders
-            #    still being written when ingest fires from a watcher).
+            # Wait for the source to stop growing (handles NLE renders
+            # still being written when ingest fires from a watcher).
             if not self._wait_for_stable(src):
-                # Distinguish cancellation from settle-timeout / disappearance —
-                # a misleading "settle timeout" message used to mask user cancels.
                 if self.is_cancelled:
                     break
                 fail_count += 1
-                err = "Source still growing — settle timeout" if src.exists() else "Source vanished before ingest"
-                self._results.append(IngestResult(src=src, dst=dst, verified=False, error=err))
-                self.file_status.emit(src.name, False, f"✗ {src.name}: {err}")
+                self._record_settle_failure(src, dst)
                 continue
 
             self.emit_progress(f"Copying {src.name} ({idx + 1}/{total})…")
 
-            try:
-                dst.parent.mkdir(parents=True, exist_ok=True)
-
-                pre_size = src.stat().st_size
-                shutil.copy2(src, dst)
-
-                # 2. Cross-check: if src grew during copy, the snapshot is
-                #    inconsistent. Surface this clearly instead of letting
-                #    a stale "Checksum mismatch" mislead the operator.
-                post_size = src.stat().st_size
-                if post_size != pre_size or post_size != dst.stat().st_size:
-                    raise IOError(
-                        f"Source size changed during copy ({pre_size:,} → {post_size:,}); writer not finished"
-                    )
-
-                if self.verify:
-                    src_md5 = self._md5(src)
-                    dst_md5 = self._md5(dst)
-                    verified = src_md5 == dst_md5
-
-                    result = IngestResult(src=src, dst=dst, verified=verified, md5=dst_md5)
-                    if verified:
-                        success_count += 1
-                        self.file_status.emit(
-                            src.name,
-                            True,
-                            f"✓ Verified → {dst} hash={dst_md5}",
-                        )
-                    else:
-                        fail_count += 1
-                        result.error = "Checksum mismatch (source likely still being written)"
-                        self.file_status.emit(src.name, False, f"✗ Checksum mismatch: {src.name}")
-                else:
-                    # Skip hash verification — trust the copy
-                    success_count += 1
-                    result = IngestResult(src=src, dst=dst, verified=True)
-                    self.file_status.emit(src.name, True, f"✓ Copied → {dst}")
-
-            except Exception as exc:
+            ok, result = self._copy_and_verify(src, dst)
+            if ok:
+                success_count += 1
+            else:
                 fail_count += 1
-                result = IngestResult(src=src, dst=dst, verified=False, error=str(exc))
-                self.file_status.emit(src.name, False, f"✗ Error: {exc}")
 
             self._results.append(result)
 
@@ -187,9 +146,57 @@ class IngestWorker(BaseWorker):
 
         cancelled = self.is_cancelled
         all_ok = fail_count == 0 and not cancelled
-        if cancelled:
-            summary = f"Ingest cancelled — {success_count} verified, {fail_count} failed"
-        else:
-            summary = f"Ingest complete — {success_count} verified, {fail_count} failed"
-
+        verb = "cancelled" if cancelled else "complete"
+        summary = f"Ingest {verb} — {success_count} verified, {fail_count} failed"
         self.finished.emit(all_ok, summary, self._results)
+
+    def _record_settle_failure(self, src: Path, dst: Path) -> None:
+        """Record a failure when the source file didn't settle in time."""
+        err = "Source still growing — settle timeout" if src.exists() else "Source vanished before ingest"
+        self._results.append(IngestResult(src=src, dst=dst, verified=False, error=err))
+        self.file_status.emit(src.name, False, f"✗ {src.name}: {err}")
+
+    def _copy_and_verify(self, src: Path, dst: Path) -> Tuple[bool, IngestResult]:
+        """Copy a single file and optionally verify its hash.
+
+        Returns ``(success, IngestResult)``.
+        """
+        try:
+            dst.parent.mkdir(parents=True, exist_ok=True)
+
+            pre_size = src.stat().st_size
+            shutil.copy2(src, dst)
+
+            # Cross-check: if src grew during copy, the snapshot is
+            # inconsistent.
+            post_size = src.stat().st_size
+            if post_size != pre_size or post_size != dst.stat().st_size:
+                raise IOError(
+                    f"Source size changed during copy ({pre_size:,} → {post_size:,}); writer not finished"
+                )
+
+            if self.verify:
+                return self._verify_copy(src, dst)
+
+            # Skip hash verification — trust the copy
+            self.file_status.emit(src.name, True, f"✓ Copied → {dst}")
+            return True, IngestResult(src=src, dst=dst, verified=True)
+
+        except Exception as exc:
+            self.file_status.emit(src.name, False, f"✗ Error: {exc}")
+            return False, IngestResult(src=src, dst=dst, verified=False, error=str(exc))
+
+    def _verify_copy(self, src: Path, dst: Path) -> Tuple[bool, IngestResult]:
+        """Hash-verify a copied file and emit status."""
+        src_md5 = self._md5(src)
+        dst_md5 = self._md5(dst)
+        verified = src_md5 == dst_md5
+
+        result = IngestResult(src=src, dst=dst, verified=verified, md5=dst_md5)
+        if verified:
+            self.file_status.emit(src.name, True, f"✓ Verified → {dst} hash={dst_md5}")
+            return True, result
+
+        result.error = "Checksum mismatch (source likely still being written)"
+        self.file_status.emit(src.name, False, f"✗ Checksum mismatch: {src.name}")
+        return False, result

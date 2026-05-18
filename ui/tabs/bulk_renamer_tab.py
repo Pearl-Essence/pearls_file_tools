@@ -95,9 +95,7 @@ class BulkRenamerTab(BaseTab):
     def get_tab_name(self) -> str:
         return "Bulk Rename"
 
-    # ─────────────────────────────────────────────────────────────────────
     # UI
-    # ─────────────────────────────────────────────────────────────────────
     def setup_ui(self):
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
@@ -1150,6 +1148,95 @@ class BulkRenamerTab(BaseTab):
 
     # ── preview ───────────────────────────────────────────────────────────
 
+    def _filter_hidden_files(self, selected_files):
+        """Apply the dot-file skip so preview matches what Apply Rename does."""
+        include_hidden = self.include_hidden_chk.isChecked()
+        if not include_hidden:
+            from core.file_utils import is_hidden_file
+
+            selected_files = [f for f in selected_files if not is_hidden_file(f.name)]
+        return selected_files
+
+    def _preview_sequential(self, selected_files) -> Optional[List[Tuple[str, str]]]:
+        """Build preview data for Number Files mode. Returns None on validation failure."""
+        base = self.seq_base_input.text().strip()
+        if not base:
+            self.show_warning("Base Name Required", "Enter a base name for sequential numbering before previewing.")
+            return None
+        pairs = generate_sequential_filenames(
+            [f.name for f in selected_files],
+            base_name=base,
+            start=self.seq_start_spin.value(),
+            padding=self.seq_padding_spin.value(),
+            separator=self.seq_separator_input.text(),
+        )
+        return list(pairs)
+
+    def _preview_template(self, selected_files) -> Optional[List[Tuple[str, str]]]:
+        """Build preview data for Template mode. Returns None on validation failure."""
+        base = self._get_template_composed_name()
+        if not base:
+            self.show_warning("Incomplete Template", "Fill in at least one template token before previewing.")
+            return None
+        sep = self._current_template.separator if self._current_template else "_"
+        if len(selected_files) == 1:
+            return [(selected_files[0].name, f"{base}{selected_files[0].suffix}")]
+        return [
+            (f.name, f"{base}{sep}{str(i + 1).zfill(3)}{f.suffix}") for i, f in enumerate(selected_files)
+        ]
+
+    def _preview_standard(self, selected_files) -> List[Tuple[str, str]]:
+        """Build preview data for Standard mode.
+
+        Includes any prefix-to-suffix / suffix-to-prefix transposition tokens
+        currently selected in the transposition group. Mirrors
+        RenameWorker._build_work_list so what you see is what you get.
+        """
+        from core.name_transform import move_prefix_to_suffix, move_suffix_to_prefix
+        from core.pattern_matching import match_prefix, match_suffix
+
+        tokens = self.get_selected_prefixes()
+        is_p2s = self.transpose_p2s_radio.isChecked()
+        fp_find = self.replace_prefix_find.text()
+        fp_repl = self.replace_prefix_with.text()
+        fs_find = self.replace_suffix_find.text()
+        fs_repl = self.replace_suffix_with.text()
+
+        preview_data: List[Tuple[str, str]] = []
+        for filepath in selected_files:
+            current = filepath.name
+            current = self._apply_transposition(current, tokens, is_p2s, match_prefix, match_suffix,
+                                                 move_prefix_to_suffix, move_suffix_to_prefix)
+            if fp_find:
+                current = replace_prefix(current, fp_find, fp_repl)
+            if fs_find:
+                current = replace_suffix(current, fs_find, fs_repl)
+            new_name = generate_new_filename(
+                current,
+                prefix=self.prefix_input.text(),
+                suffix=self.suffix_input.text(),
+                rename_to=self.rename_input.text(),
+                case_transform=self.get_case_transform(),
+            )
+            preview_data.append((filepath.name, new_name))
+        return preview_data
+
+    @staticmethod
+    def _apply_transposition(current, tokens, is_p2s, match_prefix_fn, match_suffix_fn,
+                              move_p2s_fn, move_s2p_fn):
+        """Apply prefix-to-suffix or suffix-to-prefix transposition to a filename."""
+        if not tokens:
+            return current
+        if is_p2s:
+            m = match_prefix_fn(current, tokens)
+            if m:
+                return move_p2s_fn(current, m)
+        else:
+            m = match_suffix_fn(current, tokens)
+            if m:
+                return move_s2p_fn(current, m)
+        return current
+
     def preview_changes(self):
         """Show the would-be rename results for the active mode.
 
@@ -1162,13 +1249,7 @@ class BulkRenamerTab(BaseTab):
             self.show_warning("No Files", "No files selected for preview.")
             return
 
-        # Apply the dot-file skip the same way Apply Rename does, so what
-        # the user sees in the preview matches what will actually happen.
-        include_hidden = self.include_hidden_chk.isChecked()
-        if not include_hidden:
-            from core.file_utils import is_hidden_file
-
-            selected_files = [f for f in selected_files if not is_hidden_file(f.name)]
+        selected_files = self._filter_hidden_files(selected_files)
         if not selected_files:
             self.show_info(
                 "All Files Hidden",
@@ -1179,88 +1260,24 @@ class BulkRenamerTab(BaseTab):
         from ui.dialogs.preview_dialog import PreviewDialog
 
         mode = self.mode_btn_group.checkedId()
-        preview_data: List[Tuple[str, str]] = []
 
         if mode == 1:
-            # Number Files mode
-            base = self.seq_base_input.text().strip()
-            if not base:
-                self.show_warning("Base Name Required", "Enter a base name for sequential numbering before previewing.")
-                return
-            pairs = generate_sequential_filenames(
-                [f.name for f in selected_files],
-                base_name=base,
-                start=self.seq_start_spin.value(),
-                padding=self.seq_padding_spin.value(),
-                separator=self.seq_separator_input.text(),
-            )
-            preview_data = list(pairs)
-
+            preview_data = self._preview_sequential(selected_files)
         elif mode == 2:
-            # Template mode
-            base = self._get_template_composed_name()
-            if not base:
-                self.show_warning("Incomplete Template", "Fill in at least one template token before previewing.")
-                return
-            sep = self._current_template.separator if self._current_template else "_"
-            if len(selected_files) == 1:
-                preview_data = [(selected_files[0].name, f"{base}{selected_files[0].suffix}")]
-            else:
-                preview_data = [
-                    (f.name, f"{base}{sep}{str(i + 1).zfill(3)}{f.suffix}") for i, f in enumerate(selected_files)
-                ]
-
+            preview_data = self._preview_template(selected_files)
         else:
-            # Standard mode — including any prefix→suffix / suffix→prefix
-            # tokens currently selected in the transposition group. Mirrors
-            # RenameWorker._build_work_list so what you see is what you get.
-            from core.name_transform import move_prefix_to_suffix, move_suffix_to_prefix
-            from core.pattern_matching import match_prefix, match_suffix
+            preview_data = self._preview_standard(selected_files)
 
-            tokens = self.get_selected_prefixes()
-            is_p2s = self.transpose_p2s_radio.isChecked()
-            fp_find = self.replace_prefix_find.text()
-            fp_repl = self.replace_prefix_with.text()
-            fs_find = self.replace_suffix_find.text()
-            fs_repl = self.replace_suffix_with.text()
-            for filepath in selected_files:
-                current = filepath.name
-                if tokens:
-                    if is_p2s:
-                        m = match_prefix(current, tokens)
-                        if m:
-                            current = move_prefix_to_suffix(current, m)
-                    else:
-                        m = match_suffix(current, tokens)
-                        if m:
-                            current = move_suffix_to_prefix(current, m)
-                if fp_find:
-                    current = replace_prefix(current, fp_find, fp_repl)
-                if fs_find:
-                    current = replace_suffix(current, fs_find, fs_repl)
-                new_name = generate_new_filename(
-                    current,
-                    prefix=self.prefix_input.text(),
-                    suffix=self.suffix_input.text(),
-                    rename_to=self.rename_input.text(),
-                    case_transform=self.get_case_transform(),
-                )
-                preview_data.append((filepath.name, new_name))
+        if preview_data is None:
+            return
 
         dialog = PreviewDialog(preview_data, self)
         dialog.exec()
 
     # ── apply rename ──────────────────────────────────────────────────────
 
-    def apply_rename(self):
-        """Apply rename — dispatches to standard, sequential, or template mode."""
-        selected_files = self.file_list.get_selected_files()
-        if not selected_files:
-            self.show_warning("No Files", "No files selected for renaming.")
-            return
-
-        from workers.rename_worker import RenameWorker
-
+    def _validate_copy_dest(self):
+        """Validate and return (copy_mode, copy_dest), or None if invalid."""
         copy_mode = self.copy_mode_chk.isChecked()
         copy_dest = None
         if copy_mode:
@@ -1270,105 +1287,131 @@ class BulkRenamerTab(BaseTab):
                     "No destination",
                     "Choose a valid destination folder for the copies.",
                 )
-                return
+                return None
             copy_dest = Path(dest_text)
+        return copy_mode, copy_dest
+
+    def _apply_sequential(self, selected_files, copy_mode, copy_dest):
+        """Build and confirm the sequential-numbering rename. Returns a RenameWorker or None."""
+        from workers.rename_worker import RenameWorker
+
+        base = self.seq_base_input.text().strip()
+        if not base:
+            self.show_warning("Base Name Required", "Enter a base name for sequential numbering.")
+            return None
+        pairs = generate_sequential_filenames(
+            [f.name for f in selected_files],
+            base_name=base,
+            start=self.seq_start_spin.value(),
+            padding=self.seq_padding_spin.value(),
+            separator=self.seq_separator_input.text(),
+        )
+        direct = [(selected_files[i], new_name) for i, (_, new_name) in enumerate(pairs)]
+        preview_lines = "\n".join(f"  {old} → {new}" for old, new in pairs[:5])
+        if len(pairs) > 5:
+            preview_lines += f"\n  … and {len(pairs) - 5} more"
+        if not self.confirm_action(
+            "Confirm Sequential Rename",
+            f"Rename {len(selected_files)} file(s) as:\n\n{preview_lines}\n\n"
+            "This can be undone using 'Undo Last Operation'.",
+        ):
+            return None
+        return RenameWorker(
+            selected_files,
+            direct_renames=direct,
+            copy_mode=copy_mode,
+            copy_dest=copy_dest,
+            rename_sidecars=self.rename_sidecars_chk.isChecked(),
+            rename_captions=self.rename_captions_chk.isChecked(),
+        )
+
+    def _apply_template(self, selected_files, copy_mode, copy_dest):
+        """Build and confirm the template rename. Returns a RenameWorker or None."""
+        from workers.rename_worker import RenameWorker
+
+        base = self._get_template_composed_name()
+        if not base:
+            self.show_warning("Incomplete Template", "Fill in at least one template token.")
+            return None
+        sep = self._current_template.separator if self._current_template else "_"
+        if len(selected_files) == 1:
+            direct = [(selected_files[0], f"{base}{selected_files[0].suffix}")]
+        else:
+            direct = [(f, f"{base}{sep}{str(i + 1).zfill(3)}{f.suffix}") for i, f in enumerate(selected_files)]
+        preview_lines = "\n".join(f"  {p.name} → {n}" for p, n in direct[:5])
+        if len(direct) > 5:
+            preview_lines += f"\n  … and {len(direct) - 5} more"
+        if not self.confirm_action(
+            "Confirm Template Rename",
+            f"Rename {len(selected_files)} file(s):\n\n{preview_lines}\n\n"
+            "This can be undone using 'Undo Last Operation'.",
+        ):
+            return None
+        return RenameWorker(
+            selected_files,
+            direct_renames=direct,
+            copy_mode=copy_mode,
+            copy_dest=copy_dest,
+            rename_sidecars=self.rename_sidecars_chk.isChecked(),
+            rename_captions=self.rename_captions_chk.isChecked(),
+        )
+
+    def _apply_standard(self, selected_files, copy_mode, copy_dest):
+        """Build and confirm the standard rename. Returns a RenameWorker or None."""
+        from workers.rename_worker import RenameWorker
+
+        tokens = self.get_selected_prefixes()
+        is_p2s = self.transpose_p2s_radio.isChecked()
+        prefix_to_suffix = tokens if (tokens and is_p2s) else None
+        suffix_to_prefix = tokens if (tokens and not is_p2s) else None
+
+        if not self.confirm_action(
+            "Confirm Rename",
+            f"Rename {len(selected_files)} file(s)?\n\nThis can be undone using 'Undo Last Operation'.",
+        ):
+            return None
+        return RenameWorker(
+            selected_files,
+            prefix=self.prefix_input.text(),
+            suffix=self.suffix_input.text(),
+            rename_to=self.rename_input.text(),
+            case_transform=self.get_case_transform(),
+            prefix_to_suffix=prefix_to_suffix,
+            suffix_to_prefix=suffix_to_prefix,
+            find_prefix=self.replace_prefix_find.text(),
+            replace_prefix_with=self.replace_prefix_with.text(),
+            find_suffix=self.replace_suffix_find.text(),
+            replace_suffix_with=self.replace_suffix_with.text(),
+            copy_mode=copy_mode,
+            copy_dest=copy_dest,
+            include_hidden=self.include_hidden_chk.isChecked(),
+            rename_sidecars=self.rename_sidecars_chk.isChecked(),
+            rename_captions=self.rename_captions_chk.isChecked(),
+        )
+
+    def apply_rename(self):
+        """Apply rename — dispatches to standard, sequential, or template mode."""
+        selected_files = self.file_list.get_selected_files()
+        if not selected_files:
+            self.show_warning("No Files", "No files selected for renaming.")
+            return
+
+        result = self._validate_copy_dest()
+        if result is None:
+            return
+        copy_mode, copy_dest = result
 
         mode = self.mode_btn_group.checkedId()
 
         if mode == 1:
-            # Sequential numbering
-            base = self.seq_base_input.text().strip()
-            if not base:
-                self.show_warning("Base Name Required", "Enter a base name for sequential numbering.")
-                return
-            pairs = generate_sequential_filenames(
-                [f.name for f in selected_files],
-                base_name=base,
-                start=self.seq_start_spin.value(),
-                padding=self.seq_padding_spin.value(),
-                separator=self.seq_separator_input.text(),
-            )
-            direct = [(selected_files[i], new_name) for i, (_, new_name) in enumerate(pairs)]
-            preview_lines = "\n".join(f"  {old} \u2192 {new}" for old, new in pairs[:5])
-            if len(pairs) > 5:
-                preview_lines += f"\n  \u2026 and {len(pairs) - 5} more"
-            if not self.confirm_action(
-                "Confirm Sequential Rename",
-                f"Rename {len(selected_files)} file(s) as:\n\n{preview_lines}\n\n"
-                "This can be undone using 'Undo Last Operation'.",
-            ):
-                return
-            self.worker_thread = RenameWorker(
-                selected_files,
-                direct_renames=direct,
-                copy_mode=copy_mode,
-                copy_dest=copy_dest,
-                rename_sidecars=self.rename_sidecars_chk.isChecked(),
-                rename_captions=self.rename_captions_chk.isChecked(),
-            )
-
+            self.worker_thread = self._apply_sequential(selected_files, copy_mode, copy_dest)
         elif mode == 2:
-            # Template mode
-            base = self._get_template_composed_name()
-            if not base:
-                self.show_warning("Incomplete Template", "Fill in at least one template token.")
-                return
-            sep = self._current_template.separator if self._current_template else "_"
-            if len(selected_files) == 1:
-                direct = [(selected_files[0], f"{base}{selected_files[0].suffix}")]
-            else:
-                direct = [(f, f"{base}{sep}{str(i + 1).zfill(3)}{f.suffix}") for i, f in enumerate(selected_files)]
-            preview_lines = "\n".join(f"  {p.name} \u2192 {n}" for p, n in direct[:5])
-            if len(direct) > 5:
-                preview_lines += f"\n  \u2026 and {len(direct) - 5} more"
-            if not self.confirm_action(
-                "Confirm Template Rename",
-                f"Rename {len(selected_files)} file(s):\n\n{preview_lines}\n\n"
-                "This can be undone using 'Undo Last Operation'.",
-            ):
-                return
-            self.worker_thread = RenameWorker(
-                selected_files,
-                direct_renames=direct,
-                copy_mode=copy_mode,
-                copy_dest=copy_dest,
-                rename_sidecars=self.rename_sidecars_chk.isChecked(),
-                rename_captions=self.rename_captions_chk.isChecked(),
-            )
-
+            self.worker_thread = self._apply_template(selected_files, copy_mode, copy_dest)
         else:
-            # Standard mode — picks up any transposition tokens checked in
-            # the Prefix / Suffix Transposition group, plus the hidden-file
-            # opt-in. There is no separate "Apply Prefix → Suffix" path
-            # anymore; everything funnels through this one Apply Rename.
-            tokens = self.get_selected_prefixes()
-            is_p2s = self.transpose_p2s_radio.isChecked()
-            prefix_to_suffix = tokens if (tokens and is_p2s) else None
-            suffix_to_prefix = tokens if (tokens and not is_p2s) else None
+            self.worker_thread = self._apply_standard(selected_files, copy_mode, copy_dest)
 
-            if not self.confirm_action(
-                "Confirm Rename",
-                f"Rename {len(selected_files)} file(s)?\n\nThis can be undone using 'Undo Last Operation'.",
-            ):
-                return
-            self.worker_thread = RenameWorker(
-                selected_files,
-                prefix=self.prefix_input.text(),
-                suffix=self.suffix_input.text(),
-                rename_to=self.rename_input.text(),
-                case_transform=self.get_case_transform(),
-                prefix_to_suffix=prefix_to_suffix,
-                suffix_to_prefix=suffix_to_prefix,
-                find_prefix=self.replace_prefix_find.text(),
-                replace_prefix_with=self.replace_prefix_with.text(),
-                find_suffix=self.replace_suffix_find.text(),
-                replace_suffix_with=self.replace_suffix_with.text(),
-                copy_mode=copy_mode,
-                copy_dest=copy_dest,
-                include_hidden=self.include_hidden_chk.isChecked(),
-                rename_sidecars=self.rename_sidecars_chk.isChecked(),
-                rename_captions=self.rename_captions_chk.isChecked(),
-            )
+        if self.worker_thread is None:
+            return
 
         self.worker_thread.progress.connect(self.emit_status)
         self.worker_thread.finished.connect(self.on_rename_finished)

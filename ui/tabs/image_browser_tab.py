@@ -27,6 +27,8 @@ from ui.widgets.panel import Panel
 from ui.widgets.path_card import PathCard
 from ui.widgets.tab_header import TabHeader
 
+_ALL_FOLDERS = "All folders"
+
 
 class ImageBrowserTab(BaseTab):
     """Tab for browsing image and video folders."""
@@ -40,9 +42,7 @@ class ImageBrowserTab(BaseTab):
     def get_tab_name(self) -> str:
         return "File Browser"
 
-    # ─────────────────────────────────────────────────────────────────────
     # UI
-    # ─────────────────────────────────────────────────────────────────────
     def setup_ui(self):
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
@@ -101,7 +101,7 @@ class ImageBrowserTab(BaseTab):
         folder_lbl.setObjectName("eyebrow")
         row1.addWidget(folder_lbl)
         self.folder_combo = QComboBox()
-        self.folder_combo.addItem("All folders")
+        self.folder_combo.addItem(_ALL_FOLDERS)
         self.folder_combo.setToolTip("Show images from a specific subfolder only")
         self.folder_combo.currentTextChanged.connect(self.apply_filters)
         self.folder_combo.setMinimumWidth(180)
@@ -166,9 +166,7 @@ class ImageBrowserTab(BaseTab):
         host_layout.addWidget(scroll)
         return host
 
-    # ─────────────────────────────────────────────────────────────────────
     # Behavior — same as v1
-    # ─────────────────────────────────────────────────────────────────────
     def _on_path_changed(self, directory: str):
         self.set_directory(directory)
         self.all_images.clear()
@@ -235,7 +233,7 @@ class ImageBrowserTab(BaseTab):
             self.folders[img["folder"]] = self.folders.get(img["folder"], 0) + 1
 
         self.folder_combo.clear()
-        self.folder_combo.addItem("All folders")
+        self.folder_combo.addItem(_ALL_FOLDERS)
         for folder_name in sorted(self.folders.keys()):
             self.folder_combo.addItem(f"{folder_name} ({self.folders[folder_name]})")
 
@@ -252,14 +250,14 @@ class ImageBrowserTab(BaseTab):
     def apply_filters(self):
         search_text = self.search_box.text().lower()
         selected_folder = self.folder_combo.currentText()
-        if selected_folder != "All folders" and " (" in selected_folder:
+        if selected_folder != _ALL_FOLDERS and " (" in selected_folder:
             selected_folder = selected_folder.split(" (")[0]
 
         self.filtered_images = []
         for img in self.all_images:
             if img.get("in_sequence") and not img.get("is_sequence_rep"):
                 continue
-            if selected_folder != "All folders" and img["folder"] != selected_folder:
+            if selected_folder != _ALL_FOLDERS and img["folder"] != selected_folder:
                 continue
             if search_text:
                 label = img.get("sequence_label", img["name"]).lower()
@@ -417,9 +415,7 @@ class ImageBrowserTab(BaseTab):
             )
         self.apply_filters()
 
-    # ─────────────────────────────────────────────────────────────────────
     # Persistence
-    # ─────────────────────────────────────────────────────────────────────
     def load_settings(self):
         last_dir = self.config.get_tab_directory("image_browser")
         if last_dir:

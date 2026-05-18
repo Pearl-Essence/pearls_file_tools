@@ -47,9 +47,7 @@ from ui.tabs.base_tab import BaseTab
 from ui.widgets.directory_selector import DirectorySelectorWidget
 from workers.base_worker import BaseWorker
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Colours
-# ─────────────────────────────────────────────────────────────────────────────
 _RED = QColor("#ff5370")
 _YELLOW = QColor("#ffcb6b")
 _GREEN = QColor("#c3e88d")
@@ -62,9 +60,7 @@ def _colored_item(text: str, color: QColor) -> QListWidgetItem:
     return item
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Background workers
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class _ValidateWorker(BaseWorker):
@@ -200,9 +196,7 @@ class _QCWorker(BaseWorker):
             self.emit_finished(False, str(exc), None)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Helper: open file/folder in system viewer
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 def _open_path(path: Path):
@@ -217,9 +211,7 @@ def _open_path(path: Path):
         pass
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Layout helper
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 def _options_scroll(inner: QWidget) -> QScrollArea:
@@ -235,9 +227,7 @@ def _options_scroll(inner: QWidget) -> QScrollArea:
     return sa
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Validator pane
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class _ValidatorPane(QWidget):
@@ -362,9 +352,7 @@ class _ValidatorPane(QWidget):
         self.validation_passed.emit(passed)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Package pane
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class _PackagePane(QWidget):
@@ -495,9 +483,7 @@ class _PackagePane(QWidget):
             QMessageBox.critical(self, "Zip Failed", message)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Duplicates pane
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class _DuplicatesPane(QWidget):
@@ -557,6 +543,61 @@ class _DuplicatesPane(QWidget):
         self._worker.finished.connect(self._on_done)
         self._worker.start()
 
+    @staticmethod
+    def _classify_groups(groups):
+        from collections import defaultdict
+
+        from core.pattern_matching import detect_image_sequences
+
+        sequence_groups = []
+        regular_groups = []
+        for grp in groups:
+            by_dir: Dict[Path, List[Path]] = defaultdict(list)
+            for fp in grp.files:
+                by_dir[fp.parent].append(fp)
+            if len(by_dir) == 1:
+                parent_dir, members = next(iter(by_dir.items()))
+                fnames = [p.name for p in members]
+                seqs = detect_image_sequences(fnames, min_frames=2)
+                if seqs and len(next(iter(seqs.values())).files) == len(members):
+                    sequence_groups.append((grp, parent_dir, next(iter(seqs.values()))))
+                    continue
+            regular_groups.append(grp)
+        return sequence_groups, regular_groups
+
+    def _render_sequence_rows(self, sequence_groups, fmt):
+        wasted = 0
+        for grp, parent_dir, seq in sequence_groups:
+            wasted += grp.wasted_bytes()
+            label = f"Image sequence ({len(grp.files)} identical frames)  —  {seq.label}"
+            parent_item = QTreeWidgetItem([label, fmt(grp.size_bytes()), grp.hash[:8]])
+            parent_item.setForeground(0, QBrush(_GREY))
+            parent_item.setToolTip(
+                0,
+                "All files in this duplicate group form a contiguous image "
+                "sequence with identical content — typically a hold frame "
+                "render or a stalled NLE export. Collapsed for readability.",
+            )
+            parent_item.addChild(QTreeWidgetItem([str(parent_dir), "", ""]))
+            self.tree.addTopLevelItem(parent_item)
+            parent_item.setExpanded(False)
+        return wasted
+
+    def _render_regular_rows(self, regular_groups, fmt):
+        wasted = 0
+        for grp in regular_groups:
+            wasted += grp.wasted_bytes()
+            parent_item = QTreeWidgetItem(
+                [f"Duplicate group ({len(grp.files)} copies)", fmt(grp.size_bytes()), grp.hash[:8]]
+            )
+            parent_item.setForeground(0, QBrush(_YELLOW))
+            for fp in grp.files:
+                child = QTreeWidgetItem([str(fp), fmt(fp.stat().st_size if fp.exists() else 0), ""])
+                parent_item.addChild(child)
+            self.tree.addTopLevelItem(parent_item)
+            parent_item.setExpanded(True)
+        return wasted
+
     def _on_done(self, success: bool, message: str, groups):
         self.scan_btn.setEnabled(True)
         self.status_label.setText("")
@@ -566,35 +607,6 @@ class _DuplicatesPane(QWidget):
             return
 
         self.tree.clear()
-        wasted = 0
-
-        # Sequence-aware presentation. A duplicate group whose files all live
-        # in the same folder *and* form a contiguous image sequence
-        # (e.g. 36 EXR frames of a render that looped on a hold frame) is
-        # collapsed into a single row labeled with the sequence's range,
-        # rather than 36 separate "duplicate" rows. Real production users
-        # have the same primitive intuition: that's a sequence, not 36
-        # accidentally-duplicate files.
-        from collections import defaultdict
-
-        from core.pattern_matching import detect_image_sequences
-
-        sequence_groups: List = []
-        regular_groups: List = []
-        for grp in groups:
-            by_dir: Dict[Path, List[Path]] = defaultdict(list)
-            for fp in grp.files:
-                by_dir[fp.parent].append(fp)
-            # A sequence group: every file shares the same parent and the
-            # filenames form a single detected image sequence.
-            if len(by_dir) == 1:
-                parent_dir, members = next(iter(by_dir.items()))
-                fnames = [p.name for p in members]
-                seqs = detect_image_sequences(fnames, min_frames=2)
-                if seqs and len(next(iter(seqs.values())).files) == len(members):
-                    sequence_groups.append((grp, parent_dir, next(iter(seqs.values()))))
-                    continue
-            regular_groups.append(grp)
 
         def _fmt(n):
             if n < 1024:
@@ -603,43 +615,9 @@ class _DuplicatesPane(QWidget):
                 return f"{n / 1024:.1f} KB"
             return f"{n / 1024**2:.1f} MB"
 
-        # Render sequence-collapsed rows first so they're visually distinct
-        for grp, parent_dir, seq in sequence_groups:
-            sz = grp.size_bytes()
-            waste = grp.wasted_bytes()
-            wasted += waste
-            label = f"Image sequence ({len(grp.files)} identical frames)  —  {seq.label}"
-            parent_item = QTreeWidgetItem([label, _fmt(sz), grp.hash[:8]])
-            parent_item.setForeground(0, QBrush(_GREY))
-            parent_item.setToolTip(
-                0,
-                "All files in this duplicate group form a contiguous image "
-                "sequence with identical content — typically a hold frame "
-                "render or a stalled NLE export. Collapsed for readability.",
-            )
-            child = QTreeWidgetItem([str(parent_dir), "", ""])
-            parent_item.addChild(child)
-            self.tree.addTopLevelItem(parent_item)
-            parent_item.setExpanded(False)
-
-        for grp in regular_groups:
-            sz = grp.size_bytes()
-            waste = grp.wasted_bytes()
-            wasted += waste
-
-            parent_item = QTreeWidgetItem(
-                [
-                    f"Duplicate group ({len(grp.files)} copies)",
-                    _fmt(sz),
-                    grp.hash[:8],
-                ]
-            )
-            parent_item.setForeground(0, QBrush(_YELLOW))
-            for fp in grp.files:
-                child = QTreeWidgetItem([str(fp), _fmt(fp.stat().st_size if fp.exists() else 0), ""])
-                parent_item.addChild(child)
-            self.tree.addTopLevelItem(parent_item)
-            parent_item.setExpanded(True)
+        sequence_groups, regular_groups = self._classify_groups(groups)
+        wasted = self._render_sequence_rows(sequence_groups, _fmt)
+        wasted += self._render_regular_rows(regular_groups, _fmt)
 
         if not groups:
             root = QTreeWidgetItem(["No duplicates found", "", ""])
@@ -647,19 +625,12 @@ class _DuplicatesPane(QWidget):
             self.tree.addTopLevelItem(root)
             self.summary_label.setText("No duplicates found.")
         else:
-
-            def _fmt(n):
-                if n < 1024**2:
-                    return f"{n / 1024:.1f} KB"
-                return f"{n / 1024**2:.1f} MB"
-
-            self.summary_label.setText(f"{len(groups)} duplicate group(s)  |  {_fmt(wasted)} wasted")
+            w = f"{wasted / 1024:.1f} KB" if wasted < 1024**2 else f"{wasted / 1024**2:.1f} MB"
+            self.summary_label.setText(f"{len(groups)} duplicate group(s)  |  {w} wasted")
             self.summary_label.setStyleSheet("font-weight: bold; color: #ffcb6b; padding: 2px 0;")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Handoff pane
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class _HandoffPane(QWidget):
@@ -743,9 +714,7 @@ class _HandoffPane(QWidget):
             self.result_list.addItem(_colored_item("One or more required checks FAILED", _RED))
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Combined Export pane (CSV Manifest OR HTML QC Report, toggled by radio)
-# ─────────────────────────────────────────────────────────────────────────────
 
 _MODE_CSV = 0
 _MODE_QC = 1
@@ -951,9 +920,7 @@ class _ExportPane(QWidget):
             QMessageBox.critical(self, "Report Failed", message)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Main DeliveryTab
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class DeliveryTab(BaseTab):

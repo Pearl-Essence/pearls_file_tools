@@ -101,7 +101,7 @@ def _windows_get() -> bool:
         with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_READ) as key:
             winreg.QueryValueEx(key, _REG_KEY_NAME)
             return True
-    except (FileNotFoundError, OSError):
+    except OSError:
         return False
 
 

@@ -55,9 +55,7 @@ class ArchiveExtractorTab(BaseTab):
     def get_tab_name(self) -> str:
         return "Extract Archives"
 
-    # ─────────────────────────────────────────────────────────────────────
     # UI
-    # ─────────────────────────────────────────────────────────────────────
     def setup_ui(self):
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
@@ -248,9 +246,7 @@ class ArchiveExtractorTab(BaseTab):
 
         return wrap
 
-    # ─────────────────────────────────────────────────────────────────────
     # Behavior — preserved from v1
-    # ─────────────────────────────────────────────────────────────────────
     def _on_path_changed(self, directory: str):
         self.set_directory(directory)
 
@@ -387,42 +383,15 @@ class ArchiveExtractorTab(BaseTab):
         self.append_log("UNDOING LAST EXTRACTION")
         self.append_log("=" * 70)
 
-        import shutil
-
         ok = fail = 0
         for extraction in last.get("extractions", []):
             archive_name = Path(extraction["archive_path"]).name
             self.append_log(f"\nUndoing: {archive_name}")
-            for item_path in extraction.get("extracted_items", []):
-                try:
-                    item = Path(item_path)
-                    if item.exists():
-                        if item.is_dir():
-                            shutil.rmtree(item)
-                            self.append_log(f"  ✓ Removed folder: {item.name}")
-                        else:
-                            item.unlink()
-                            self.append_log(f"  ✓ Removed file: {item.name}")
-                except Exception as e:
-                    self.append_log(f"  ✗ Failed to remove {item_path}: {e}")
-                    fail += 1
-            if extraction.get("archive_deleted") and extraction.get("backup_path"):
-                try:
-                    backup = Path(extraction["backup_path"])
-                    original = Path(extraction["archive_path"])
-                    if backup.exists():
-                        shutil.copy2(backup, original)
-                        backup.unlink()
-                        self.append_log(f"  ✓ Restored archive: {original.name}")
-                        ok += 1
-                    else:
-                        self.append_log(f"  ✗ Backup not found: {backup}")
-                        fail += 1
-                except Exception as e:
-                    self.append_log(f"  ✗ Failed to restore archive: {e}")
-                    fail += 1
-            else:
-                ok += 1
+            item_fail = self._undo_extracted_items(extraction)
+            fail += item_fail
+            restore_ok, restore_fail = self._restore_archive_backup(extraction)
+            ok += restore_ok
+            fail += restore_fail
 
         self.extraction_history.pop()
         if not self.extraction_history:
@@ -433,14 +402,55 @@ class ArchiveExtractorTab(BaseTab):
         self.append_log("=" * 70)
         self.emit_status(f"Undo complete: {ok} succeeded, {fail} failed")
 
+    def _undo_extracted_items(self, extraction: dict) -> int:
+        """Remove all extracted items for one archive. Returns the failure count."""
+        import shutil
+
+        fail = 0
+        for item_path in extraction.get("extracted_items", []):
+            try:
+                item = Path(item_path)
+                if item.exists():
+                    if item.is_dir():
+                        shutil.rmtree(item)
+                        self.append_log(f"  ✓ Removed folder: {item.name}")
+                    else:
+                        item.unlink()
+                        self.append_log(f"  ✓ Removed file: {item.name}")
+            except Exception as e:
+                self.append_log(f"  ✗ Failed to remove {item_path}: {e}")
+                fail += 1
+        return fail
+
+    def _restore_archive_backup(self, extraction: dict) -> tuple:
+        """Restore the original archive from its backup if applicable.
+
+        Returns (ok_count, fail_count) — each is 0 or 1.
+        """
+        import shutil
+
+        if not (extraction.get("archive_deleted") and extraction.get("backup_path")):
+            return 1, 0
+        try:
+            backup = Path(extraction["backup_path"])
+            original = Path(extraction["archive_path"])
+            if backup.exists():
+                shutil.copy2(backup, original)
+                backup.unlink()
+                self.append_log(f"  ✓ Restored archive: {original.name}")
+                return 1, 0
+            self.append_log(f"  ✗ Backup not found: {backup}")
+            return 0, 1
+        except Exception as e:
+            self.append_log(f"  ✗ Failed to restore archive: {e}")
+            return 0, 1
+
     def clear_log(self):
         self.log_text.clear()
         self.full_log_lines.clear()
         self.emit_status("Log cleared")
 
-    # ─────────────────────────────────────────────────────────────────────
     # Persistence
-    # ─────────────────────────────────────────────────────────────────────
     def load_settings(self):
         last_dir = self.config.get_tab_directory("archive_extractor")
         if last_dir:

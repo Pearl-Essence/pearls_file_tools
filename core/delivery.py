@@ -31,9 +31,7 @@ def _long_path(p: Path) -> str:
     return "\\\\?\\" + abspath
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Data models
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 @dataclass
@@ -129,9 +127,7 @@ class HandoffResult:
     detail: str = ""
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Built-in handoff rules factory
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 def default_handoff_rules() -> List[HandoffRule]:
@@ -189,9 +185,7 @@ def default_handoff_rules() -> List[HandoffRule]:
     ]
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # DeliveryValidator
-# ─────────────────────────────────────────────────────────────────────────────
 
 _VERSION_RE = re.compile(r"_v\d+", re.IGNORECASE)
 _FINAL_RE = re.compile(r"_FINAL", re.IGNORECASE)
@@ -300,9 +294,7 @@ class DeliveryValidator:
         )
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Delivery package
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 def list_delivery_files(source_dir: Path) -> List[Path]:
@@ -317,6 +309,18 @@ def list_delivery_files(source_dir: Path) -> List[Path]:
     return sorted(out)
 
 
+def _zip_single_file(zf, fp, source_dir, idx, total, progress_cb):
+    try:
+        arcname = fp.relative_to(source_dir)
+        zf.write(_long_path(fp), str(arcname))
+    except (OSError, RuntimeError, ValueError) as exc:
+        if progress_cb is not None:
+            progress_cb(f"Skipping {fp.name}: {exc}", idx + 1, total)
+        return
+    if progress_cb is not None and (idx % 16 == 0 or idx == total - 1):
+        progress_cb(f"Zipped {fp.name}", idx + 1, total)
+
+
 def create_delivery_zip(
     source_dir: Path,
     project_name: str,
@@ -324,20 +328,10 @@ def create_delivery_zip(
     progress_cb: Optional[Callable[[str, int, int], None]] = None,
     cancel_check: Optional[Callable[[], bool]] = None,
 ) -> Path:
-    """Create ``[PROJECT]_DELIVERY_[YYYYMMDD].zip`` and return its path.
-
-    * ``allowZip64=True`` is set explicitly so 4+ GB archives never silently
-      fail if a downstream Python build flips the global default.
-    * Per-file failures (permission errors, vanished files, "size unexpectedly
-      increased" from a still-being-written render) are caught and reported
-      via *progress_cb* — they no longer abort the whole zip.
-    * If *cancel_check* returns True between files the partial zip is deleted
-      and ``InterruptedError`` is raised.
-    """
+    """Create ``[PROJECT]_DELIVERY_[YYYYMMDD].zip`` and return its path."""
     date_str = datetime.date.today().strftime("%Y%m%d")
     safe_name = re.sub(r"[^\w\-]", "_", project_name)
-    zip_name = f"{safe_name}_DELIVERY_{date_str}.zip"
-    zip_path = output_dir / zip_name
+    zip_path = output_dir / f"{safe_name}_DELIVERY_{date_str}.zip"
 
     files = list_delivery_files(source_dir)
     total = len(files)
@@ -347,18 +341,7 @@ def create_delivery_zip(
             for idx, fp in enumerate(files):
                 if cancel_check is not None and cancel_check():
                     raise InterruptedError("Cancelled mid-zip")
-                try:
-                    arcname = fp.relative_to(source_dir)
-                    zf.write(_long_path(fp), str(arcname))
-                except (OSError, RuntimeError, ValueError) as exc:
-                    # OSError → permission denied / file gone
-                    # RuntimeError → "File size unexpectedly increased during write"
-                    # ValueError → "ZIP does not support timestamps before 1980"
-                    if progress_cb is not None:
-                        progress_cb(f"Skipping {fp.name}: {exc}", idx + 1, total)
-                    continue
-                if progress_cb is not None and (idx % 16 == 0 or idx == total - 1):
-                    progress_cb(f"Zipped {fp.name}", idx + 1, total)
+                _zip_single_file(zf, fp, source_dir, idx, total, progress_cb)
     except InterruptedError:
         try:
             zip_path.unlink()
@@ -369,9 +352,7 @@ def create_delivery_zip(
     return zip_path
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Duplicate detection
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 def _file_hash(filepath: Path) -> str:
@@ -382,44 +363,30 @@ def _file_hash(filepath: Path) -> str:
     return h.hexdigest()
 
 
-def find_duplicates(
-    directory: Path,
-    progress_cb: Optional[Callable[[str, int, int], None]] = None,
-    cancel_check: Optional[Callable[[], bool]] = None,
-) -> List[DuplicateGroup]:
-    """Group files by content hash. Returns groups with 2+ files.
-
-    Two-pass algorithm: bucket by file size first, then only hash files whose
-    size matches at least one other file. On a 4 GB tree of mostly-unique
-    files this cuts disk I/O by orders of magnitude — only same-sized
-    candidates ever get hashed.
-    """
-    if cancel_check is None:
-
-        def cancel_check():
-            return False
-
-    # Pass 1 — bucket by size
+def _bucket_by_size(directory: Path, cancel_check: Callable) -> Optional[List[Path]]:
     size_buckets: Dict[int, List[Path]] = defaultdict(list)
     for fp in directory.rglob("*"):
         if cancel_check():
-            return []
+            return None
         try:
             if not fp.is_file() or fp.is_symlink():
                 continue
             size_buckets[fp.stat().st_size].append(fp)
         except OSError:
             continue
+    return [fp for files in size_buckets.values() if len(files) > 1 for fp in files]
 
-    # Only files in same-size buckets are duplicate candidates
-    candidates: List[Path] = [fp for files in size_buckets.values() if len(files) > 1 for fp in files]
+
+def _hash_candidates(
+    candidates: List[Path],
+    progress_cb: Optional[Callable],
+    cancel_check: Callable,
+) -> Optional[Dict[str, List[Path]]]:
     total = len(candidates)
-
-    # Pass 2 — hash candidates only
     hash_map: Dict[str, List[Path]] = defaultdict(list)
     for idx, fp in enumerate(candidates):
         if cancel_check():
-            return []
+            return None
         try:
             digest = _file_hash(fp)
             hash_map[digest].append(fp)
@@ -427,6 +394,27 @@ def find_duplicates(
             continue
         if progress_cb is not None and (idx % 16 == 0 or idx == total - 1):
             progress_cb(f"Hashed {fp.name}", idx + 1, total)
+    return hash_map
+
+
+def find_duplicates(
+    directory: Path,
+    progress_cb: Optional[Callable[[str, int, int], None]] = None,
+    cancel_check: Optional[Callable[[], bool]] = None,
+) -> List[DuplicateGroup]:
+    """Group files by content hash. Returns groups with 2+ files."""
+    if cancel_check is None:
+
+        def cancel_check():
+            return False
+
+    candidates = _bucket_by_size(directory, cancel_check)
+    if candidates is None:
+        return []
+
+    hash_map = _hash_candidates(candidates, progress_cb, cancel_check)
+    if hash_map is None:
+        return []
 
     return [DuplicateGroup(hash=h, files=sorted(files)) for h, files in hash_map.items() if len(files) > 1]
 
@@ -440,9 +428,7 @@ def find_case_collisions(directory: Path) -> List[List[Path]]:
     return [sorted(group) for group in name_map.values() if len(group) > 1]
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Colorist handoff validation
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 def run_handoff_checks(directory: Path, rules: Optional[List[HandoffRule]] = None) -> List[HandoffResult]:
@@ -459,74 +445,71 @@ def run_handoff_checks(directory: Path, rules: Optional[List[HandoffRule]] = Non
     return results
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Manifest / shot list export
-# ─────────────────────────────────────────────────────────────────────────────
+
+
+_MANIFEST_FIELDS = [
+    "filename",
+    "folder",
+    "size_bytes",
+    "extension",
+    "codec",
+    "resolution",
+    "fps",
+    "audio_channels",
+    "duration_secs",
+    "date_modified",
+]
+
+
+def _extract_media_fields(fp: Path) -> dict:
+    from core.media_info import get_media_info
+
+    fields = {"codec": "", "resolution": "", "fps": "", "audio_channels": "", "duration_secs": ""}
+    try:
+        info = get_media_info(fp)
+        if info:
+            if info.duration_secs is not None:
+                fields["duration_secs"] = f"{info.duration_secs:.3f}"
+            fields["codec"] = info.codec or ""
+            fields["resolution"] = info.resolution_str or ""
+            fields["fps"] = info.fps_str or ""
+            fields["audio_channels"] = str(info.audio_channels) if info.audio_channels else ""
+    except Exception:
+        pass
+    return fields
+
+
+def _build_manifest_row(fp: Path, directory: Path) -> Optional[dict]:
+    try:
+        stat = fp.stat()
+    except OSError:
+        return None
+    row = {
+        "filename": fp.name,
+        "folder": str(fp.parent.relative_to(directory)),
+        "size_bytes": stat.st_size,
+        "extension": fp.suffix.lower(),
+        "date_modified": datetime.datetime.fromtimestamp(stat.st_mtime).isoformat(),
+    }
+    row.update(_extract_media_fields(fp))
+    return row
 
 
 def export_manifest(directory: Path, output_path: Path) -> int:
     """Write a CSV manifest of all files in *directory*. Returns file count."""
     import csv
 
-    from core.media_info import get_media_info
-
     rows = []
     for fp in sorted(directory.rglob("*")):
         if not fp.is_file():
             continue
-        try:
-            stat = fp.stat()
-        except OSError:
-            continue
-
-        codec = ""
-        resolution = ""
-        fps = ""
-        audio_channels = ""
-        duration_secs = ""
-        try:
-            info = get_media_info(fp)
-            if info:
-                if info.duration_secs is not None:
-                    duration_secs = f"{info.duration_secs:.3f}"
-                codec = info.codec or ""
-                resolution = info.resolution_str or ""
-                fps = info.fps_str or ""
-                audio_channels = str(info.audio_channels) if info.audio_channels else ""
-        except Exception:
-            pass
-
-        rows.append(
-            {
-                "filename": fp.name,
-                "folder": str(fp.parent.relative_to(directory)),
-                "size_bytes": stat.st_size,
-                "extension": fp.suffix.lower(),
-                "codec": codec,
-                "resolution": resolution,
-                "fps": fps,
-                "audio_channels": audio_channels,
-                "duration_secs": duration_secs,
-                "date_modified": datetime.datetime.fromtimestamp(stat.st_mtime).isoformat(),
-            }
-        )
+        row = _build_manifest_row(fp, directory)
+        if row is not None:
+            rows.append(row)
 
     with open(output_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(
-            f,
-            fieldnames=[
-                "filename",
-                "folder",
-                "size_bytes",
-                "extension",
-                "codec",
-                "resolution",
-                "fps",
-                "audio_channels",
-                "duration_secs",
-                "date_modified",
-            ],
-        )
+        writer = csv.DictWriter(f, fieldnames=_MANIFEST_FIELDS)
         writer.writeheader()
         writer.writerows(rows)
 

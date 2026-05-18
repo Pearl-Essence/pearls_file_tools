@@ -105,7 +105,7 @@ run_setup() {
     else
         echo "  ℹ  ffprobe not found (optional)."
         echo "     Install ffmpeg to enable video thumbnails:"
-        if [ "$(uname)" = "Darwin" ]; then
+        if [[ "$(uname)" = "Darwin" ]]; then
             echo "       brew install ffmpeg"
         else
             echo "       sudo apt install ffmpeg"
@@ -126,12 +126,12 @@ if [ "${1:-}" = "--setup" ]; then
 fi
 
 # Resolve the Python to use: prefer the venv, fall back to system Python 3
-if [ -f "$VENV_DIR/bin/python" ]; then
+if [[ -f "$VENV_DIR/bin/python" ]]; then
     PYTHON="$VENV_DIR/bin/python"
 else
     PYTHON=$(find_python3)
-    if [ -z "$PYTHON" ]; then
-        echo "ERROR: Python 3 not found."
+    if [[ -z "$PYTHON" ]]; then
+        echo "ERROR: Python 3 not found." >&2
         echo "Run setup first:  ./run.sh --setup"
         exit 1
     fi
@@ -139,7 +139,7 @@ fi
 
 # Check PyQt5 is present before trying to launch
 if ! "$PYTHON" -c "import PyQt5" 2>/dev/null; then
-    echo "ERROR: PyQt5 is not installed."
+    echo "ERROR: PyQt5 is not installed." >&2
     echo ""
     echo "Run setup to install everything automatically:"
     echo "  ./run.sh --setup"
@@ -147,7 +147,7 @@ if ! "$PYTHON" -c "import PyQt5" 2>/dev/null; then
 fi
 
 # macOS: required for Qt 5.15+ layer-backed views
-if [ "$(uname)" = "Darwin" ]; then
+if [[ "$(uname)" = "Darwin" ]]; then
     export QT_MAC_WANTS_LAYER=1
 fi
 

@@ -64,73 +64,56 @@ def _index_dir(root: Path) -> Dict[str, Path]:
     return index
 
 
+def _determine_status(path_a: Optional[Path], path_b: Optional[Path], mtime_a: float, mtime_b: float) -> str:
+    if path_a and path_b:
+        md5_a = _file_hash(path_a)
+        md5_b = _file_hash(path_b)
+        if md5_a != md5_b:
+            return "modified_both"
+        return "a_newer" if mtime_a > mtime_b else "b_newer"
+    return "a_only" if path_a else "b_only"
+
+
+def _build_entry(rel: str, index_a, index_b, since_ts: Optional[float]) -> Optional[SyncEntry]:
+    path_a = index_a.get(rel)
+    path_b = index_b.get(rel)
+
+    size_a = path_a.stat().st_size if path_a else 0
+    size_b = path_b.stat().st_size if path_b else 0
+    mtime_a = path_a.stat().st_mtime if path_a else 0.0
+    mtime_b = path_b.stat().st_mtime if path_b else 0.0
+
+    if since_ts is not None and max(mtime_a, mtime_b) <= since_ts:
+        return None
+
+    return SyncEntry(
+        rel_path=rel,
+        status=_determine_status(path_a, path_b, mtime_a, mtime_b),
+        path_a=path_a,
+        path_b=path_b,
+        size_a=size_a,
+        size_b=size_b,
+        mtime_a=mtime_a,
+        mtime_b=mtime_b,
+    )
+
+
 def compare_directories(
     dir_a: Path,
     dir_b: Path,
     since: Optional[datetime.datetime] = None,
 ) -> SyncReport:
-    """Compare two directory trees and return a SyncReport.
-
-    For files in both:
-        * MD5 differs          → 'modified_both'
-        * MD5 same, mtime_a > mtime_b → 'a_newer'
-        * MD5 same, otherwise  → 'b_newer'
-    Files only in A → 'a_only'
-    Files only in B → 'b_only'
-
-    If *since* is provided, only include entries where
-    ``max(mtime_a, mtime_b) > since.timestamp()``.
-    """
+    """Compare two directory trees and return a SyncReport."""
     since_ts: Optional[float] = since.timestamp() if since is not None else None
 
     index_a = _index_dir(dir_a)
     index_b = _index_dir(dir_b)
 
-    all_keys = set(index_a) | set(index_b)
     entries: List[SyncEntry] = []
-
-    for rel in sorted(all_keys):
-        in_a = rel in index_a
-        in_b = rel in index_b
-
-        path_a = index_a.get(rel)
-        path_b = index_b.get(rel)
-
-        size_a = path_a.stat().st_size if path_a else 0
-        size_b = path_b.stat().st_size if path_b else 0
-        mtime_a = path_a.stat().st_mtime if path_a else 0.0
-        mtime_b = path_b.stat().st_mtime if path_b else 0.0
-
-        max_mtime = max(mtime_a, mtime_b)
-        if since_ts is not None and max_mtime <= since_ts:
-            continue
-
-        if in_a and in_b:
-            md5_a = _file_hash(path_a)
-            md5_b = _file_hash(path_b)
-            if md5_a != md5_b:
-                status = "modified_both"
-            elif mtime_a > mtime_b:
-                status = "a_newer"
-            else:
-                status = "b_newer"
-        elif in_a:
-            status = "a_only"
-        else:
-            status = "b_only"
-
-        entries.append(
-            SyncEntry(
-                rel_path=rel,
-                status=status,
-                path_a=path_a,
-                path_b=path_b,
-                size_a=size_a,
-                size_b=size_b,
-                mtime_a=mtime_a,
-                mtime_b=mtime_b,
-            )
-        )
+    for rel in sorted(set(index_a) | set(index_b)):
+        entry = _build_entry(rel, index_a, index_b, since_ts)
+        if entry is not None:
+            entries.append(entry)
 
     return SyncReport(
         dir_a=dir_a,

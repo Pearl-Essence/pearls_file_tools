@@ -57,9 +57,7 @@ class FileOrganizerTab(BaseTab):
     def get_tab_name(self) -> str:
         return "Group by Pattern"
 
-    # ─────────────────────────────────────────────────────────────────────
     # UI
-    # ─────────────────────────────────────────────────────────────────────
     def setup_ui(self):
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
@@ -384,6 +382,20 @@ class FileOrganizerTab(BaseTab):
         """Update scan status."""
         self.status_label.setText(message)
 
+    def _strip_sequence_files(self, subdir_path: str, seq_filenames: set):
+        if subdir_path in self.file_groups:
+            cleaned: Dict[str, List[Path]] = {}
+            for grp, files in self.file_groups[subdir_path].items():
+                remaining = [f for f in files if f.name not in seq_filenames]
+                if remaining:
+                    cleaned[grp] = remaining
+            self.file_groups[subdir_path] = cleaned
+
+        if subdir_path in self.unsorted_files:
+            self.unsorted_files[subdir_path] = [
+                f for f in self.unsorted_files[subdir_path] if f.name not in seq_filenames
+            ]
+
     def _extract_sequences(self):
         """Detect image sequences and strip them from grouped/unsorted buckets."""
         all_subdirs = set(list(self.file_groups.keys()) + list(self.unsorted_files.keys()))
@@ -402,19 +414,7 @@ class FileOrganizerTab(BaseTab):
 
             self.file_sequences[subdir_path] = sequences
             seq_filenames = {fname for seq in sequences.values() for fname in seq.files}
-
-            if subdir_path in self.file_groups:
-                cleaned: Dict[str, List[Path]] = {}
-                for grp, files in self.file_groups[subdir_path].items():
-                    remaining = [f for f in files if f.name not in seq_filenames]
-                    if remaining:
-                        cleaned[grp] = remaining
-                self.file_groups[subdir_path] = cleaned
-
-            if subdir_path in self.unsorted_files:
-                self.unsorted_files[subdir_path] = [
-                    f for f in self.unsorted_files[subdir_path] if f.name not in seq_filenames
-                ]
+            self._strip_sequence_files(subdir_path, seq_filenames)
 
     def _build_scan_summary(self) -> str:
         """Return a human-readable summary of scan results."""
