@@ -3,6 +3,9 @@
 from pathlib import Path
 
 from core.file_utils import (
+    _matches_extension,
+    _scan_flat,
+    _scan_recursive,
     calculate_directory_hash,
     format_file_size,
     get_extension_category,
@@ -389,4 +392,99 @@ class TestGetFilesInDirectory:
 
     def test_nonexistent_directory(self):
         files = get_files_in_directory(Path("/nonexistent_xyz"))
+        assert files == []
+
+
+# ── _matches_extension ─────────────────────────────────────────────────────
+
+
+class TestMatchesExtension:
+    def test_none_extensions_matches_everything(self):
+        assert _matches_extension(Path("file.txt"), None) is True
+
+    def test_none_extensions_matches_no_ext(self):
+        assert _matches_extension(Path("Makefile"), None) is True
+
+    def test_matching_extension(self):
+        assert _matches_extension(Path("clip.mov"), [".mov", ".mp4"]) is True
+
+    def test_non_matching_extension(self):
+        assert _matches_extension(Path("readme.md"), [".mov", ".mp4"]) is False
+
+    def test_case_insensitive(self):
+        assert _matches_extension(Path("clip.MOV"), [".mov"]) is True
+
+    def test_empty_extensions_list(self):
+        assert _matches_extension(Path("file.txt"), []) is False
+
+    def test_no_extension_against_list(self):
+        assert _matches_extension(Path("Makefile"), [".txt"]) is False
+
+
+# ── _scan_recursive ────────────────────────────────────────────────────────
+
+
+class TestScanRecursive:
+    def test_finds_all_files(self, tmp_tree):
+        files = _scan_recursive(tmp_tree, None)
+        names = {f.name for f in files}
+        assert "file_a.mov" in names
+        assert "file_b.mov" in names
+        assert "file_c.txt" in names
+        assert ".hidden" in names
+
+    def test_filters_by_extension(self, tmp_tree):
+        files = _scan_recursive(tmp_tree, [".mov"])
+        names = {f.name for f in files}
+        assert "file_a.mov" in names
+        assert "file_b.mov" in names
+        assert "file_c.txt" not in names
+
+    def test_nested_files_included(self, tmp_tree):
+        files = _scan_recursive(tmp_tree, [".txt"])
+        names = {f.name for f in files}
+        assert "file_c.txt" in names
+
+    def test_empty_directory(self, tmp_path):
+        files = _scan_recursive(tmp_path, None)
+        assert files == []
+
+    def test_deeply_nested(self, tmp_path):
+        deep = tmp_path / "a" / "b" / "c"
+        deep.mkdir(parents=True)
+        (deep / "deep.txt").write_text("deep")
+        files = _scan_recursive(tmp_path, None)
+        names = {f.name for f in files}
+        assert "deep.txt" in names
+
+
+# ── _scan_flat ─────────────────────────────────────────────────────────────
+
+
+class TestScanFlat:
+    def test_finds_top_level_files(self, tmp_tree):
+        files = _scan_flat(tmp_tree, None)
+        names = {f.name for f in files}
+        assert "file_a.mov" in names
+        assert "file_b.mov" in names
+        assert ".hidden" in names
+
+    def test_excludes_subdirectory_files(self, tmp_tree):
+        files = _scan_flat(tmp_tree, None)
+        names = {f.name for f in files}
+        assert "file_c.txt" not in names
+
+    def test_excludes_directories_themselves(self, tmp_tree):
+        files = _scan_flat(tmp_tree, None)
+        # "sub" is a directory, should not appear
+        assert all(f.is_file() for f in files)
+
+    def test_filters_by_extension(self, tmp_tree):
+        files = _scan_flat(tmp_tree, [".mov"])
+        names = {f.name for f in files}
+        assert "file_a.mov" in names
+        assert ".hidden" not in names
+
+    def test_empty_directory(self, tmp_path):
+        files = _scan_flat(tmp_path, None)
         assert files == []

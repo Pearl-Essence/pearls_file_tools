@@ -1,4 +1,4 @@
-"""Offload (ingest) tab — Pearl Post Suite v0.20.
+"""Offload (ingest) tab — Pearl Post Suite.
 
 Single-screen tab. Source/destination cards, options row, live manifest table
 with status pills, sticky footer with progress + cancel.

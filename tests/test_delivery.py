@@ -13,6 +13,10 @@ from core.delivery import (
     HandoffRule,
     ValidationIssue,
     ValidationReport,
+    _bucket_by_size,
+    _build_manifest_row,
+    _extract_media_fields,
+    _hash_candidates,
     create_delivery_zip,
     default_handoff_rules,
     find_case_collisions,
@@ -388,3 +392,191 @@ class TestRunHandoffChecks:
         results = run_handoff_checks(tmp_path, rules=[rule])
         assert results[0].passed is False
         assert "division by zero" in results[0].detail
+
+
+# ── _extract_media_fields ──────────────────────────────────────────────────
+
+
+class TestExtractMediaFields:
+    def test_non_media_file(self, tmp_path):
+        f = tmp_path / "readme.txt"
+        f.write_text("hello world")
+        fields = _extract_media_fields(f)
+        assert isinstance(fields, dict)
+        assert fields["codec"] == ""
+        assert fields["resolution"] == ""
+        assert fields["fps"] == ""
+        assert fields["audio_channels"] == ""
+        assert fields["duration_secs"] == ""
+
+    def test_nonexistent_file(self, tmp_path):
+        f = tmp_path / "nope.txt"
+        fields = _extract_media_fields(f)
+        assert fields["codec"] == ""
+        assert fields["duration_secs"] == ""
+
+    def test_returns_all_expected_keys(self, tmp_path):
+        f = tmp_path / "test.txt"
+        f.write_text("data")
+        fields = _extract_media_fields(f)
+        expected_keys = {"codec", "resolution", "fps", "audio_channels", "duration_secs"}
+        assert set(fields.keys()) == expected_keys
+
+
+# ── _build_manifest_row ───────────────────────────────────────────────────
+
+
+class TestBuildManifestRow:
+    def test_basic_file(self, tmp_path):
+        f = tmp_path / "test.txt"
+        f.write_text("hello world")
+        row = _build_manifest_row(f, tmp_path)
+        assert row is not None
+        assert row["filename"] == "test.txt"
+        assert row["folder"] == "."
+        assert row["extension"] == ".txt"
+        assert row["size_bytes"] == f.stat().st_size
+        assert "date_modified" in row
+
+    def test_nested_file(self, tmp_path):
+        sub = tmp_path / "sub"
+        sub.mkdir()
+        f = sub / "nested.txt"
+        f.write_text("data")
+        row = _build_manifest_row(f, tmp_path)
+        assert row is not None
+        assert row["folder"] == "sub"
+
+    def test_nonexistent_file_returns_none(self, tmp_path):
+        f = tmp_path / "ghost.txt"
+        row = _build_manifest_row(f, tmp_path)
+        assert row is None
+
+    def test_includes_media_fields(self, tmp_path):
+        f = tmp_path / "test.txt"
+        f.write_text("data")
+        row = _build_manifest_row(f, tmp_path)
+        assert "codec" in row
+        assert "resolution" in row
+        assert "fps" in row
+        assert "audio_channels" in row
+        assert "duration_secs" in row
+
+    def test_extension_lowercase(self, tmp_path):
+        f = tmp_path / "FILE.TXT"
+        f.write_text("data")
+        row = _build_manifest_row(f, tmp_path)
+        assert row["extension"] == ".txt"
+
+
+# ── _bucket_by_size ───────────────────────────────────────────────────────
+
+
+class TestBucketBySize:
+    def test_same_size_files_returned(self, tmp_path):
+        (tmp_path / "a.txt").write_bytes(b"x" * 100)
+        (tmp_path / "b.txt").write_bytes(b"x" * 100)
+        result = _bucket_by_size(tmp_path, lambda: False)
+        assert result is not None
+        assert len(result) == 2
+
+    def test_different_sizes_excluded(self, tmp_path):
+        (tmp_path / "a.txt").write_bytes(b"x" * 100)
+        (tmp_path / "b.txt").write_bytes(b"y" * 200)
+        result = _bucket_by_size(tmp_path, lambda: False)
+        assert result is not None
+        assert len(result) == 0
+
+    def test_cancel_returns_none(self, tmp_path):
+        (tmp_path / "a.txt").write_bytes(b"data")
+        result = _bucket_by_size(tmp_path, lambda: True)
+        assert result is None
+
+    def test_empty_directory(self, tmp_path):
+        result = _bucket_by_size(tmp_path, lambda: False)
+        assert result is not None
+        assert len(result) == 0
+
+    def test_three_same_size_files(self, tmp_path):
+        (tmp_path / "a.txt").write_bytes(b"x" * 50)
+        (tmp_path / "b.txt").write_bytes(b"y" * 50)
+        (tmp_path / "c.txt").write_bytes(b"z" * 50)
+        result = _bucket_by_size(tmp_path, lambda: False)
+        assert result is not None
+        assert len(result) == 3
+
+    def test_skips_symlinks(self, tmp_path):
+        real = tmp_path / "real.txt"
+        real.write_bytes(b"data")
+        link = tmp_path / "link.txt"
+        try:
+            link.symlink_to(real)
+        except OSError:
+            pytest.skip("Symlinks not supported")
+        result = _bucket_by_size(tmp_path, lambda: False)
+        # symlink should be skipped, only 1 real file, no bucket pair
+        assert result is not None
+        assert len(result) == 0
+
+    def test_recursive_finds_nested(self, tmp_path):
+        sub = tmp_path / "sub"
+        sub.mkdir()
+        (tmp_path / "a.txt").write_bytes(b"x" * 100)
+        (sub / "b.txt").write_bytes(b"y" * 100)
+        result = _bucket_by_size(tmp_path, lambda: False)
+        assert result is not None
+        assert len(result) == 2
+
+
+# ── _hash_candidates ──────────────────────────────────────────────────────
+
+
+class TestHashCandidates:
+    def test_identical_files_same_hash(self, tmp_path):
+        (tmp_path / "a.txt").write_bytes(b"same content")
+        (tmp_path / "b.txt").write_bytes(b"same content")
+        candidates = [tmp_path / "a.txt", tmp_path / "b.txt"]
+        result = _hash_candidates(candidates, None, lambda: False)
+        assert result is not None
+        # Both files should map to the same hash
+        assert any(len(files) == 2 for files in result.values())
+
+    def test_different_files_different_hashes(self, tmp_path):
+        (tmp_path / "a.txt").write_bytes(b"content a")
+        (tmp_path / "b.txt").write_bytes(b"content b")
+        candidates = [tmp_path / "a.txt", tmp_path / "b.txt"]
+        result = _hash_candidates(candidates, None, lambda: False)
+        assert result is not None
+        assert all(len(files) == 1 for files in result.values())
+
+    def test_cancel_returns_none(self, tmp_path):
+        (tmp_path / "a.txt").write_bytes(b"data")
+        result = _hash_candidates([tmp_path / "a.txt"], None, lambda: True)
+        assert result is None
+
+    def test_progress_callback(self, tmp_path):
+        (tmp_path / "a.txt").write_bytes(b"data")
+        calls = []
+        result = _hash_candidates(
+            [tmp_path / "a.txt"],
+            lambda msg, cur, tot: calls.append((msg, cur, tot)),
+            lambda: False,
+        )
+        assert result is not None
+        assert len(calls) > 0
+        assert calls[0][1] == 1  # current index
+        assert calls[0][2] == 1  # total
+
+    def test_empty_candidates(self, tmp_path):
+        result = _hash_candidates([], None, lambda: False)
+        assert result is not None
+        assert len(result) == 0
+
+    def test_skips_unreadable_file(self, tmp_path):
+        # A nonexistent file in the candidates list should be skipped
+        ghost = tmp_path / "ghost.txt"
+        real = tmp_path / "real.txt"
+        real.write_bytes(b"data")
+        result = _hash_candidates([ghost, real], None, lambda: False)
+        assert result is not None
+        assert len(result) == 1

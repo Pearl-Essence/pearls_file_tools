@@ -6,6 +6,8 @@ from pathlib import Path
 from core.sync_check import (
     SyncEntry,
     SyncReport,
+    _build_entry,
+    _determine_status,
     _file_hash,
     _index_dir,
     compare_directories,
@@ -179,3 +181,117 @@ class TestCompareDirectories:
         report = compare_directories(dir_a, dir_b)
         a_only = report.by_status("a_only")
         assert len(a_only) == 1
+
+
+# ── _determine_status ─────────────────────────────────────────────────────
+
+
+class TestDetermineStatus:
+    def test_a_only(self, tmp_path):
+        f = tmp_path / "a.txt"
+        f.write_bytes(b"data")
+        status = _determine_status(f, None, 1000.0, 0.0)
+        assert status == "a_only"
+
+    def test_b_only(self, tmp_path):
+        f = tmp_path / "b.txt"
+        f.write_bytes(b"data")
+        status = _determine_status(None, f, 0.0, 1000.0)
+        assert status == "b_only"
+
+    def test_modified_both(self, tmp_path):
+        fa = tmp_path / "a.txt"
+        fb = tmp_path / "b.txt"
+        fa.write_bytes(b"version a")
+        fb.write_bytes(b"version b")
+        status = _determine_status(fa, fb, 1000.0, 1000.0)
+        assert status == "modified_both"
+
+    def test_a_newer_same_content(self, tmp_path):
+        fa = tmp_path / "a.txt"
+        fb = tmp_path / "b.txt"
+        fa.write_bytes(b"same")
+        fb.write_bytes(b"same")
+        status = _determine_status(fa, fb, 2000.0, 1000.0)
+        assert status == "a_newer"
+
+    def test_b_newer_same_content(self, tmp_path):
+        fa = tmp_path / "a.txt"
+        fb = tmp_path / "b.txt"
+        fa.write_bytes(b"same")
+        fb.write_bytes(b"same")
+        status = _determine_status(fa, fb, 1000.0, 2000.0)
+        assert status == "b_newer"
+
+    def test_both_none(self):
+        # Edge case: both paths None → b_only (since path_a is falsy)
+        status = _determine_status(None, None, 0.0, 0.0)
+        assert status == "b_only"
+
+
+# ── _build_entry ──────────────────────────────────────────────────────────
+
+
+class TestBuildEntry:
+    def test_a_only_entry(self, tmp_path):
+        fa = tmp_path / "a.txt"
+        fa.write_bytes(b"data")
+        index_a = {"file.txt": fa}
+        index_b = {}
+        entry = _build_entry("file.txt", index_a, index_b, None)
+        assert entry is not None
+        assert entry.status == "a_only"
+        assert entry.rel_path == "file.txt"
+        assert entry.path_a == fa
+        assert entry.path_b is None
+        assert entry.size_a > 0
+        assert entry.size_b == 0
+
+    def test_b_only_entry(self, tmp_path):
+        fb = tmp_path / "b.txt"
+        fb.write_bytes(b"data")
+        index_a = {}
+        index_b = {"file.txt": fb}
+        entry = _build_entry("file.txt", index_a, index_b, None)
+        assert entry is not None
+        assert entry.status == "b_only"
+        assert entry.path_b == fb
+
+    def test_both_present_different_content(self, tmp_path):
+        fa = tmp_path / "a.txt"
+        fb = tmp_path / "b.txt"
+        fa.write_bytes(b"version a content")
+        fb.write_bytes(b"version b content")
+        index_a = {"file.txt": fa}
+        index_b = {"file.txt": fb}
+        entry = _build_entry("file.txt", index_a, index_b, None)
+        assert entry is not None
+        assert entry.status == "modified_both"
+
+    def test_filtered_by_since(self, tmp_path):
+        fa = tmp_path / "a.txt"
+        fa.write_bytes(b"data")
+        index_a = {"file.txt": fa}
+        index_b = {}
+        # Set since_ts far in the future so it filters out the entry
+        future_ts = fa.stat().st_mtime + 10000
+        entry = _build_entry("file.txt", index_a, index_b, future_ts)
+        assert entry is None
+
+    def test_not_filtered_when_newer(self, tmp_path):
+        fa = tmp_path / "a.txt"
+        fa.write_bytes(b"data")
+        index_a = {"file.txt": fa}
+        index_b = {}
+        # Set since_ts in the past so entry passes through
+        past_ts = fa.stat().st_mtime - 10000
+        entry = _build_entry("file.txt", index_a, index_b, past_ts)
+        assert entry is not None
+
+    def test_since_none_includes_all(self, tmp_path):
+        fa = tmp_path / "a.txt"
+        fa.write_bytes(b"data")
+        index_a = {"file.txt": fa}
+        index_b = {}
+        entry = _build_entry("file.txt", index_a, index_b, None)
+        assert entry is not None

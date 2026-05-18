@@ -171,9 +171,7 @@ class IngestWorker(BaseWorker):
             # inconsistent.
             post_size = src.stat().st_size
             if post_size != pre_size or post_size != dst.stat().st_size:
-                raise IOError(
-                    f"Source size changed during copy ({pre_size:,} → {post_size:,}); writer not finished"
-                )
+                raise IOError(f"Source size changed during copy ({pre_size:,} → {post_size:,}); writer not finished")
 
             if self.verify:
                 return self._verify_copy(src, dst)
