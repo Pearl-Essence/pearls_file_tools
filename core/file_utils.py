@@ -66,7 +66,7 @@ def same_inode(a: Path, b: Path) -> bool:
     try:
         sa, sb = a.stat(), b.stat()
         return sa.st_dev == sb.st_dev and sa.st_ino == sb.st_ino
-    except (OSError, FileNotFoundError):
+    except OSError:
         return False
 
 
@@ -185,7 +185,7 @@ def calculate_directory_hash(directory: Path) -> str:
             if item.is_dir() and not item.name.startswith("."):
                 try:
                     folders.append(f"{item.name}:{item.stat().st_mtime}")
-                except (PermissionError, OSError):
+                except OSError:
                     folders.append(f"{item.name}:0")
         folder_string = "|".join(sorted(folders))
         return hashlib.sha256(folder_string.encode()).hexdigest()
@@ -258,6 +258,28 @@ def safe_move(src_path: Path, dest_path: Path) -> bool:
         return False
 
 
+def _matches_extension(path: Path, extensions: Optional[List[str]]) -> bool:
+    return extensions is None or path.suffix.lower() in extensions
+
+
+def _scan_recursive(directory: Path, extensions: Optional[List[str]]) -> List[Path]:
+    files = []
+    for root, dirs, filenames in os.walk(directory):
+        for filename in filenames:
+            filepath = Path(root) / filename
+            if _matches_extension(filepath, extensions):
+                files.append(filepath)
+    return files
+
+
+def _scan_flat(directory: Path, extensions: Optional[List[str]]) -> List[Path]:
+    files = []
+    for item in directory.iterdir():
+        if item.is_file() and _matches_extension(item, extensions):
+            files.append(item)
+    return files
+
+
 def get_files_in_directory(
     directory: Path, extensions: Optional[List[str]] = None, recursive: bool = False
 ) -> List[Path]:
@@ -272,21 +294,13 @@ def get_files_in_directory(
     Returns:
         List of file paths
     """
-    files = []
-
     try:
         if recursive:
-            for root, dirs, filenames in os.walk(directory):
-                for filename in filenames:
-                    filepath = Path(root) / filename
-                    if extensions is None or filepath.suffix.lower() in extensions:
-                        files.append(filepath)
+            files = _scan_recursive(directory, extensions)
         else:
-            for item in directory.iterdir():
-                if item.is_file():
-                    if extensions is None or item.suffix.lower() in extensions:
-                        files.append(item)
+            files = _scan_flat(directory, extensions)
     except Exception as e:
         print(f"Error reading directory {directory}: {e}")
+        files = []
 
     return sorted(files, key=lambda x: x.name.lower())

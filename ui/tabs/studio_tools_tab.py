@@ -55,12 +55,11 @@ from ui.tabs.base_tab import BaseTab
 from ui.widgets.directory_selector import DirectorySelectorWidget
 from workers.base_worker import BaseWorker
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Shared helpers
-# ─────────────────────────────────────────────────────────────────────────────
 
 _CFG_NLE_SCAN_DIR = "nle_backup.scan_dir"
 _CFG_NLE_BACKUP_DIR = "nle_backup.backup_dir"
+_MSG_NO_FOLDER = "No Folder"
 
 _STALE_MARKERS = re.compile(r"_WIP|_DRAFT|_TEST|_TEMP", re.IGNORECASE)
 
@@ -154,9 +153,7 @@ def _gather_files(
 
 TRASH_DIR_NAME = ".pearls_trash"
 
-# ─────────────────────────────────────────────────────────────────────────────
 # NLE project file format registry
-# ─────────────────────────────────────────────────────────────────────────────
 
 # Each entry: NLE name → set of extensions (lowercase, with dot)
 _NLE_FORMATS: Dict[str, set] = {
@@ -176,9 +173,7 @@ _NLE_FORMATS: Dict[str, set] = {
 _PACKAGE_EXTS = {".fcpbundle", ".logicx"}
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Data classes
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 @dataclass
@@ -189,9 +184,7 @@ class StaleFile:
     is_dir: bool = False
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Background workers
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class _NLEBackupWorker(BaseWorker):
@@ -226,7 +219,7 @@ class _NLEBackupWorker(BaseWorker):
         def walk(directory: Path) -> None:
             try:
                 entries = list(directory.iterdir())
-            except (PermissionError, OSError):
+            except OSError:
                 return
             for child in entries:
                 try:
@@ -541,9 +534,7 @@ class _VerifyWorker(BaseWorker):
             self.emit_finished(False, str(exc), None)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Storage proportional bar
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class _StorageBar(QWidget):
@@ -574,9 +565,7 @@ class _StorageBar(QWidget):
         p.end()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Stale Files pane
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class _StaleFilesPane(QWidget):
@@ -640,7 +629,7 @@ class _StaleFilesPane(QWidget):
     def _scan(self):
         directory = Path(self.dir_selector.get_directory())
         if not directory.is_dir():
-            QMessageBox.warning(self, "No Folder", "Please select a valid folder.")
+            QMessageBox.warning(self, _MSG_NO_FOLDER, "Please select a valid folder.")
             return
         if self._worker and self._worker.isRunning():
             return
@@ -712,9 +701,7 @@ class _StaleFilesPane(QWidget):
         self._scan()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Storage Report pane
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class _StoragePane(QWidget):
@@ -798,7 +785,7 @@ class _StoragePane(QWidget):
     def _scan(self):
         directory = Path(self.dir_selector.get_directory())
         if not directory.is_dir():
-            QMessageBox.warning(self, "No Folder", "Please select a valid folder.")
+            QMessageBox.warning(self, _MSG_NO_FOLDER, "Please select a valid folder.")
             return
         if self._worker and self._worker.isRunning():
             return
@@ -937,7 +924,7 @@ class _StoragePane(QWidget):
             return
         directory = self.dir_selector.get_directory()
         if not directory or not Path(directory).is_dir():
-            QMessageBox.warning(self, "No Folder", "Select a valid folder first.")
+            QMessageBox.warning(self, _MSG_NO_FOLDER, "Select a valid folder first.")
             return
         import subprocess
 
@@ -947,9 +934,7 @@ class _StoragePane(QWidget):
             QMessageBox.critical(self, "Launch Failed", str(exc))
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Trash pane
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class _TrashPane(QWidget):
@@ -1121,9 +1106,7 @@ class _TrashPane(QWidget):
         self._refresh()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Cold Storage Wizard pages
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class _SelectPage(QWizardPage):
@@ -1434,9 +1417,7 @@ class ColdStorageWizard(QWizard):
             self.addPage(page)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Archive pane (wizard launcher)
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class _ArchivePane(QWidget):
@@ -1487,9 +1468,7 @@ class _ArchivePane(QWidget):
         ColdStorageWizard(self).exec()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # NLE Backup pane
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class _NLEBackupPane(QWidget):
@@ -1642,9 +1621,7 @@ class _NLEBackupPane(QWidget):
         self.config.set("nle_backup.custom_exts", self.custom_ext_edit.text())
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Export folder watcher pane
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class _ExportWatcherPane(QWidget):
@@ -1732,7 +1709,7 @@ class _ExportWatcherPane(QWidget):
     def _start(self):
         directory = Path(self.dir_selector.get_directory())
         if not directory.is_dir():
-            QMessageBox.warning(self, "No Folder", "Select a valid watch folder.")
+            QMessageBox.warning(self, _MSG_NO_FOLDER, "Select a valid watch folder.")
             return
         self._known_files = {
             fp for fp in directory.rglob("*") if fp.is_file() and fp.suffix.lower() in self._WATCH_EXTS
@@ -1829,9 +1806,7 @@ class _ExportWatcherPane(QWidget):
             self.config.set("export_watcher.watch_dir", d)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Main StudioToolsTab
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class StudioToolsTab(BaseTab):

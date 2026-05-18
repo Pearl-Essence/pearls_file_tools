@@ -7,9 +7,7 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Delimiter auto-detection
-# ─────────────────────────────────────────────────────────────────────────────
 # Real-world filenames mix conventions: AE renders use ``_``, Resolve exports
 # use ``-``, DPX stacks use ``.``, and casual exports use space. We score each
 # candidate delimiter by how many *distinct* filenames in the batch contain it
@@ -29,7 +27,7 @@ def detect_dominant_delimiter(filenames: Iterable[str]) -> str:
     ``_  >  -  >  ' '  >  .`` to match historic behaviour. Returns
     ``DEFAULT_DELIMITER`` (``_``) when nothing matches.
     """
-    counts: Dict[str, int] = {d: 0 for d in DELIMITER_CANDIDATES}
+    counts: Dict[str, int] = dict.fromkeys(DELIMITER_CANDIDATES, 0)
     total = 0
     for fname in filenames:
         if not fname:
@@ -173,7 +171,6 @@ def detect_image_sequences(filenames: List[str], min_frames: int = 3) -> Dict[st
 
 def get_group_name(
     filename: str,
-    similarity_threshold: float = 0.6,
     delimiter: Optional[str] = None,
 ) -> Tuple[str, float]:
     """Extract a group name from a filename.
@@ -184,7 +181,6 @@ def get_group_name(
 
     Args:
         filename: Filename to analyse.
-        similarity_threshold: Currently unused; preserved for API stability.
         delimiter: Override the split delimiter. Pass the result of
             :func:`detect_dominant_delimiter` to honour the dataset's
             actual convention.

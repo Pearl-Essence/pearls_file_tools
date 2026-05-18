@@ -54,9 +54,7 @@ PILL_FOR_STATE = {
 }
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Offload pane
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class _OffloadPane(QWidget):
@@ -498,52 +496,37 @@ class _OffloadPane(QWidget):
         except Exception as exc:
             self._emit_status(f"MHL write failed: {exc}")
 
+    def _run_eject_command(self, cmd: list, success_verb: str, fail_verb: str, volume: Path):
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+            if result.returncode == 0:
+                self._emit_status(f"Source {success_verb}: {volume.name}")
+            else:
+                self._emit_status(f"{fail_verb} failed: {result.stderr.strip() or 'unknown error'}")
+        except Exception as exc:
+            self._emit_status(f"{fail_verb} failed: {exc}")
+
     def _eject_source(self):
         """Attempt to eject/unmount the source volume."""
         src = self.card_src.get_path()
         if not src:
             return
 
-        if sys.platform == "darwin":
-            # Walk up to find the volume mount point
-            volume = _find_volume_root(src)
-            if volume and volume != Path("/"):
-                try:
-                    result = subprocess.run(
-                        ["diskutil", "eject", str(volume)],
-                        capture_output=True,
-                        text=True,
-                        timeout=15,
-                    )
-                    if result.returncode == 0:
-                        self._emit_status(f"Source ejected: {volume.name}")
-                    else:
-                        self._emit_status(f"Eject failed: {result.stderr.strip() or 'unknown error'}")
-                except Exception as exc:
-                    self._emit_status(f"Eject failed: {exc}")
-            else:
-                self._emit_status("Eject skipped — source is not on a removable volume")
-        elif sys.platform == "win32":
+        if sys.platform == "win32":
             self._emit_status(
                 "Eject on Windows requires manual action — please safely remove the drive from the system tray"
             )
+            return
+
+        volume = _find_volume_root(src)
+        if not volume or volume == Path("/"):
+            self._emit_status("Eject skipped — source is not on a removable volume")
+            return
+
+        if sys.platform == "darwin":
+            self._run_eject_command(["diskutil", "eject", str(volume)], "ejected", "Eject", volume)
         else:
-            # Linux — try udisksctl
-            volume = _find_volume_root(src)
-            if volume and volume != Path("/"):
-                try:
-                    result = subprocess.run(
-                        ["udisksctl", "unmount", "-b", str(volume)],
-                        capture_output=True,
-                        text=True,
-                        timeout=15,
-                    )
-                    if result.returncode == 0:
-                        self._emit_status(f"Source unmounted: {volume.name}")
-                    else:
-                        self._emit_status(f"Unmount failed: {result.stderr.strip()}")
-                except Exception as exc:
-                    self._emit_status(f"Unmount failed: {exc}")
+            self._run_eject_command(["udisksctl", "unmount", "-b", str(volume)], "unmounted", "Unmount", volume)
 
     def _send_email_report(self, results: list):
         """Send an email completion report using SMTP config from Settings."""
@@ -597,9 +580,7 @@ class _OffloadPane(QWidget):
             self._emit_status(f"Email failed: {exc}")
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Helpers
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 def _human_bytes(n: int) -> str:
@@ -650,9 +631,7 @@ def _find_volume_root(path: Path) -> Optional[Path]:
         return None
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Public IngestTab
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class IngestTab(BaseTab):

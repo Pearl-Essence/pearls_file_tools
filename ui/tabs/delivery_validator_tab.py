@@ -28,9 +28,7 @@ from ui.tabs.delivery_tab import _ValidatorPane
 from ui.widgets.path_card import PathCard
 from ui.widgets.tab_header import TabHeader
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Empty-state hero
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class _ValidatorHero(QWidget):
@@ -98,9 +96,7 @@ class _ValidatorHero(QWidget):
             self.folder_picked.emit(chosen)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # SpecValidatorTab
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class SpecValidatorTab(BaseTab):
@@ -112,9 +108,7 @@ class SpecValidatorTab(BaseTab):
     def get_tab_name(self) -> str:
         return "Spec Validator"
 
-    # ─────────────────────────────────────────────────────────────────────
     # UI
-    # ─────────────────────────────────────────────────────────────────────
     def setup_ui(self):
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
@@ -157,9 +151,7 @@ class SpecValidatorTab(BaseTab):
         self.path_card.path_changed.connect(self._on_folder_picked)
         return self.path_card
 
-    # ─────────────────────────────────────────────────────────────────────
     # Wiring
-    # ─────────────────────────────────────────────────────────────────────
     def _on_folder_picked(self, path: str):
         if not path:
             return
@@ -178,9 +170,7 @@ class SpecValidatorTab(BaseTab):
         """Forward to the inner pane so cross-tab callers can pre-fill Package."""
         return self._inner.dir_selector.get_directory()
 
-    # ─────────────────────────────────────────────────────────────────────
     # Persistence
-    # ─────────────────────────────────────────────────────────────────────
     def load_settings(self):
         directory = self.config.get_tab_directory("delivery")
         if directory and Path(directory).is_dir():

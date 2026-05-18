@@ -49,9 +49,7 @@ class MainWindow(QMainWindow):
         self._setup_shortcuts()
         self._load_window_state()
 
-    # ─────────────────────────────────────────────────────────────────
     # UI construction
-    # ─────────────────────────────────────────────────────────────────
     def _setup_ui(self):
         self.setWindowTitle(APP_NAME)
         self.setMinimumSize(900, 600)
@@ -261,9 +259,7 @@ class MainWindow(QMainWindow):
         # Default to Offload
         self.sidebar.select_key("offload")
 
-    # ─────────────────────────────────────────────────────────────────
     # Navigation routing
-    # ─────────────────────────────────────────────────────────────────
     def _on_nav_activated(self, factory_key: str):
         # All destinations are now real panes in the QStackedWidget.
         idx = self._stack_index_for_key.get(factory_key)
@@ -276,9 +272,7 @@ class MainWindow(QMainWindow):
                         self._crumb.setText(f"{section_label.split('·')[0].strip()} · {label.upper()}")
                         return
 
-    # ─────────────────────────────────────────────────────────────────
     # Menu bar (slimmer — Sync/Watch are in the sidebar now)
-    # ─────────────────────────────────────────────────────────────────
     def _setup_menu_bar(self):
         bar = self.menuBar()
 
@@ -328,9 +322,7 @@ class MainWindow(QMainWindow):
             sc.activated.connect(lambda k=key: self.sidebar.select_key(k))
         QShortcut(QKeySequence("Ctrl+W"), self).activated.connect(self.close)
 
-    # ─────────────────────────────────────────────────────────────────
     # Window state persistence
-    # ─────────────────────────────────────────────────────────────────
     def _load_window_state(self):
         screen = QApplication.primaryScreen().availableGeometry()
         remember_size = self.config.get("settings.remember_window_size", True)
@@ -373,9 +365,7 @@ class MainWindow(QMainWindow):
         self._save_window_state()
         event.accept()
 
-    # ─────────────────────────────────────────────────────────────────
     # Status / misc
-    # ─────────────────────────────────────────────────────────────────
     def _update_status(self, message: str):
         self.statusBar().showMessage(message)
 
@@ -424,6 +414,12 @@ class MainWindow(QMainWindow):
         )
         if reply != QMessageBox.Yes:
             return
+
+        cleared, total = self._delete_cache_files()
+        self._report_cache_results(cleared, total)
+
+    def _delete_cache_files(self):
+        """Find and delete all known cache files. Returns (count, total_bytes)."""
         from pathlib import Path as _P
 
         cleared = 0
@@ -444,6 +440,10 @@ class MainWindow(QMainWindow):
                             cleared += 1
                     except OSError:
                         pass
+        return cleared, total
+
+    def _report_cache_results(self, cleared, total):
+        """Show a message box summarising the cache-clearing result."""
         if cleared:
             kb = total / 1024
             sz = f"{kb:.2f} KB" if kb < 1024 else f"{kb / 1024:.2f} MB"
@@ -471,9 +471,7 @@ class MainWindow(QMainWindow):
             f"<p style='margin-top:10px;'><i>Built with PySide6</i></p>",
         )
 
-    # ─────────────────────────────────────────────────────────────────
     # User footer context menu
-    # ─────────────────────────────────────────────────────────────────
     def _show_user_menu(self):
         menu = QMenu(self)
         menu.addAction("Settings…", self._show_settings)
@@ -483,9 +481,7 @@ class MainWindow(QMainWindow):
         menu.addAction("About Pearl Post Suite", self._show_about)
         menu.exec(QCursor.pos())
 
-    # ─────────────────────────────────────────────────────────────────
     # Project management
-    # ─────────────────────────────────────────────────────────────────
     def _get_projects(self) -> list:
         """Return list of Project dicts from config."""
         return self.config.get("projects", [])
@@ -596,17 +592,26 @@ class MainWindow(QMainWindow):
         for p in self._get_projects():
             if p.get("name") == active:
                 proj = Project.from_dict(p)
-                paths = proj.default_paths
-
-                # Find tabs by factory key and apply defaults
-                for tab in self._tab_instances:
-                    tab_name = getattr(tab, "get_tab_name", lambda: "")()
-                    if tab_name == "Offload" and hasattr(tab, "_pane"):
-                        pane = tab._pane
-                        if paths.get("ingest_source") and not pane.card_src.get_path():
-                            pane.card_src.set_path(paths["ingest_source"])
-                        if paths.get("ingest_dest") and not pane.card_dst.get_path():
-                            pane.card_dst.set_path(paths["ingest_dest"])
-                        if paths.get("mirror_dest") and not pane.card_mirror.get_path():
-                            pane.card_mirror.set_path(paths["mirror_dest"])
+                self._apply_paths_to_tabs(proj.default_paths)
                 return
+
+    def _apply_paths_to_tabs(self, paths: dict):
+        """Set default paths on matching tab instances (if their cards are empty)."""
+        for tab in self._tab_instances:
+            tab_name = getattr(tab, "get_tab_name", lambda: "")()
+            if tab_name == "Offload" and hasattr(tab, "_pane"):
+                self._apply_offload_defaults(tab._pane, paths)
+
+    @staticmethod
+    def _apply_offload_defaults(pane, paths: dict):
+        """Apply project default paths to the Offload pane's PathCards."""
+        _path_pairs = [
+            ("ingest_source", "card_src"),
+            ("ingest_dest", "card_dst"),
+            ("mirror_dest", "card_mirror"),
+        ]
+        for path_key, card_attr in _path_pairs:
+            if paths.get(path_key):
+                card = getattr(pane, card_attr, None)
+                if card and not card.get_path():
+                    card.set_path(paths[path_key])

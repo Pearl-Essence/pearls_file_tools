@@ -9,9 +9,7 @@ import zipfile
 from pathlib import Path
 from typing import Iterable, List, Optional
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Path-traversal defense (Zip Slip)
-# ─────────────────────────────────────────────────────────────────────────────
 # Modern CPython sanitises ``..`` and absolute paths inside zipfile.extractall
 # but py7zr / rarfile / older Python builds do not always. We add a
 # pre-extraction validation pass that refuses any archive containing an

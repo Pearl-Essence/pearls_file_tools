@@ -31,9 +31,7 @@ from ui.tabs.studio_tools_tab import (
 )
 from ui.widgets.tab_header import TabHeader
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Wrapper helpers
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 def _shell(host: QWidget, eyebrow: str, title: str, subtitle: str, inner: QWidget) -> QVBoxLayout:
@@ -46,9 +44,7 @@ def _shell(host: QWidget, eyebrow: str, title: str, subtitle: str, inner: QWidge
     return root
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # 03 · MAINTAIN tabs
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class StaleFilesTab(BaseTab):
@@ -176,9 +172,7 @@ class ExportWatcherTab(BaseTab):
         self._inner.save_settings()
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # 05 · ARCHIVE tabs
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class ColdStorageTab(BaseTab):

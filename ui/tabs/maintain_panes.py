@@ -35,9 +35,7 @@ def _shell(host: QWidget, eyebrow: str, title: str, subtitle: str, inner: QWidge
     return root
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Sync Check
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class SyncCheckTab(BaseTab):
@@ -70,9 +68,7 @@ class SyncCheckTab(BaseTab):
         return
 
 
-# ─────────────────────────────────────────────────────────────────────────────
 # Watch Folders
-# ─────────────────────────────────────────────────────────────────────────────
 
 
 class WatchFoldersTab(BaseTab):

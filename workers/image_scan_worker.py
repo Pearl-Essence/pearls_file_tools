@@ -40,8 +40,6 @@ class ImageScanWorker(BaseWorker):
     def run(self):
         """Execute the directory scan."""
         try:
-            images = []
-
             # Try to load from cache first
             if self.use_cache:
                 cached_images = self._load_from_cache()
@@ -55,100 +53,129 @@ class ImageScanWorker(BaseWorker):
             self.emit_progress("Scanning directory for files...")
 
             if self.recursive:
-                for dirpath, dirnames, filenames in os.walk(self.root_dir):
-                    if self.is_cancelled:
-                        self.emit_finished(False, "Scan cancelled", None)
-                        return
-
-                    current_dir = Path(dirpath)
-                    relative_dir = current_dir.relative_to(self.root_dir)
-
-                    if any(part.startswith(".") for part in relative_dir.parts):
-                        continue
-
-                    folder_name = str(relative_dir) if str(relative_dir) != "." else "Root"
-                    self.emit_progress(f"Scanning: {folder_name}")
-
-                    for filename in filenames:
-                        ext = Path(filename).suffix.lower()
-                        if ext not in self._valid_extensions:
-                            continue
-                        file_path = current_dir / filename
-                        try:
-                            if file_path.is_symlink() and not file_path.exists():
-                                self.emit_progress(f"Skipping broken symlink: {filename}")
-                                continue
-                            size = file_path.stat().st_size
-                        except (OSError, PermissionError) as exc:
-                            self.emit_progress(f"Skipping {filename}: {exc}")
-                            continue
-                        entry = {
-                            "name": filename,
-                            "path": str(file_path),
-                            "folder": folder_name,
-                            "size": size,
-                        }
-                        if ext in VIDEO_EXTENSIONS:
-                            entry["is_video"] = True
-                        images.append(entry)
+                images = self._scan_recursive()
             else:
-                self.emit_progress(f"Scanning: {self.root_dir.name}")
+                images = self._scan_flat()
 
-                for file_path in self.root_dir.iterdir():
-                    if self.is_cancelled:
-                        self.emit_finished(False, "Scan cancelled", None)
-                        return
-                    ext = file_path.suffix.lower()
-                    if file_path.is_file() and ext in self._valid_extensions:
-                        entry = {
-                            "name": file_path.name,
-                            "path": str(file_path),
-                            "folder": "Root",
-                            "size": file_path.stat().st_size,
-                        }
-                        if ext in VIDEO_EXTENSIONS:
-                            entry["is_video"] = True
-                        images.append(entry)
+            if images is None:
+                # Cancelled during scan
+                return
 
-            # Sort images by name
             images.sort(key=lambda x: x["name"].lower())
-
-            # Detect image sequences per folder (videos excluded)
             self._annotate_sequences(images)
+            self._enrich_videos(images)
+            self._emit_scan_summary(images)
 
-            # Enrich video entries with thumbnails and duration
-            video_entries = [e for e in images if e.get("is_video")]
-            if video_entries:
-                self.emit_progress(f"Generating thumbnails for {len(video_entries)} video(s)...")
-                for i, entry in enumerate(video_entries):
-                    if self.is_cancelled:
-                        break
-                    thumb_b64 = self._extract_video_thumbnail(entry["path"])
-                    if thumb_b64:
-                        entry["thumbnail_b64"] = thumb_b64
-                    duration = self._get_video_duration(entry["path"])
-                    if duration is not None:
-                        entry["duration_secs"] = duration
-
-            total_images = sum(1 for e in images if not e.get("is_video"))
-            total_videos = sum(1 for e in images if e.get("is_video"))
-            parts = []
-            if total_images:
-                parts.append(f"{total_images} image(s)")
-            if total_videos:
-                parts.append(f"{total_videos} video(s)")
-            self.emit_progress(f"Found {' + '.join(parts) if parts else '0 files'}")
-
-            # Save to cache
             if images:
                 self._save_to_cache(images)
                 self.emit_progress("Cache saved")
 
-            message = f"Found {len(images)} file(s)"
-            self.emit_finished(True, message, images)
+            self.emit_finished(True, f"Found {len(images)} file(s)", images)
 
         except Exception as e:
             self.emit_finished(False, f"Error scanning directory: {str(e)}", None)
+
+    def _scan_recursive(self) -> Optional[List[Dict]]:
+        """Walk the directory tree and collect matching file entries.
+
+        Returns None if cancelled, otherwise a list of image/video dicts.
+        """
+        images: List[Dict] = []
+        for dirpath, dirnames, filenames in os.walk(self.root_dir):
+            if self.is_cancelled:
+                self.emit_finished(False, "Scan cancelled", None)
+                return None
+
+            current_dir = Path(dirpath)
+            relative_dir = current_dir.relative_to(self.root_dir)
+
+            if any(part.startswith(".") for part in relative_dir.parts):
+                continue
+
+            folder_name = str(relative_dir) if str(relative_dir) != "." else "Root"
+            self.emit_progress(f"Scanning: {folder_name}")
+
+            for filename in filenames:
+                entry = self._make_entry(current_dir / filename, folder_name)
+                if entry is not None:
+                    images.append(entry)
+
+        return images
+
+    def _scan_flat(self) -> Optional[List[Dict]]:
+        """Scan the root directory (non-recursive) for matching files.
+
+        Returns None if cancelled, otherwise a list of image/video dicts.
+        """
+        images: List[Dict] = []
+        self.emit_progress(f"Scanning: {self.root_dir.name}")
+
+        for file_path in self.root_dir.iterdir():
+            if self.is_cancelled:
+                self.emit_finished(False, "Scan cancelled", None)
+                return None
+
+            if not file_path.is_file():
+                continue
+
+            entry = self._make_entry(file_path, "Root")
+            if entry is not None:
+                images.append(entry)
+
+        return images
+
+    def _make_entry(self, file_path: Path, folder_name: str) -> Optional[Dict]:
+        """Build a single image/video entry dict, or None if the file should be skipped."""
+        ext = file_path.suffix.lower()
+        if ext not in self._valid_extensions:
+            return None
+
+        try:
+            if file_path.is_symlink() and not file_path.exists():
+                self.emit_progress(f"Skipping broken symlink: {file_path.name}")
+                return None
+            size = file_path.stat().st_size
+        except OSError as exc:
+            self.emit_progress(f"Skipping {file_path.name}: {exc}")
+            return None
+
+        entry: Dict = {
+            "name": file_path.name,
+            "path": str(file_path),
+            "folder": folder_name,
+            "size": size,
+        }
+        if ext in VIDEO_EXTENSIONS:
+            entry["is_video"] = True
+        return entry
+
+    def _enrich_videos(self, images: List[Dict]) -> None:
+        """Populate thumbnail and duration fields for video entries."""
+        video_entries = [e for e in images if e.get("is_video")]
+        if not video_entries:
+            return
+
+        self.emit_progress(f"Generating thumbnails for {len(video_entries)} video(s)...")
+        for entry in video_entries:
+            if self.is_cancelled:
+                break
+            thumb_b64 = self._extract_video_thumbnail(entry["path"])
+            if thumb_b64:
+                entry["thumbnail_b64"] = thumb_b64
+            duration = self._get_video_duration(entry["path"])
+            if duration is not None:
+                entry["duration_secs"] = duration
+
+    def _emit_scan_summary(self, images: List[Dict]) -> None:
+        """Emit a human-readable progress message summarising the scan results."""
+        total_images = sum(1 for e in images if not e.get("is_video"))
+        total_videos = sum(1 for e in images if e.get("is_video"))
+        parts = []
+        if total_images:
+            parts.append(f"{total_images} image(s)")
+        if total_videos:
+            parts.append(f"{total_videos} video(s)")
+        self.emit_progress(f"Found {' + '.join(parts) if parts else '0 files'}")
 
     @staticmethod
     def _annotate_sequences(images: List[Dict]):
@@ -223,7 +250,7 @@ class ImageScanWorker(BaseWorker):
             )
             if result.returncode == 0 and result.stdout:
                 return base64.b64encode(result.stdout).decode("ascii")
-        except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        except (subprocess.TimeoutExpired, OSError):
             pass
         return None
 
@@ -248,11 +275,11 @@ class ImageScanWorker(BaseWorker):
             )
             if result.returncode == 0 and result.stdout.strip():
                 return float(result.stdout.strip())
-        except (FileNotFoundError, subprocess.TimeoutExpired, ValueError, OSError):
+        except (subprocess.TimeoutExpired, ValueError, OSError):
             pass
         return None
 
-    def _get_directory_hash(self) -> str:
+    def _get_directory_hash(self) -> Optional[str]:
         """Generate a hash based on directory structure for cache validation."""
         try:
             # Get directory modification time and file count
@@ -273,7 +300,7 @@ class ImageScanWorker(BaseWorker):
         except Exception:
             return None
 
-    def _load_from_cache(self) -> List[Dict]:
+    def _load_from_cache(self) -> Optional[List[Dict]]:
         """Load images from cache file if valid."""
         try:
             if not self.cache_file.exists():
@@ -320,7 +347,7 @@ class ImageScanWorker(BaseWorker):
             }
             with open(self.cache_file, "w", encoding="utf-8") as f:
                 json.dump(cache_data, f, indent=2)
-        except (PermissionError, OSError):
+        except OSError:
             pass
         except Exception as e:
             self.emit_progress(f"Cache save error: {e}")

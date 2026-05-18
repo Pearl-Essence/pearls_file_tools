@@ -2,6 +2,7 @@
 
 import csv
 import datetime
+from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
@@ -27,6 +28,29 @@ from models.operation_record import OperationRecord
 from workers.base_worker import BaseWorker
 
 
+@dataclass
+class RenameConfig:
+    """Bundles all configuration for a rename/copy operation."""
+
+    prefix: str = ""
+    suffix: str = ""
+    rename_to: str = ""
+    case_transform: str = "none"
+    prefix_to_suffix: Optional[List[str]] = None
+    suffix_to_prefix: Optional[List[str]] = None
+    find_prefix: str = ""
+    replace_prefix_with: str = ""
+    find_suffix: str = ""
+    replace_suffix_with: str = ""
+    direct_renames: Optional[List[Tuple[Path, str]]] = None
+    copy_mode: bool = False
+    copy_dest: Optional[Path] = None
+    rename_sidecars: bool = True
+    rename_captions: bool = True
+    write_manifest: bool = True
+    include_hidden: bool = False
+
+
 class RenameWorker(BaseWorker):
     """Worker thread for renaming files."""
 
@@ -38,6 +62,8 @@ class RenameWorker(BaseWorker):
     def __init__(
         self,
         files: List[Path],
+        config: Optional[RenameConfig] = None,
+        *,
         prefix: str = "",
         suffix: str = "",
         rename_to: str = "",
@@ -56,54 +82,38 @@ class RenameWorker(BaseWorker):
         write_manifest: bool = True,
         include_hidden: bool = False,
     ):
-        """
-        Args:
-            files: Files to rename (ignored when direct_renames is provided).
-            prefix/suffix/rename_to/case_transform: Standard transform options.
-            prefix_to_suffix: Tokens to move from the beginning to the end.
-                Combines with the standard transforms (prefix/suffix/case)
-                so the user can do "strip DRAFT_" *and* "add HERO_" in one
-                Apply Rename click — historically these were two separate
-                button presses.
-            suffix_to_prefix: Tokens to move from the end to the beginning.
-                Same combination semantics as ``prefix_to_suffix``.
-            direct_renames: Pre-computed [(Path, new_name)] pairs — bypasses all
-                            transform logic (used by sequential numbering mode).
-            rename_sidecars: Also rename same-stem sidecar files.
-            rename_captions: Also rename same-stem caption/subtitle files.
-            write_manifest: Write a CSV log of the batch to the target directory.
-            include_hidden: When False (default), files whose name starts with
-                ``.`` are silently dropped from the batch. Hidden files are
-                almost always config/OS files (``.DS_Store``, ``.gitignore``)
-                that the user does not intend to rename.
-        """
         super().__init__()
         self.files = files
-        self.prefix = prefix
-        self.suffix = suffix
-        self.rename_to = rename_to
-        self.case_transform = case_transform
-        self.prefix_to_suffix = prefix_to_suffix
-        self.suffix_to_prefix = suffix_to_prefix
-        self.find_prefix = find_prefix
-        self.replace_prefix_with = replace_prefix_with
-        self.find_suffix = find_suffix
-        self.replace_suffix_with = replace_suffix_with
-        self.direct_renames = direct_renames
-        self.copy_mode = copy_mode
-        self.copy_dest = copy_dest
-        self.rename_sidecars = rename_sidecars
-        self.rename_captions = rename_captions
-        self.write_manifest = write_manifest
-        self.include_hidden = include_hidden
+        if config is not None:
+            self.config = config
+        else:
+            self.config = RenameConfig(
+                prefix=prefix,
+                suffix=suffix,
+                rename_to=rename_to,
+                case_transform=case_transform,
+                prefix_to_suffix=prefix_to_suffix,
+                suffix_to_prefix=suffix_to_prefix,
+                find_prefix=find_prefix,
+                replace_prefix_with=replace_prefix_with,
+                find_suffix=find_suffix,
+                replace_suffix_with=replace_suffix_with,
+                direct_renames=direct_renames,
+                copy_mode=copy_mode,
+                copy_dest=copy_dest,
+                rename_sidecars=rename_sidecars,
+                rename_captions=rename_captions,
+                write_manifest=write_manifest,
+                include_hidden=include_hidden,
+            )
 
     # ── helpers ──────────────────────────────────────────────────────────────
 
     def _companion_extensions(self) -> set:
         exts = set()
-        if self.rename_sidecars:
+        if self.config.rename_sidecars:
             exts |= SIDECAR_EXTENSIONS
-        if self.rename_captions:
+        if self.config.rename_captions:
             exts |= CAPTION_EXTENSIONS
         return exts
 
@@ -154,61 +164,58 @@ class RenameWorker(BaseWorker):
         except Exception as e:
             self.emit_progress(f"Warning: could not write rename log — {e}")
 
+    @staticmethod
+    def _format_result_message(verb: str, success_count: int, error_count: int, errors: List[str]) -> str:
+        """Build the human-readable result message for rename/copy operations."""
+        message = f"Successfully {verb} {success_count} file(s)."
+        if error_count:
+            message += f"\n{error_count} error(s):\n" + "\n".join(errors[:5])
+            if len(errors) > 5:
+                message += f"\n… and {len(errors) - 5} more"
+        return message
+
     # ── main run ─────────────────────────────────────────────────────────────
 
     def run(self):
         """Execute the rename or copy operation."""
-        if self.copy_mode:
+        if self.config.copy_mode:
             self._run_copy()
         else:
             self._run_rename()
 
     def _run_copy(self):
         """Copy files with new names to copy_dest."""
-        import shutil
-
         success_count = 0
         error_count = 0
         errors = []
         copy_operations = []  # (copied_path, original_path) for OperationRecord
         manifest_rows = []
 
-        if self.direct_renames is not None:
-            work = list(self.direct_renames)
+        if self.config.direct_renames is not None:
+            work = list(self.config.direct_renames)
         else:
             work = self._build_work_list()
 
         total = len(work)
-        dest = self.copy_dest
+        dest = self.config.copy_dest
 
         for idx, (filepath, new_name) in enumerate(work):
             if self.is_cancelled:
                 self.emit_finished(False, "Operation cancelled by user", None)
                 return
-            try:
-                dest_path = dest / new_name
-                if dest_path.exists():
-                    dest_path = resolve_name_conflict(dest_path)
-                    if dest_path is None:
-                        errors.append(f"{filepath.name}: target already exists in destination")
-                        error_count += 1
-                        continue
 
-                shutil.copy2(filepath, dest_path)
-                ts_str = datetime.datetime.now().isoformat(timespec="seconds")
-                copy_operations.append((dest_path, filepath))
-                manifest_rows.append((filepath.name, dest_path.name, ts_str))
+            ok, err = self._copy_single_file(filepath, new_name, dest, copy_operations, manifest_rows)
+            if ok:
                 success_count += 1
-                self.emit_progress(f"Copied: {filepath.name} → {dest_path.name}")
-            except Exception as e:
-                errors.append(f"{filepath.name}: {e}")
+            else:
+                errors.append(err)
                 error_count += 1
 
             if total > 0:
                 pct = int(((idx + 1) / total) * 100)
                 self.emit_progress(f"Processing… {idx + 1}/{total} ({pct}%)")
 
-        if self.write_manifest and manifest_rows:
+        if self.config.write_manifest and manifest_rows:
             self._write_manifest(manifest_rows, dest)
 
         operation_record = None
@@ -219,13 +226,38 @@ class RenameWorker(BaseWorker):
                 metadata={"copy_dest": str(dest)},
             )
 
-        message = f"Successfully copied {success_count} file(s)."
-        if error_count:
-            message += f"\n{error_count} error(s):\n" + "\n".join(errors[:5])
-            if len(errors) > 5:
-                message += f"\n… and {len(errors) - 5} more"
-
+        message = self._format_result_message("copied", success_count, error_count, errors)
         self.emit_finished(error_count == 0, message, operation_record)
+
+    def _copy_single_file(
+        self,
+        filepath: Path,
+        new_name: str,
+        dest: Path,
+        copy_operations: list,
+        manifest_rows: list,
+    ) -> Tuple[bool, str]:
+        """Copy one file to *dest* with *new_name*.
+
+        Returns ``(True, "")`` on success or ``(False, error_description)`` on failure.
+        """
+        import shutil
+
+        try:
+            dest_path = dest / new_name
+            if dest_path.exists():
+                dest_path = resolve_name_conflict(dest_path)
+                if dest_path is None:
+                    return False, f"{filepath.name}: target already exists in destination"
+
+            shutil.copy2(filepath, dest_path)
+            ts_str = datetime.datetime.now().isoformat(timespec="seconds")
+            copy_operations.append((dest_path, filepath))
+            manifest_rows.append((filepath.name, dest_path.name, ts_str))
+            self.emit_progress(f"Copied: {filepath.name} → {dest_path.name}")
+            return True, ""
+        except Exception as e:
+            return False, f"{filepath.name}: {e}"
 
     def _run_rename(self):
         """Execute the rename operation."""
@@ -235,9 +267,8 @@ class RenameWorker(BaseWorker):
         rename_operations = []  # (new_path, old_path) for OperationRecord / undo
         manifest_rows = []  # (old_name, new_name, timestamp) for CSV
 
-        # Build the work list: [(Path, new_name_str), ...]
-        if self.direct_renames is not None:
-            work = list(self.direct_renames)
+        if self.config.direct_renames is not None:
+            work = list(self.config.direct_renames)
         else:
             work = self._build_work_list()
 
@@ -248,82 +279,86 @@ class RenameWorker(BaseWorker):
                 self.emit_finished(False, "Operation cancelled by user", None)
                 return
 
-            try:
-                if new_name == filepath.name:
-                    continue
-
-                new_path = filepath.parent / new_name
-
-                # On case-insensitive filesystems (APFS / NTFS), Path.exists()
-                # for a target that differs from the source only by case will
-                # return True (the OS resolves it to the source itself). Don't
-                # treat that as a conflict — same_inode confirms it's the same
-                # file viewed under a different case, and safe_rename handles
-                # the two-step rename.
-                if new_path.exists() and new_path != filepath and not same_inode(new_path, filepath):
-                    new_path = resolve_name_conflict(new_path)
-                    if new_path is None:
-                        errors.append(f"{filepath.name}: target already exists")
-                        error_count += 1
-                        continue
-
-                # Rename primary file
-                if not safe_rename(filepath, new_path):
-                    errors.append(f"{filepath.name}: rename failed")
-                    error_count += 1
-                    continue
-
-                ts_str = datetime.datetime.now().isoformat(timespec="seconds")
-                rename_operations.append((new_path, filepath))
-                manifest_rows.append((filepath.name, new_path.name, ts_str))
+            ok, err = self._rename_single_file(filepath, new_name, rename_operations, manifest_rows)
+            if ok:
                 success_count += 1
-                self.emit_progress(f"Renamed: {filepath.name} → {new_path.name}")
-
-                # Rename companion sidecar / caption files
-                new_stem, _ = split_compound_suffix(new_path.name)
-                for old_comp, new_comp in self._find_companions(filepath, new_stem):
-                    if new_comp.exists() and new_comp != old_comp and not same_inode(new_comp, old_comp):
-                        new_comp = resolve_name_conflict(new_comp)
-                    if new_comp and safe_rename(old_comp, new_comp):
-                        rename_operations.append((new_comp, old_comp))
-                        manifest_rows.append((old_comp.name, new_comp.name, ts_str))
-                        self.emit_progress(f"  + companion: {old_comp.name} → {new_comp.name}")
-
-            except Exception as e:
-                errors.append(f"{filepath.name}: {e}")
+            elif err:
+                errors.append(err)
                 error_count += 1
 
             if total > 0:
                 pct = int(((idx + 1) / total) * 100)
                 self.emit_progress(f"Processing… {idx + 1}/{total} ({pct}%)")
 
-        # Write manifest CSV
-        if self.write_manifest and manifest_rows:
+        if self.config.write_manifest and manifest_rows:
             dirs = {p.parent for p, _ in rename_operations}
-            target_dir = next(iter(dirs))  # use first directory
+            target_dir = next(iter(dirs))
             self._write_manifest(manifest_rows, target_dir)
 
-        # Build OperationRecord for undo
         operation_record = None
         if rename_operations:
             operation_record = OperationRecord(
                 operation_type=OP_TYPE_RENAME,
                 files_affected=rename_operations,
                 metadata={
-                    "prefix": self.prefix,
-                    "suffix": self.suffix,
-                    "rename_to": self.rename_to,
-                    "case_transform": self.case_transform,
+                    "prefix": self.config.prefix,
+                    "suffix": self.config.suffix,
+                    "rename_to": self.config.rename_to,
+                    "case_transform": self.config.case_transform,
                 },
             )
 
-        message = f"Successfully renamed {success_count} file(s)."
-        if error_count:
-            message += f"\n{error_count} error(s):\n" + "\n".join(errors[:5])
-            if len(errors) > 5:
-                message += f"\n… and {len(errors) - 5} more"
-
+        message = self._format_result_message("renamed", success_count, error_count, errors)
         self.emit_finished(error_count == 0, message, operation_record)
+
+    def _rename_single_file(
+        self,
+        filepath: Path,
+        new_name: str,
+        rename_operations: list,
+        manifest_rows: list,
+    ) -> Tuple[bool, str]:
+        """Rename one file and its companion sidecars/captions.
+
+        Returns ``(True, "")`` on success, ``(False, "")`` if skipped (name
+        unchanged), or ``(False, error_description)`` on failure.
+        """
+        try:
+            if new_name == filepath.name:
+                return False, ""  # skip, not an error
+
+            new_path = filepath.parent / new_name
+
+            # On case-insensitive filesystems (APFS / NTFS), Path.exists()
+            # for a target that differs only by case resolves to the source.
+            # same_inode confirms it's the same file — not a conflict.
+            if new_path.exists() and new_path != filepath and not same_inode(new_path, filepath):
+                new_path = resolve_name_conflict(new_path)
+                if new_path is None:
+                    return False, f"{filepath.name}: target already exists"
+
+            if not safe_rename(filepath, new_path):
+                return False, f"{filepath.name}: rename failed"
+
+            ts_str = datetime.datetime.now().isoformat(timespec="seconds")
+            rename_operations.append((new_path, filepath))
+            manifest_rows.append((filepath.name, new_path.name, ts_str))
+            self.emit_progress(f"Renamed: {filepath.name} → {new_path.name}")
+
+            # Rename companion sidecar / caption files
+            new_stem, _ = split_compound_suffix(new_path.name)
+            for old_comp, new_comp in self._find_companions(filepath, new_stem):
+                if new_comp.exists() and new_comp != old_comp and not same_inode(new_comp, old_comp):
+                    new_comp = resolve_name_conflict(new_comp)
+                if new_comp and safe_rename(old_comp, new_comp):
+                    rename_operations.append((new_comp, old_comp))
+                    manifest_rows.append((old_comp.name, new_comp.name, ts_str))
+                    self.emit_progress(f"  + companion: {old_comp.name} → {new_comp.name}")
+
+            return True, ""
+
+        except Exception as e:
+            return False, f"{filepath.name}: {e}"
 
     def _build_work_list(self) -> List[Tuple[Path, str]]:
         """Convert self.files into ``(Path, new_name)`` pairs.
@@ -339,37 +374,38 @@ class RenameWorker(BaseWorker):
         ``HERO_`` prefix" as one operation rather than two button clicks.
         """
         work: List[Tuple[Path, str]] = []
+        cfg = self.config
         for filepath in self.files:
-            # Skip hidden files unless explicitly included
-            if not self.include_hidden and is_hidden_file(filepath.name):
+            if not cfg.include_hidden and is_hidden_file(filepath.name):
                 continue
-
-            current_name = filepath.name
-
-            # Transposition pass — moves a leading or trailing token across
-            if self.prefix_to_suffix:
-                matched = match_prefix(current_name, self.prefix_to_suffix)
-                if matched:
-                    current_name = move_prefix_to_suffix(current_name, matched)
-            if self.suffix_to_prefix:
-                matched = match_suffix(current_name, self.suffix_to_prefix)
-                if matched:
-                    current_name = move_suffix_to_prefix(current_name, matched)
-
-            # Replace prefix/suffix pass
-            if self.find_prefix:
-                current_name = replace_prefix(current_name, self.find_prefix, self.replace_prefix_with)
-            if self.find_suffix:
-                current_name = replace_suffix(current_name, self.find_suffix, self.replace_suffix_with)
-
-            # Standard transform pass — runs even after a transposition so
-            # users can chain "remove DRAFT_" and "add HERO_" in one click.
-            new_name = generate_new_filename(
-                current_name,
-                prefix=self.prefix,
-                suffix=self.suffix,
-                rename_to=self.rename_to,
-                case_transform=self.case_transform,
-            )
+            new_name = self._transform_filename(filepath.name, cfg)
             work.append((filepath, new_name))
         return work
+
+    @staticmethod
+    def _transform_filename(current_name: str, cfg: RenameConfig) -> str:
+        """Apply all configured transforms to a single filename and return the new name."""
+        # Transposition pass — moves a leading or trailing token across
+        if cfg.prefix_to_suffix:
+            matched = match_prefix(current_name, cfg.prefix_to_suffix)
+            if matched:
+                current_name = move_prefix_to_suffix(current_name, matched)
+        if cfg.suffix_to_prefix:
+            matched = match_suffix(current_name, cfg.suffix_to_prefix)
+            if matched:
+                current_name = move_suffix_to_prefix(current_name, matched)
+
+        # Replace prefix/suffix pass
+        if cfg.find_prefix:
+            current_name = replace_prefix(current_name, cfg.find_prefix, cfg.replace_prefix_with)
+        if cfg.find_suffix:
+            current_name = replace_suffix(current_name, cfg.find_suffix, cfg.replace_suffix_with)
+
+        # Standard transform pass
+        return generate_new_filename(
+            current_name,
+            prefix=cfg.prefix,
+            suffix=cfg.suffix,
+            rename_to=cfg.rename_to,
+            case_transform=cfg.case_transform,
+        )
