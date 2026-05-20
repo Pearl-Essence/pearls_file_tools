@@ -422,24 +422,35 @@ class MainWindow(QMainWindow):
         """Find and delete all known cache files. Returns (count, total_bytes)."""
         from pathlib import Path as _P
 
-        cleared = 0
-        total = 0
         names = [".image_browser_cache.json"]
         roots = [_P.home()]
         if self.config.config_path:
             roots.append(_P(self.config.config_path).parent)
+
+        cleared = 0
+        total = 0
         for root in roots:
             if not root.exists():
                 continue
             for name in names:
-                for f in root.rglob(name):
-                    try:
-                        if f.is_file():
-                            total += f.stat().st_size
-                            f.unlink()
-                            cleared += 1
-                    except OSError:
-                        pass
+                c, t = self._delete_matching(root, name)
+                cleared += c
+                total += t
+        return cleared, total
+
+    @staticmethod
+    def _delete_matching(root, name):
+        """Delete all files matching *name* under *root*. Returns (count, bytes)."""
+        cleared = 0
+        total = 0
+        for f in root.rglob(name):
+            try:
+                if f.is_file():
+                    total += f.stat().st_size
+                    f.unlink()
+                    cleared += 1
+            except OSError:
+                pass
         return cleared, total
 
     def _report_cache_results(self, cleared, total):
@@ -452,13 +463,13 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "No caches found", "No cache files were found to clear.")
 
     def _show_about(self):
-        from __init__ import __version__
+        from constants import VERSION
 
         QMessageBox.about(
             self,
             f"About {APP_NAME}",
             f"<h3>{APP_NAME}</h3>"
-            f"<p><b>Version {__version__}</b></p>"
+            f"<p><b>Version {VERSION}</b></p>"
             f"<p>A premium post-production file management suite.</p>"
             f"<p><b>Modules:</b></p>"
             f"<ul>"

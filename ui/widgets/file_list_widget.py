@@ -240,37 +240,50 @@ class FileListWidget(QWidget):
 
     def _on_metadata_ready(self, filepath_str: str, info: dict):
         target = Path(filepath_str)
+        row = self._find_row_for_path(target)
+        if row is None:
+            return
+
+        codec, res, dur, fps = self._format_metadata(info)
+
+        self.table.item(row, self.COL_CODEC).setText(codec)
+        self.table.item(row, self.COL_RESOLUTION).setText(res)
+        self.table.item(row, self.COL_DURATION).setText(dur)
+        self.table.item(row, self.COL_FPS).setText(fps)
+
+        self._enrich_tooltip(row, target, info, codec, res, dur)
+
+    def _find_row_for_path(self, target: Path) -> Optional[int]:
         for row in range(self.table.rowCount()):
             fn_item = self.table.item(row, self.COL_FILENAME)
-            if not fn_item or fn_item.data(Qt.UserRole) != target:
-                continue
+            if fn_item and fn_item.data(Qt.UserRole) == target:
+                return row
+        return None
 
-            codec = info.get("codec") or "\u2014"
-            w, h = info.get("width"), info.get("height")
-            res = f"{w}\u00d7{h}" if w and h else "\u2014"
-            dur = _fmt_duration(info.get("duration_secs"))
-            fps_raw = info.get("fps")
-            fps = f"{fps_raw:.2f}" if fps_raw else "\u2014"
+    def _format_metadata(self, info: dict) -> tuple:
+        codec = info.get("codec") or "\u2014"
+        w, h = info.get("width"), info.get("height")
+        res = f"{w}\u00d7{h}" if w and h else "\u2014"
+        dur = _fmt_duration(info.get("duration_secs"))
+        fps_raw = info.get("fps")
+        fps = f"{fps_raw:.2f}" if fps_raw else "\u2014"
+        return codec, res, dur, fps
 
-            self.table.item(row, self.COL_CODEC).setText(codec)
-            self.table.item(row, self.COL_RESOLUTION).setText(res)
-            self.table.item(row, self.COL_DURATION).setText(dur)
-            self.table.item(row, self.COL_FPS).setText(fps)
-
-            # Enrich tooltip even when columns are hidden
-            meta_parts = [
-                p
-                for p in (
-                    codec if codec != "\u2014" else None,
-                    res if res != "\u2014" else None,
-                    f"{fps_raw:.2f} fps" if fps_raw else None,
-                    dur if dur != "\u2014" else None,
-                )
-                if p
-            ]
-            if meta_parts:
-                fn_item.setToolTip(f"{target}\n{', '.join(meta_parts)}")
-            break
+    def _enrich_tooltip(self, row: int, target: Path, info: dict, codec: str, res: str, dur: str):
+        fps_raw = info.get("fps")
+        meta_parts = [
+            p
+            for p in (
+                codec if codec != "\u2014" else None,
+                res if res != "\u2014" else None,
+                f"{fps_raw:.2f} fps" if fps_raw else None,
+                dur if dur != "\u2014" else None,
+            )
+            if p
+        ]
+        if meta_parts:
+            fn_item = self.table.item(row, self.COL_FILENAME)
+            fn_item.setToolTip(f"{target}\n{', '.join(meta_parts)}")
 
     # ── selection helpers ─────────────────────────────────────────────────
 

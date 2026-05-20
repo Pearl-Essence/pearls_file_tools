@@ -53,6 +53,11 @@ _YELLOW = QColor("#ffcb6b")
 _GREEN = QColor("#c3e88d")
 _GREY = QColor("#888888")
 
+_STYLE_BTN = "padding: 8px 20px;"
+_STYLE_SUMMARY = "font-weight: bold; padding: 2px 0;"
+_MSG_NO_FOLDER = "No Folder"
+_MSG_SELECT_FOLDER = "Please select a valid folder."
+
 
 def _colored_item(text: str, color: QColor) -> QListWidgetItem:
     item = QListWidgetItem(text)
@@ -276,12 +281,12 @@ class _ValidatorPane(QWidget):
 
         # ── Bottom pinned: summary + run button ───────────────────────────────
         self.summary_label = QLabel("")
-        self.summary_label.setStyleSheet("font-weight: bold; padding: 2px 0;")
+        self.summary_label.setStyleSheet(_STYLE_SUMMARY)
         layout.addWidget(self.summary_label)
 
         btn_row = QHBoxLayout()
         self.run_btn = QPushButton("Run Validation")
-        self.run_btn.setStyleSheet("padding: 8px 20px;")
+        self.run_btn.setStyleSheet(_STYLE_BTN)
         self.run_btn.clicked.connect(self._run)
         btn_row.addWidget(self.run_btn)
         self.status_label = QLabel("")
@@ -302,7 +307,7 @@ class _ValidatorPane(QWidget):
     def _run(self):
         directory = Path(self.dir_selector.get_directory())
         if not directory.is_dir():
-            QMessageBox.warning(self, "No Folder", "Please select a valid folder.")
+            QMessageBox.warning(self, _MSG_NO_FOLDER, _MSG_SELECT_FOLDER)
             return
         if self._worker and self._worker.isRunning():
             return
@@ -341,7 +346,6 @@ class _ValidatorPane(QWidget):
         passed = report.passed
         errs = report.error_count()
         warns = report.warning_count()
-        color = _GREEN if passed else _RED
         status = "PASSED" if passed else "FAILED"
         self.summary_label.setText(
             f"{status}  |  {report.total_files} files  |  {errs} error(s)  |  {warns} warning(s)"
@@ -399,7 +403,7 @@ class _PackagePane(QWidget):
         # ── Bottom pinned: action button ──────────────────────────────────────
         btn_row = QHBoxLayout()
         self.zip_btn = QPushButton("Create Delivery Zip")
-        self.zip_btn.setStyleSheet("padding: 8px 20px;")
+        self.zip_btn.setStyleSheet(_STYLE_BTN)
         self.zip_btn.clicked.connect(self._create_zip)
         btn_row.addWidget(self.zip_btn)
         self.status_label = QLabel("")
@@ -512,12 +516,12 @@ class _DuplicatesPane(QWidget):
 
         # ── Bottom pinned: summary + scan button ──────────────────────────────
         self.summary_label = QLabel("")
-        self.summary_label.setStyleSheet("font-weight: bold; padding: 2px 0;")
+        self.summary_label.setStyleSheet(_STYLE_SUMMARY)
         layout.addWidget(self.summary_label)
 
         btn_row = QHBoxLayout()
         self.scan_btn = QPushButton("Find Duplicates")
-        self.scan_btn.setStyleSheet("padding: 8px 20px;")
+        self.scan_btn.setStyleSheet(_STYLE_BTN)
         self.scan_btn.clicked.connect(self._scan)
         btn_row.addWidget(self.scan_btn)
         self.status_label = QLabel("")
@@ -528,7 +532,7 @@ class _DuplicatesPane(QWidget):
     def _scan(self):
         directory = Path(self.dir_selector.get_directory())
         if not directory.is_dir():
-            QMessageBox.warning(self, "No Folder", "Please select a valid folder.")
+            QMessageBox.warning(self, _MSG_NO_FOLDER, _MSG_SELECT_FOLDER)
             return
         if self._worker and self._worker.isRunning():
             return
@@ -670,7 +674,7 @@ class _HandoffPane(QWidget):
         # ── Bottom pinned: run button ─────────────────────────────────────────
         btn_row = QHBoxLayout()
         self.run_btn = QPushButton("Run Handoff Checks")
-        self.run_btn.setStyleSheet("padding: 8px 20px;")
+        self.run_btn.setStyleSheet(_STYLE_BTN)
         self.run_btn.clicked.connect(self._run)
         btn_row.addWidget(self.run_btn)
         btn_row.addStretch()
@@ -679,7 +683,7 @@ class _HandoffPane(QWidget):
     def _run(self):
         directory = Path(self.dir_selector.get_directory())
         if not directory.is_dir():
-            QMessageBox.warning(self, "No Folder", "Please select a valid folder.")
+            QMessageBox.warning(self, _MSG_NO_FOLDER, _MSG_SELECT_FOLDER)
             return
 
         from core.delivery import run_handoff_checks
@@ -691,27 +695,28 @@ class _HandoffPane(QWidget):
             self.result_list.addItem(_colored_item(f"Error: {exc}", _RED))
             return
 
+        all_passed = self._render_handoff_results(results)
+        self.result_list.addItem(QListWidgetItem(""))
+        summary_color = _GREEN if all_passed else _RED
+        summary_text = "All required checks PASSED" if all_passed else "One or more required checks FAILED"
+        self.result_list.addItem(_colored_item(summary_text, summary_color))
+
+    def _render_handoff_results(self, results) -> bool:
         all_passed = True
         for res in results:
-            if res.passed:
-                icon = "✓"
-                color = _GREEN
-            else:
-                icon = "✗"
-                color = _RED if res.rule.required else _YELLOW
-                if res.rule.required:
-                    all_passed = False
-
+            icon, color = self._handoff_result_style(res)
+            if not res.passed and res.rule.required:
+                all_passed = False
             req_str = " [required]" if res.rule.required else " [optional]"
             detail = f"  — {res.detail}" if res.detail else ""
             self.result_list.addItem(_colored_item(f"{icon}  {res.rule.name}{req_str}{detail}", color))
+        return all_passed
 
-        sep = QListWidgetItem("")
-        self.result_list.addItem(sep)
-        if all_passed:
-            self.result_list.addItem(_colored_item("All required checks PASSED", _GREEN))
-        else:
-            self.result_list.addItem(_colored_item("One or more required checks FAILED", _RED))
+    @staticmethod
+    def _handoff_result_style(res):
+        if res.passed:
+            return "✓", _GREEN
+        return "✗", _RED if res.rule.required else _YELLOW
 
 
 # Combined Export pane (CSV Manifest OR HTML QC Report, toggled by radio)
@@ -812,7 +817,7 @@ class _ExportPane(QWidget):
         # ── Bottom pinned: export button ──────────────────────────────────────
         btn_row = QHBoxLayout()
         self.export_btn = QPushButton("Export CSV Manifest")
-        self.export_btn.setStyleSheet("padding: 8px 20px;")
+        self.export_btn.setStyleSheet(_STYLE_BTN)
         self.export_btn.clicked.connect(self._export)
         btn_row.addWidget(self.export_btn)
         self.status_label = QLabel("")
@@ -841,7 +846,7 @@ class _ExportPane(QWidget):
     def _export(self):
         src = Path(self.dir_selector.get_directory())
         if not src.is_dir():
-            QMessageBox.warning(self, "No Folder", "Please select a valid folder.")
+            QMessageBox.warning(self, _MSG_NO_FOLDER, _MSG_SELECT_FOLDER)
             return
         if self._worker and self._worker.isRunning():
             return

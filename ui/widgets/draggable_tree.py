@@ -100,7 +100,7 @@ class DraggableTreeWidget(QTreeWidget):
 
     # ── drag ──────────────────────────────────────────────────────────────
 
-    def startDrag(self, supportedActions):
+    def startDrag(self, supported_actions):
         """Collect all selected file items and begin a drag operation."""
         selected_items = self.selectedItems()
         if not selected_items:

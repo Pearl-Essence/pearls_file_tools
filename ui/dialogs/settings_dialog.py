@@ -259,11 +259,11 @@ class SettingsDialog(QDialog):
 
         import PySide6
 
-        from __init__ import __version__
+        from constants import VERSION
 
         info_group = QGroupBox("Application Info")
         info_layout = QVBoxLayout()
-        info_layout.addWidget(QLabel(f"Pearl Post Suite v{__version__}"))
+        info_layout.addWidget(QLabel(f"Pearl Post Suite v{VERSION}"))
         info_layout.addWidget(QLabel(f"Python {sys.version.split()[0]}"))
         info_layout.addWidget(QLabel(f"PySide6 {PySide6.__version__}"))
         info_group.setLayout(info_layout)

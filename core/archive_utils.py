@@ -93,7 +93,7 @@ def _scrub_extracted(temp_dir: Path) -> Iterable[Path]:
     extractor honoured a malicious path despite our validator) are deleted.
     """
     temp_root = temp_dir.resolve(strict=False)
-    for p in list(temp_dir.rglob("*")):
+    for p in list(temp_dir.rglob("*")):  # noqa: S7504 — list() needed: loop deletes entries
         if not _safe_path_under(temp_root, p):
             try:
                 if p.is_file() or p.is_symlink():

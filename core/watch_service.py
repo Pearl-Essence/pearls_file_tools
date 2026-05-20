@@ -95,36 +95,35 @@ class WatchService:
         self._active = True
 
         if HAS_WATCHDOG:
-            for rule in rules:
-                if not rule.enabled:
-                    continue
-                watch_dir = Path(rule.watch_dir)
-                if not watch_dir.is_dir():
-                    continue
-
-                profile_name = rule.profile_name
-
-                def make_cb(pname: str) -> Callable[[Path], None]:
-                    def cb(path: Path):
-                        callback(path, pname)
-
-                    return cb
-
-                handler = _SettleHandler(make_cb(profile_name))
-                observer = Observer()
-                observer.schedule(handler, str(watch_dir), recursive=False)
-                observer.start()
-                self._observers.append(observer)
-                self._handlers.append(handler)
+            self._start_watchdog(rules, callback)
         else:
-            # Build initial snapshot for poll mode
-            self._snapshot = {}
-            for rule in rules:
-                if not rule.enabled:
-                    continue
-                watch_dir = Path(rule.watch_dir)
-                if watch_dir.is_dir():
-                    self._snapshot[rule.watch_dir] = self._scan(watch_dir)
+            self._start_poll_mode(rules)
+
+    def _start_watchdog(self, rules: List[WatchRule], callback: Callable[[Path, str], None]):
+        for rule in self._enabled_rules(rules):
+            watch_dir = Path(rule.watch_dir)
+            if not watch_dir.is_dir():
+                continue
+
+            def make_cb(pname: str) -> Callable[[Path], None]:
+                def cb(path: Path):
+                    callback(path, pname)
+
+                return cb
+
+            handler = _SettleHandler(make_cb(rule.profile_name))
+            observer = Observer()
+            observer.schedule(handler, str(watch_dir), recursive=False)
+            observer.start()
+            self._observers.append(observer)
+            self._handlers.append(handler)
+
+    def _start_poll_mode(self, rules: List[WatchRule]):
+        self._snapshot = {}
+        for rule in self._enabled_rules(rules):
+            watch_dir = Path(rule.watch_dir)
+            if watch_dir.is_dir():
+                self._snapshot[rule.watch_dir] = self._scan(watch_dir)
 
     def stop(self):
         """Stop all observers and cancel pending settle timers."""
@@ -147,44 +146,33 @@ class WatchService:
         """
         if self._callback is None:
             return
-        for rule in self._rules:
-            if not rule.enabled:
-                continue
+        for rule in self._enabled_rules(self._rules):
             watch_dir = Path(rule.watch_dir)
             if not watch_dir.is_dir():
                 continue
             current = self._scan(watch_dir)
             prev = self._snapshot.get(rule.watch_dir, set())
-            new_files = current - prev
             settle = self._pending.setdefault(rule.watch_dir, {})
 
-            # Add freshly-seen files to the pending set
-            for p in new_files:
+            for p in current - prev:
                 settle.setdefault(p, (-1, 0))
 
-            # Re-check sizes for everything in pending; promote when stable
-            for p in list(settle.keys()):
-                # Drop entries whose file was removed before settling
-                if not p.exists():
-                    settle.pop(p, None)
-                    continue
-                try:
-                    size = p.stat().st_size
-                except OSError:
-                    settle.pop(p, None)
-                    continue
-                last_size, passes = settle[p]
-                if size == last_size:
-                    passes += 1
-                else:
-                    passes = 0
-                if passes >= self.POLL_SETTLE_PASSES:
-                    self._callback(p, rule.profile_name)
-                    settle.pop(p, None)
-                else:
-                    settle[p] = (size, passes)
-
+            self._settle_pending(settle, rule.profile_name)
             self._snapshot[rule.watch_dir] = current
+
+    def _settle_pending(self, settle: dict, profile_name: str):
+        for p in list(settle.keys()):
+            size = self._read_file_size(p)
+            if size is None:
+                settle.pop(p, None)
+                continue
+            last_size, passes = settle[p]
+            passes = passes + 1 if size == last_size else 0
+            if passes >= self.POLL_SETTLE_PASSES:
+                self._callback(p, profile_name)
+                settle.pop(p, None)
+            else:
+                settle[p] = (size, passes)
 
     @property
     def is_active(self) -> bool:
@@ -193,6 +181,19 @@ class WatchService:
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _enabled_rules(rules: List[WatchRule]) -> List[WatchRule]:
+        return [r for r in rules if r.enabled]
+
+    @staticmethod
+    def _read_file_size(p: Path) -> Optional[int]:
+        if not p.exists():
+            return None
+        try:
+            return p.stat().st_size
+        except OSError:
+            return None
 
     @staticmethod
     def _scan(directory: Path) -> set:

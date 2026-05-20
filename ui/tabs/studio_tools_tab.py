@@ -60,6 +60,9 @@ from workers.base_worker import BaseWorker
 _CFG_NLE_SCAN_DIR = "nle_backup.scan_dir"
 _CFG_NLE_BACKUP_DIR = "nle_backup.backup_dir"
 _MSG_NO_FOLDER = "No Folder"
+_STYLE_BTN = "padding: 8px 20px;"
+_STYLE_SUMMARY = "font-weight: bold; padding: 2px 0;"
+_PROFILE_NONE = "(None)"
 
 _STALE_MARKERS = re.compile(r"_WIP|_DRAFT|_TEST|_TEMP", re.IGNORECASE)
 
@@ -128,6 +131,16 @@ def _should_strip(filepath: Path) -> bool:
     return False
 
 
+def _matches_extra_patterns(name: str, extra_pats: List[re.Pattern]) -> bool:
+    return any(pat.search(name) for pat in extra_pats)
+
+
+def _is_excluded(fp: Path, extra_pats: List[re.Pattern]) -> bool:
+    if _should_strip(fp):
+        return True
+    return _matches_extra_patterns(fp.name, extra_pats)
+
+
 def _gather_files(
     source_dir: Path,
     extra_exclude_patterns: List[str],
@@ -141,13 +154,7 @@ def _gather_files(
             continue
         if TRASH_DIR_NAME in fp.parts:
             continue
-        strip = _should_strip(fp)
-        if not strip:
-            for pat in extra_pats:
-                if pat.search(fp.name):
-                    strip = True
-                    break
-        (exclude if strip else include).append(fp)
+        (exclude if _is_excluded(fp, extra_pats) else include).append(fp)
     return sorted(include), sorted(exclude)
 
 
@@ -215,33 +222,58 @@ class _NLEBackupWorker(BaseWorker):
         bundles, which is a major performance footgun.
         """
         found: List[Path] = []
-
-        def walk(directory: Path) -> None:
-            try:
-                entries = list(directory.iterdir())
-            except OSError:
-                return
-            for child in entries:
-                try:
-                    suffix = child.suffix.lower()
-                    if child.is_dir():
-                        # A package directory we care about — register and
-                        # do NOT descend into it.
-                        if suffix in _PACKAGE_EXTS and suffix in self.extensions:
-                            found.append(child)
-                            continue
-                        # Other apps' packages — opaque, also skip.
-                        if suffix in _PACKAGE_EXTS:
-                            continue
-                        walk(child)
-                    elif child.is_file():
-                        if suffix in self.extensions and suffix not in _PACKAGE_EXTS:
-                            found.append(child)
-                except OSError:
-                    continue
-
-        walk(self.scan_dir)
+        self._walk_for_projects(self.scan_dir, found)
         return sorted(found)
+
+    def _walk_for_projects(self, directory: Path, found: List[Path]) -> None:
+        try:
+            entries = list(directory.iterdir())
+        except OSError:
+            return
+        for child in entries:
+            self._classify_project_entry(child, found)
+
+    def _classify_project_entry(self, child: Path, found: List[Path]) -> None:
+        try:
+            suffix = child.suffix.lower()
+        except OSError:
+            return
+        if child.is_dir():
+            if suffix in _PACKAGE_EXTS:
+                if suffix in self.extensions:
+                    found.append(child)
+                return
+            self._walk_for_projects(child, found)
+        elif child.is_file() and suffix in self.extensions and suffix not in _PACKAGE_EXTS:
+            found.append(child)
+
+    def _backup_package(self, proj: Path, ts: str) -> Tuple[str, int]:
+        import zipfile
+
+        dest_name = f"{proj.stem}_{ts}.zip"
+        dest_path = self.dest_dir / dest_name
+        with zipfile.ZipFile(dest_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for fp in proj.rglob("*"):
+                if fp.is_file():
+                    zf.write(fp, fp.relative_to(proj.parent))
+        return dest_name, dest_path.stat().st_size
+
+    def _backup_file(self, proj: Path, ts: str) -> Tuple[str, int]:
+        dest_name = f"{proj.stem}_{ts}{proj.suffix}"
+        dest_path = self.dest_dir / dest_name
+        shutil.copy2(str(proj), str(dest_path))
+        return dest_name, dest_path.stat().st_size
+
+    def _backup_one(self, proj: Path, ts: str) -> dict:
+        try:
+            if proj.is_dir():
+                dest_name, size = self._backup_package(proj, ts)
+            else:
+                dest_name, size = self._backup_file(proj, ts)
+            self.file_backed.emit(proj.name)
+            return {"name": proj.name, "dest": dest_name, "size": size, "timestamp": ts, "ok": True}
+        except Exception as exc:
+            return {"name": proj.name, "error": str(exc), "timestamp": ts, "ok": False}
 
     def run(self):
         try:
@@ -250,46 +282,7 @@ class _NLEBackupWorker(BaseWorker):
                 self.emit_finished(True, "No matching project files found.", [])
                 return
             ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            results = []
-            for proj in projects:
-                if self.is_cancelled:
-                    break
-                try:
-                    if proj.is_dir():
-                        # Package directory (e.g. .fcpbundle) — zip it
-                        import zipfile
-
-                        dest_name = f"{proj.stem}_{ts}.zip"
-                        dest_path = self.dest_dir / dest_name
-                        with zipfile.ZipFile(dest_path, "w", zipfile.ZIP_DEFLATED) as zf:
-                            for fp in proj.rglob("*"):
-                                if fp.is_file():
-                                    zf.write(fp, fp.relative_to(proj.parent))
-                        size = dest_path.stat().st_size
-                    else:
-                        dest_name = f"{proj.stem}_{ts}{proj.suffix}"
-                        dest_path = self.dest_dir / dest_name
-                        shutil.copy2(str(proj), str(dest_path))
-                        size = dest_path.stat().st_size
-                    results.append(
-                        {
-                            "name": proj.name,
-                            "dest": dest_name,
-                            "size": size,
-                            "timestamp": ts,
-                            "ok": True,
-                        }
-                    )
-                    self.file_backed.emit(proj.name)
-                except Exception as exc:
-                    results.append(
-                        {
-                            "name": proj.name,
-                            "error": str(exc),
-                            "timestamp": ts,
-                            "ok": False,
-                        }
-                    )
+            results = [self._backup_one(proj, ts) for proj in projects if not self.is_cancelled]
             ok = sum(1 for r in results if r.get("ok"))
             self.emit_finished(True, f"Backed up {ok}/{len(results)} project(s)", results)
         except Exception as exc:
@@ -308,6 +301,21 @@ class _StaleWorker(BaseWorker):
     def emit_finished(self, success: bool, message: str, result=None):
         self.finished.emit(success, message, result)
 
+    def _check_file(self, item: Path, stat, cutoff_ts: float) -> Optional[StaleFile]:
+        if _STALE_MARKERS.search(item.stem):
+            return StaleFile(item, "WIP/Draft/Temp marker", stat.st_size)
+        if stat.st_size == 0:
+            return StaleFile(item, "Zero-byte file", 0)
+        if self.check_atime and stat.st_atime < cutoff_ts:
+            days = int((datetime.datetime.now().timestamp() - stat.st_atime) / 86400)
+            return StaleFile(item, f"Not accessed in {days} days", stat.st_size)
+        return None
+
+    def _check_dir(self, item: Path) -> Optional[StaleFile]:
+        if not any(True for _ in item.rglob("*") if _.is_file()):
+            return StaleFile(item, "Empty folder", 0, is_dir=True)
+        return None
+
     def run(self):
         results: List[StaleFile] = []
         cutoff_ts = (datetime.datetime.now() - datetime.timedelta(days=self.max_age_days)).timestamp()
@@ -323,16 +331,13 @@ class _StaleWorker(BaseWorker):
                 except OSError:
                     continue
                 if item.is_file():
-                    if _STALE_MARKERS.search(item.stem):
-                        results.append(StaleFile(item, "WIP/Draft/Temp marker", stat.st_size))
-                    elif stat.st_size == 0:
-                        results.append(StaleFile(item, "Zero-byte file", 0))
-                    elif self.check_atime and stat.st_atime < cutoff_ts:
-                        days = int((datetime.datetime.now().timestamp() - stat.st_atime) / 86400)
-                        results.append(StaleFile(item, f"Not accessed in {days} days", stat.st_size))
+                    result = self._check_file(item, stat, cutoff_ts)
                 elif item.is_dir():
-                    if not any(True for _ in item.rglob("*") if _.is_file()):
-                        results.append(StaleFile(item, "Empty folder", 0, is_dir=True))
+                    result = self._check_dir(item)
+                else:
+                    result = None
+                if result:
+                    results.append(result)
             self.emit_finished(True, f"Found {len(results)} stale item(s)", results)
         except Exception as exc:
             self.emit_finished(False, str(exc), None)
@@ -348,6 +353,24 @@ class _StorageWorker(BaseWorker):
     def emit_finished(self, success: bool, message: str, result=None):
         self.finished.emit(success, message, result)
 
+    def _folder_for(self, fp: Path) -> str:
+        try:
+            rel = fp.relative_to(self.directory)
+            return rel.parts[0] if len(rel.parts) > 1 else "__root__"
+        except ValueError:
+            return "__root__"
+
+    def _tally_file(self, fp: Path, data: Dict[str, Dict[str, int]]) -> None:
+        try:
+            size = fp.stat().st_size
+        except OSError:
+            return
+        folder = self._folder_for(fp)
+        cat = _file_category(fp.suffix)
+        if folder not in data:
+            data[folder] = dict.fromkeys(_CATEGORY_ORDER, 0)
+        data[folder][cat] = data[folder].get(cat, 0) + size
+
     def run(self):
         data: Dict[str, Dict[str, int]] = {}
         try:
@@ -359,19 +382,7 @@ class _StorageWorker(BaseWorker):
                     continue
                 if TRASH_DIR_NAME in fp.parts:
                     continue
-                try:
-                    size = fp.stat().st_size
-                except OSError:
-                    continue
-                try:
-                    rel = fp.relative_to(self.directory)
-                    folder = rel.parts[0] if len(rel.parts) > 1 else "__root__"
-                except ValueError:
-                    folder = "__root__"
-                cat = _file_category(fp.suffix)
-                if folder not in data:
-                    data[folder] = {c: 0 for c in _CATEGORY_ORDER}
-                data[folder][cat] = data[folder].get(cat, 0) + size
+                self._tally_file(fp, data)
             self.emit_finished(True, "Scan complete", data)
         except Exception as exc:
             self.emit_finished(False, str(exc), None)
@@ -459,38 +470,37 @@ class _CopyWorker(BaseWorker):
     def emit_finished(self, success: bool, message: str, result=None):
         self.finished.emit(success, message, result)
 
+    def _run_zip(self, total: int) -> None:
+        import zipfile
+
+        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        zip_path = self.dest_dir / f"{self.source_dir.name}_{ts}.zip"
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for i, fp in enumerate(self.include_files):
+                if self.is_cancelled:
+                    break
+                arcname = fp.name if self.flatten else str(fp.relative_to(self.source_dir))
+                zf.write(str(fp), arcname)
+                self.file_copied.emit(fp.name, i + 1, total)
+        self.emit_finished(True, f"Created {zip_path.name}", zip_path)
+
+    def _run_folder_copy(self, total: int) -> None:
+        for i, fp in enumerate(self.include_files):
+            if self.is_cancelled:
+                break
+            dst = self.dest_dir / (fp.name if self.flatten else fp.relative_to(self.source_dir))
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(str(fp), str(dst))
+            self.file_copied.emit(fp.name, i + 1, total)
+        self.emit_finished(True, f"Copied {total} file(s) to {self.dest_dir.name}", self.dest_dir)
+
     def run(self):
         total = len(self.include_files)
         try:
             if self.as_zip:
-                import zipfile
-
-                ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                zip_path = self.dest_dir / f"{self.source_dir.name}_{ts}.zip"
-                with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-                    for i, fp in enumerate(self.include_files):
-                        if self.is_cancelled:
-                            break
-                        arcname = fp.name if self.flatten else str(fp.relative_to(self.source_dir))
-                        zf.write(str(fp), arcname)
-                        self.file_copied.emit(fp.name, i + 1, total)
-                self.emit_finished(True, f"Created {zip_path.name}", zip_path)
+                self._run_zip(total)
             else:
-                for i, fp in enumerate(self.include_files):
-                    if self.is_cancelled:
-                        break
-                    if self.flatten:
-                        dst = self.dest_dir / fp.name
-                    else:
-                        dst = self.dest_dir / fp.relative_to(self.source_dir)
-                    dst.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copy2(str(fp), str(dst))
-                    self.file_copied.emit(fp.name, i + 1, total)
-                self.emit_finished(
-                    True,
-                    f"Copied {total} file(s) to {self.dest_dir.name}",
-                    self.dest_dir,
-                )
+                self._run_folder_copy(total)
         except Exception as exc:
             self.emit_finished(False, str(exc), None)
 
@@ -607,12 +617,12 @@ class _StaleFilesPane(QWidget):
         layout.addWidget(self.result_list, stretch=1)
 
         self.summary_label = QLabel("")
-        self.summary_label.setStyleSheet("font-weight: bold; padding: 2px 0;")
+        self.summary_label.setStyleSheet(_STYLE_SUMMARY)
         layout.addWidget(self.summary_label)
 
         btn_row = QHBoxLayout()
         self.scan_btn = QPushButton("Scan for Stale Files")
-        self.scan_btn.setStyleSheet("padding: 8px 20px;")
+        self.scan_btn.setStyleSheet(_STYLE_BTN)
         self.scan_btn.setToolTip("Search the folder for stale, temporary, zero-byte, and empty items")
         self.scan_btn.clicked.connect(self._scan)
         btn_row.addWidget(self.scan_btn)
@@ -744,7 +754,7 @@ class _StoragePane(QWidget):
 
         btn_row = QHBoxLayout()
         self.scan_btn = QPushButton("Scan Storage Usage")
-        self.scan_btn.setStyleSheet("padding: 8px 20px;")
+        self.scan_btn.setStyleSheet(_STYLE_BTN)
         self.scan_btn.setToolTip("Recursively scan the folder and categorize files by type and subfolder")
         self.scan_btn.clicked.connect(self._scan)
         btn_row.addWidget(self.scan_btn)
@@ -822,7 +832,7 @@ class _StoragePane(QWidget):
         if grand_total == 0:
             return
 
-        cat_totals: Dict[str, int] = {c: 0 for c in _CATEGORY_ORDER}
+        cat_totals: Dict[str, int] = dict.fromkeys(_CATEGORY_ORDER, 0)
 
         for folder, cats in sorted(data.items(), key=lambda kv: sum(kv[1].values()), reverse=True):
             folder_total = sum(cats.values())
@@ -977,7 +987,7 @@ class _TrashPane(QWidget):
         layout.addWidget(self.tree, stretch=1)
 
         self.summary_label = QLabel("")
-        self.summary_label.setStyleSheet("font-weight: bold; padding: 2px 0;")
+        self.summary_label.setStyleSheet(_STYLE_SUMMARY)
         layout.addWidget(self.summary_label)
 
         btn_row = QHBoxLayout()
@@ -1101,7 +1111,7 @@ class _TrashPane(QWidget):
         )
         if reply != QMessageBox.Yes:
             return
-        for item in list(self._items):
+        for item in self._items:
             self._trash.purge(item)
         self._refresh()
 
@@ -1147,7 +1157,7 @@ class _ReviewPage(QWizardPage):
         self.exclude_list.setAlternatingRowColors(True)
         layout.addWidget(self.exclude_list, stretch=1)
         self.info_label = QLabel("")
-        self.info_label.setStyleSheet("font-weight: bold; padding: 2px 0;")
+        self.info_label.setStyleSheet(_STYLE_SUMMARY)
         layout.addWidget(self.info_label)
 
     def initializePage(self):
@@ -1523,7 +1533,7 @@ class _NLEBackupPane(QWidget):
 
         btn_row = QHBoxLayout()
         self.backup_btn = QPushButton("Backup Now")
-        self.backup_btn.setStyleSheet("padding: 8px 20px;")
+        self.backup_btn.setStyleSheet(_STYLE_BTN)
         self.backup_btn.setToolTip("Scan for project files and copy them to the backup destination")
         self.backup_btn.clicked.connect(self._backup)
         btn_row.addWidget(self.backup_btn)
@@ -1647,7 +1657,7 @@ class _ExportWatcherPane(QWidget):
         opts_layout = QFormLayout(opts)
 
         self.profile_combo = QComboBox()
-        self.profile_combo.addItem("(None)")
+        self.profile_combo.addItem(_PROFILE_NONE)
         self.profile_combo.setToolTip(
             "When a new file arrives, its filename is checked against this profile's "
             "naming convention and any issues are logged."
@@ -1677,7 +1687,7 @@ class _ExportWatcherPane(QWidget):
         self.status_label = QLabel("Not watching.")
         btn_row.addWidget(self.status_label, stretch=1)
         self.toggle_btn = QPushButton("Start Watching")
-        self.toggle_btn.setStyleSheet("padding: 8px 20px;")
+        self.toggle_btn.setStyleSheet(_STYLE_BTN)
         self.toggle_btn.setToolTip("Begin polling the watch folder for new media file arrivals")
         self.toggle_btn.clicked.connect(self._toggle)
         btn_row.addWidget(self.toggle_btn)
@@ -1687,7 +1697,7 @@ class _ExportWatcherPane(QWidget):
         self.profile_combo.blockSignals(True)
         current = self.profile_combo.currentText()
         self.profile_combo.clear()
-        self.profile_combo.addItem("(None)")
+        self.profile_combo.addItem(_PROFILE_NONE)
         for p in self.config.get("naming.profiles", []):
             name = p.get("name", "")
             if name:
@@ -1752,42 +1762,51 @@ class _ExportWatcherPane(QWidget):
         except OSError:
             size = 0
         self._log(f"[{ts}]  ▶  New file: {fp.name}  ({_fmt_size(size)})", "#82aaff")
-
-        # Profile conformance check
-        profile_name = self.profile_combo.currentText()
-        if profile_name != "(None)":
-            for p in self.config.get("naming.profiles", []):
-                if p.get("name") == profile_name:
-                    try:
-                        from core.linter import FilenameLint
-                        from core.name_transform import ProductionTemplate
-
-                        template = ProductionTemplate.from_dict(p)
-                        issues = FilenameLint().lint_directory(fp.parent, profile=template)
-                        file_issues = [i for i in issues if i.filename == fp.name]
-                        if file_issues:
-                            for issue in file_issues:
-                                self._log(f"       ⚠  {issue.description}", "#ffcb6b")
-                        else:
-                            self._log(f"       ✓  Conforms to profile '{profile_name}'", "#c3e88d")
-                    except Exception:
-                        pass
-                    break
-
-        # Optional delivery validation
+        self._check_profile_conformance(fp)
         if self.chk_validate.isChecked():
-            try:
-                from core.delivery import DeliveryProfile, DeliveryValidator
+            self._run_delivery_validation(watch_dir)
 
-                report = DeliveryValidator().validate(watch_dir, DeliveryProfile())
-                color = "#c3e88d" if report.passed else "#ff5370"
-                status = "PASSED" if report.passed else "FAILED"
-                self._log(
-                    f"       Validation {status}: {report.error_count()} error(s), {report.warning_count()} warning(s)",
-                    color,
-                )
-            except Exception as exc:
-                self._log(f"       Validation error: {exc}", "#ff5370")
+    def _find_profile(self, profile_name: str) -> Optional[dict]:
+        for p in self.config.get("naming.profiles", []):
+            if p.get("name") == profile_name:
+                return p
+        return None
+
+    def _check_profile_conformance(self, fp: Path) -> None:
+        profile_name = self.profile_combo.currentText()
+        if profile_name == _PROFILE_NONE:
+            return
+        profile = self._find_profile(profile_name)
+        if not profile:
+            return
+        try:
+            from core.linter import FilenameLint
+            from core.name_transform import ProductionTemplate
+
+            template = ProductionTemplate.from_dict(profile)
+            issues = FilenameLint().lint_directory(fp.parent, profile=template)
+            file_issues = [i for i in issues if i.filename == fp.name]
+            if file_issues:
+                for issue in file_issues:
+                    self._log(f"       ⚠  {issue.description}", "#ffcb6b")
+            else:
+                self._log(f"       ✓  Conforms to profile '{profile_name}'", "#c3e88d")
+        except Exception:
+            pass
+
+    def _run_delivery_validation(self, watch_dir: Path) -> None:
+        try:
+            from core.delivery import DeliveryProfile, DeliveryValidator
+
+            report = DeliveryValidator().validate(watch_dir, DeliveryProfile())
+            color = "#c3e88d" if report.passed else "#ff5370"
+            status = "PASSED" if report.passed else "FAILED"
+            self._log(
+                f"       Validation {status}: {report.error_count()} error(s), {report.warning_count()} warning(s)",
+                color,
+            )
+        except Exception as exc:
+            self._log(f"       Validation error: {exc}", "#ff5370")
 
     def _log(self, text: str, color_hex: str = "#e0e0e0"):
         item = QListWidgetItem(text)

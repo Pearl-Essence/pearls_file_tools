@@ -193,51 +193,62 @@ class ImageScanWorker(BaseWorker):
         except ImportError:
             return
 
-        # Clear any stale sequence annotations from a previous scan (e.g. cached data)
-        # so that dissolved sequences don't leave hidden ghost frames.
+        _SEQUENCE_KEYS = (
+            "in_sequence",
+            "is_sequence_rep",
+            "sequence_key",
+            "sequence_label",
+            "sequence_total",
+            "sequence_files",
+        )
         for img in images:
-            img.pop("in_sequence", None)
-            img.pop("is_sequence_rep", None)
-            img.pop("sequence_key", None)
-            img.pop("sequence_label", None)
-            img.pop("sequence_total", None)
-            img.pop("sequence_files", None)
+            for k in _SEQUENCE_KEYS:
+                img.pop(k, None)
 
-        # Group image indices by folder (skip videos — they don't participate in sequences)
-        folder_map: Dict[str, List[int]] = {}
-        for i, img in enumerate(images):
-            if img.get("is_video"):
-                continue
-            folder_map.setdefault(img["folder"], []).append(i)
+        folder_map = ImageScanWorker._build_folder_map(images)
 
         for folder, indices in folder_map.items():
             filenames = [images[i]["name"] for i in indices]
             sequences = detect_image_sequences(filenames)
             if not sequences:
                 continue
+            fname_to_key = ImageScanWorker._build_fname_lookup(sequences)
+            ImageScanWorker._apply_sequence_annotations(images, indices, sequences, fname_to_key)
 
-            # Build filename → sequence key lookup
-            fname_to_key: Dict[str, str] = {}
-            for seq_key, seq in sequences.items():
-                for fname in seq.files:
-                    fname_to_key[fname] = seq_key
+    @staticmethod
+    def _build_folder_map(images: List[Dict]) -> Dict[str, List[int]]:
+        folder_map: Dict[str, List[int]] = {}
+        for i, img in enumerate(images):
+            if img.get("is_video"):
+                continue
+            folder_map.setdefault(img["folder"], []).append(i)
+        return folder_map
 
-            # Annotate images and identify representatives
-            for i in indices:
-                fname = images[i]["name"]
-                if fname not in fname_to_key:
-                    continue
-                seq_key = fname_to_key[fname]
-                seq = sequences[seq_key]
-                images[i]["in_sequence"] = True
-                images[i]["sequence_key"] = seq_key
+    @staticmethod
+    def _build_fname_lookup(sequences: dict) -> Dict[str, str]:
+        fname_to_key: Dict[str, str] = {}
+        for seq_key, seq in sequences.items():
+            for fname in seq.files:
+                fname_to_key[fname] = seq_key
+        return fname_to_key
 
-                if fname == seq.files[0]:  # First frame = representative
-                    parent_dir = Path(images[i]["path"]).parent
-                    images[i]["is_sequence_rep"] = True
-                    images[i]["sequence_label"] = seq.label
-                    images[i]["sequence_total"] = len(seq.files)
-                    images[i]["sequence_files"] = [str(parent_dir / f) for f in seq.files]
+    @staticmethod
+    def _apply_sequence_annotations(images, indices, sequences, fname_to_key):
+        for i in indices:
+            fname = images[i]["name"]
+            if fname not in fname_to_key:
+                continue
+            seq_key = fname_to_key[fname]
+            seq = sequences[seq_key]
+            images[i]["in_sequence"] = True
+            images[i]["sequence_key"] = seq_key
+
+            if fname == seq.files[0]:
+                parent_dir = Path(images[i]["path"]).parent
+                images[i]["is_sequence_rep"] = True
+                images[i]["sequence_label"] = seq.label
+                images[i]["sequence_total"] = len(seq.files)
+                images[i]["sequence_files"] = [str(parent_dir / f) for f in seq.files]
 
     @staticmethod
     def _extract_video_thumbnail(path: str) -> Optional[str]:
