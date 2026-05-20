@@ -143,6 +143,72 @@ def _fmt_size(n: int) -> str:
     return f"{n / 1024**3:.2f} GB"
 
 
+def _media_strings(fp: Path) -> tuple:
+    from core.media_info import get_media_info
+
+    media_str = ""
+    duration_str = ""
+    try:
+        info = get_media_info(fp)
+        if info:
+            parts = []
+            if info.codec:
+                parts.append(info.codec)
+            if info.resolution_str:
+                parts.append(info.resolution_str)
+            if info.fps_str:
+                parts.append(f"{info.fps_str} fps")
+            media_str = ", ".join(parts)
+            if info.duration_str:
+                duration_str = info.duration_str
+    except Exception:
+        pass
+    return media_str, duration_str
+
+
+def _thumb_cell(fp: Path, tmp_dir: Path, include_thumbnails: bool) -> str:
+    if include_thumbnails and _HAS_FFMPEG and fp.suffix.lower() in VIDEO_EXTENSIONS:
+        b64 = _extract_thumbnail_b64(fp, tmp_dir)
+        if b64:
+            return f'<img class="thumb" src="data:image/jpeg;base64,{b64}" alt="">'
+    return '<span class="no-thumb">—</span>'
+
+
+def _rel_folder(fp: Path, source_dir: Path) -> str:
+    try:
+        rel = str(fp.parent.relative_to(source_dir))
+        return "" if rel == "." else rel
+    except ValueError:
+        return ""
+
+
+def _build_row(fp: Path, source_dir: Path, tmp_dir: Path, min_flag_size_bytes: int, include_thumbnails: bool) -> tuple:
+    try:
+        size = fp.stat().st_size
+    except OSError:
+        size = 0
+
+    media_str, duration_str = _media_strings(fp)
+    thumb = _thumb_cell(fp, tmp_dir, include_thumbnails)
+
+    flag = _flag_file(fp, min_flag_size_bytes)
+    flagged = flag is not None
+    flag_class = "flag-bad" if flagged else "flag-ok"
+    flag_str = flag if flagged else "OK"
+
+    row = _ROW_TEMPLATE.substitute(
+        thumb_cell=thumb,
+        filename=fp.name,
+        rel_folder=_rel_folder(fp, source_dir),
+        size_str=_fmt_size(size),
+        media_str=media_str or "—",
+        duration_str=duration_str or "—",
+        flag_class=flag_class,
+        flag_str=flag_str,
+    )
+    return row, size, flagged
+
+
 def generate_qc_report(
     source_dir: Path,
     project_name: str,
@@ -150,8 +216,6 @@ def generate_qc_report(
     include_thumbnails: bool = True,
 ) -> Path:
     """Generate QC_Report_[YYYYMMDD_HHMMSS].html in *source_dir* and return its path."""
-    from core.media_info import get_media_info
-
     ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     out_path = source_dir / f"QC_Report_{ts}.html"
 
@@ -162,70 +226,12 @@ def generate_qc_report(
 
     with tempfile.TemporaryDirectory() as tmp_str:
         tmp_dir = Path(tmp_str)
-
         for fp in all_files:
-            try:
-                stat = fp.stat()
-                size = stat.st_size
-            except OSError:
-                size = 0
+            row, size, flagged = _build_row(fp, source_dir, tmp_dir, min_flag_size_bytes, include_thumbnails)
             total_size += size
-
-            # Media info
-            media_str = ""
-            duration_str = ""
-            try:
-                info = get_media_info(fp)
-                if info:
-                    parts = []
-                    if info.codec:
-                        parts.append(info.codec)
-                    if info.resolution_str:
-                        parts.append(info.resolution_str)
-                    if info.fps_str:
-                        parts.append(f"{info.fps_str} fps")
-                    media_str = ", ".join(parts)
-                    if info.duration_str:
-                        duration_str = info.duration_str
-            except Exception:
-                pass
-
-            # Thumbnail
-            thumb_cell = '<span class="no-thumb">—</span>'
-            if include_thumbnails and _HAS_FFMPEG and fp.suffix.lower() in VIDEO_EXTENSIONS:
-                b64 = _extract_thumbnail_b64(fp, tmp_dir)
-                if b64:
-                    thumb_cell = f'<img class="thumb" src="data:image/jpeg;base64,{b64}" alt="">'
-
-            # Flag
-            flag = _flag_file(fp, min_flag_size_bytes)
-            if flag:
+            if flagged:
                 flagged_count += 1
-                flag_class = "flag-bad"
-                flag_str = flag
-            else:
-                flag_class = "flag-ok"
-                flag_str = "OK"
-
-            # Relative folder
-            try:
-                rel = str(fp.parent.relative_to(source_dir))
-                rel_folder = "" if rel == "." else rel
-            except ValueError:
-                rel_folder = ""
-
-            rows_html.append(
-                _ROW_TEMPLATE.substitute(
-                    thumb_cell=thumb_cell,
-                    filename=fp.name,
-                    rel_folder=rel_folder,
-                    size_str=_fmt_size(size),
-                    media_str=media_str or "—",
-                    duration_str=duration_str or "—",
-                    flag_class=flag_class,
-                    flag_str=flag_str,
-                )
-            )
+            rows_html.append(row)
 
     flag_color = "flag-bad" if flagged_count > 0 else "flag-ok"
     html = _PAGE_TEMPLATE.substitute(

@@ -80,7 +80,7 @@ def _fmt_size(n: int) -> str:
 
 
 def _fmt_mtime(ts: float) -> str:
-    if ts == 0.0:
+    if not ts:
         return ""
     return datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M")
 

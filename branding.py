@@ -6,10 +6,12 @@ Reference these everywhere instead of hardcoding strings or colors.
 
 from pathlib import Path
 
+from constants import VERSION
+
 # ── Identity ────────────────────────────────────────────────────────────────
 APP_NAME = "Pearl Post Suite"
 APP_NAME_SHORT = "Pearl"
-APP_TAGLINE = "POST SUITE · V0.24.8"
+APP_TAGLINE = f"POST SUITE · V{VERSION}"
 ORG_NAME = "Pearl"
 
 # ── Resource paths ──────────────────────────────────────────────────────────

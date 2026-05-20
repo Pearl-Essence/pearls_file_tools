@@ -1,5 +1,7 @@
 """Shared constants and definitions for Pearl's File Tools."""
 
+VERSION = "0.24.10"
+
 # File extension categories
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tiff", ".tif", ".svg", ".ico", ".heic", ".heif"}
 IMAGE_EXTENSIONS |= {".exr", ".dpx", ".tga", ".hdr", ".raw", ".cr2", ".nef", ".arw", ".dng"}

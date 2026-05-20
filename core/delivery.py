@@ -130,55 +130,58 @@ class HandoffResult:
 # Built-in handoff rules factory
 
 
+def _check_luts_folder(d: Path) -> bool:
+    return any(p.is_dir() and p.name.lower() == "luts" for p in d.iterdir())
+
+
+def _check_audio_stems(d: Path) -> bool:
+    for name in ("audio", "stems", "audio_stems", "audio stems"):
+        if any(p.is_dir() and p.name.lower() == name for p in d.iterdir()):
+            return True
+    return False
+
+
+def _check_no_offline_files(d: Path) -> bool:
+    return not any("OFFLINE" in p.name.upper() for p in d.rglob("*") if p.is_file())
+
+
+def _check_no_tiny_video_files(d: Path) -> bool:
+    from constants import VIDEO_EXTENSIONS
+
+    for p in d.rglob("*"):
+        if p.is_file() and p.suffix.lower() in VIDEO_EXTENSIONS:
+            try:
+                if p.stat().st_size < 1024 * 1024:
+                    return False
+            except OSError:
+                pass
+    return True
+
+
 def default_handoff_rules() -> List[HandoffRule]:
     """Return the standard colorist/delivery handoff rules."""
-
-    def has_luts_folder(d: Path) -> bool:
-        return any(p.is_dir() and p.name.lower() == "luts" for p in d.iterdir())
-
-    def has_audio_stems(d: Path) -> bool:
-        for name in ("audio", "stems", "audio_stems", "audio stems"):
-            if any(p.is_dir() and p.name.lower() == name for p in d.iterdir()):
-                return True
-        return False
-
-    def no_offline_files(d: Path) -> bool:
-        return not any("OFFLINE" in p.name.upper() for p in d.rglob("*") if p.is_file())
-
-    def no_tiny_video_files(d: Path) -> bool:
-        from constants import VIDEO_EXTENSIONS
-
-        for p in d.rglob("*"):
-            if p.is_file() and p.suffix.lower() in VIDEO_EXTENSIONS:
-                try:
-                    if p.stat().st_size < 1024 * 1024:
-                        return False
-                except OSError:
-                    pass
-        return True
-
     return [
         HandoffRule(
             name="luts/ folder present",
-            check_fn=has_luts_folder,
+            check_fn=_check_luts_folder,
             required=False,
             description="A 'luts' subfolder should exist for colorist handoff",
         ),
         HandoffRule(
             name="Audio stems folder present",
-            check_fn=has_audio_stems,
+            check_fn=_check_audio_stems,
             required=False,
             description="An 'audio' or 'stems' subfolder should exist",
         ),
         HandoffRule(
             name="No OFFLINE files",
-            check_fn=no_offline_files,
+            check_fn=_check_no_offline_files,
             required=True,
             description="No files should contain 'OFFLINE' in their name",
         ),
         HandoffRule(
             name="No tiny video files (<1 MB)",
-            check_fn=no_tiny_video_files,
+            check_fn=_check_no_tiny_video_files,
             required=True,
             description="All video files should be at least 1 MB",
         ),
@@ -194,104 +197,107 @@ _FINAL_RE = re.compile(r"_FINAL", re.IGNORECASE)
 class DeliveryValidator:
     """Validate a directory against a DeliveryProfile."""
 
-    def validate(self, directory: Path, profile: Optional[DeliveryProfile] = None) -> ValidationReport:
-        if profile is None:
-            profile = DeliveryProfile()
-
+    @staticmethod
+    def _check_banned_terms(all_files: List[Path], profile: DeliveryProfile) -> List[ValidationIssue]:
         issues: List[ValidationIssue] = []
-        all_files: List[Path] = []
-
-        for p in directory.rglob("*"):
-            if p.is_file():
-                all_files.append(p)
-
-        # 1. Banned terms
         for fp in all_files:
             name_upper = fp.name.upper()
             for term in profile.banned_terms:
                 if term.upper() in name_upper:
                     issues.append(
-                        ValidationIssue(
-                            filepath=fp,
-                            rule="banned_term",
-                            description=f"Contains banned term '{term}'",
-                        )
+                        ValidationIssue(filepath=fp, rule="banned_term", description=f"Contains banned term '{term}'")
                     )
                     break
+        return issues
 
-        # 2. Video files must have _FINAL or _v## suffix
+    @staticmethod
+    def _check_version_suffix(all_files: List[Path]) -> List[ValidationIssue]:
+        from constants import VIDEO_EXTENSIONS
+
+        issues: List[ValidationIssue] = []
+        for fp in all_files:
+            if fp.suffix.lower() in VIDEO_EXTENSIONS:
+                stem = fp.stem
+                if not (_VERSION_RE.search(stem) or _FINAL_RE.search(stem)):
+                    issues.append(
+                        ValidationIssue(
+                            filepath=fp,
+                            rule="missing_version_suffix",
+                            description="Video file lacks _FINAL or _v## suffix",
+                        )
+                    )
+        return issues
+
+    @staticmethod
+    def _check_case_duplicates(all_files: List[Path]) -> List[ValidationIssue]:
+        issues: List[ValidationIssue] = []
+        seen: Dict[str, Path] = {}
+        for fp in all_files:
+            key = fp.name.lower()
+            if key in seen:
+                issues.append(
+                    ValidationIssue(
+                        filepath=fp,
+                        rule="case_duplicate",
+                        description=f"Case-insensitive name collision with '{seen[key].name}'",
+                    )
+                )
+            else:
+                seen[key] = fp
+        return issues
+
+    @staticmethod
+    def _check_small_videos(all_files: List[Path], profile: DeliveryProfile) -> List[ValidationIssue]:
+        from constants import VIDEO_EXTENSIONS
+
+        issues: List[ValidationIssue] = []
+        thresh = profile.min_video_size_bytes
+        thresh_mb = thresh / (1024 * 1024)
+        for fp in all_files:
+            if fp.suffix.lower() not in VIDEO_EXTENSIONS:
+                continue
+            try:
+                size = fp.stat().st_size
+                if size < thresh:
+                    issues.append(
+                        ValidationIssue(
+                            filepath=fp,
+                            rule="small_file",
+                            description=f"Video is {size / 1024:.1f} KB (threshold {thresh_mb:.0f} MB — possible corrupt render)",
+                        )
+                    )
+            except OSError:
+                pass
+        return issues
+
+    @staticmethod
+    def _check_hidden_files(all_files: List[Path]) -> List[ValidationIssue]:
+        return [
+            ValidationIssue(
+                filepath=fp, rule="hidden_file", description="Hidden file (name starts with '.')", severity="warning"
+            )
+            for fp in all_files
+            if fp.name.startswith(".")
+        ]
+
+    def validate(self, directory: Path, profile: Optional[DeliveryProfile] = None) -> ValidationReport:
+        if profile is None:
+            profile = DeliveryProfile()
+
+        all_files = [p for p in directory.rglob("*") if p.is_file()]
+        issues: List[ValidationIssue] = []
+
+        issues.extend(self._check_banned_terms(all_files, profile))
         if profile.require_version_suffix:
-            from constants import VIDEO_EXTENSIONS
-
-            for fp in all_files:
-                if fp.suffix.lower() in VIDEO_EXTENSIONS:
-                    stem = fp.stem
-                    if not (_VERSION_RE.search(stem) or _FINAL_RE.search(stem)):
-                        issues.append(
-                            ValidationIssue(
-                                filepath=fp,
-                                rule="missing_version_suffix",
-                                description="Video file lacks _FINAL or _v## suffix",
-                            )
-                        )
-
-        # 3. Case-insensitive name collisions
+            issues.extend(self._check_version_suffix(all_files))
         if profile.check_case_duplicates:
-            seen: Dict[str, Path] = {}
-            for fp in all_files:
-                key = fp.name.lower()
-                if key in seen:
-                    issues.append(
-                        ValidationIssue(
-                            filepath=fp,
-                            rule="case_duplicate",
-                            description=f"Case-insensitive name collision with '{seen[key].name}'",
-                        )
-                    )
-                else:
-                    seen[key] = fp
-
-        # 4. Video files smaller than threshold
+            issues.extend(self._check_case_duplicates(all_files))
         if profile.min_video_size_bytes > 0:
-            from constants import VIDEO_EXTENSIONS
-
-            for fp in all_files:
-                if fp.suffix.lower() in VIDEO_EXTENSIONS:
-                    try:
-                        size = fp.stat().st_size
-                        if size < profile.min_video_size_bytes:
-                            thresh_mb = profile.min_video_size_bytes / (1024 * 1024)
-                            issues.append(
-                                ValidationIssue(
-                                    filepath=fp,
-                                    rule="small_file",
-                                    description=(
-                                        f"Video is {size / 1024:.1f} KB "
-                                        f"(threshold {thresh_mb:.0f} MB — possible corrupt render)"
-                                    ),
-                                )
-                            )
-                    except OSError:
-                        pass
-
-        # 5. Hidden files
+            issues.extend(self._check_small_videos(all_files, profile))
         if profile.check_hidden_files:
-            for fp in all_files:
-                if fp.name.startswith("."):
-                    issues.append(
-                        ValidationIssue(
-                            filepath=fp,
-                            rule="hidden_file",
-                            description="Hidden file (name starts with '.')",
-                            severity="warning",
-                        )
-                    )
+            issues.extend(self._check_hidden_files(all_files))
 
-        return ValidationReport(
-            directory=directory,
-            issues=issues,
-            total_files=len(all_files),
-        )
+        return ValidationReport(directory=directory, issues=issues, total_files=len(all_files))
 
 
 # Delivery package

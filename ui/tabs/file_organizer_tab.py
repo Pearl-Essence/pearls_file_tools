@@ -38,6 +38,8 @@ from ui.widgets.panel import Panel
 from ui.widgets.path_card import PathCard
 from ui.widgets.tab_header import TabHeader
 
+_UNSORTED = "[UNSORTED]"
+
 
 class FileOrganizerTab(BaseTab):
     """Tab for organizing files into folders by naming patterns."""
@@ -445,6 +447,9 @@ class FileOrganizerTab(BaseTab):
             self.status_label.setText("Scan failed")
             return
 
+        self._apply_scan_results(grouped_results, unsorted_results)
+
+    def _apply_scan_results(self, grouped_results: Dict = None, unsorted_results: Dict = None):
         self.file_groups = grouped_results or {}
         self.unsorted_files = unsorted_results or {}
         self.file_sequences = {}
@@ -509,79 +514,80 @@ class FileOrganizerTab(BaseTab):
             subdir_item.setFont(0, QFont("", -1, QFont.Bold))
             subdir_item.setData(0, Qt.UserRole, ("subdir", subdir_path))
 
-            # Add groups
-            groups = self.file_groups.get(subdir_path, {})
-            for group_name, files in sorted(groups.items()):
-                group_item = QTreeWidgetItem([group_name, f"{len(files)} files", "Grouped"])
-                group_item.setForeground(2, QBrush(QColor(0, 150, 0)))
-                group_item.setData(0, Qt.UserRole, ("group", subdir_path, group_name))
-
-                for file_path in sorted(files, key=lambda f: f.name):
-                    from core.file_utils import format_file_size
-
-                    size = file_path.stat().st_size
-                    size_str = format_file_size(size)
-                    file_item = QTreeWidgetItem([file_path.name, size_str, ""])
-                    file_item.setData(0, Qt.UserRole, ("file", subdir_path, group_name, file_path))
-                    group_item.addChild(file_item)
-
-                subdir_item.addChild(group_item)
-
-            # Add image sequences
-            sequences = self.file_sequences.get(subdir_path, {})
-            for seq_key, seq in sorted(sequences.items()):
-                seq_item = QTreeWidgetItem(
-                    [
-                        seq.label,
-                        f"{len(seq.files)} frames",
-                        "Sequence",
-                    ]
-                )
-                seq_item.setForeground(0, QBrush(QColor(30, 144, 255)))  # dodger blue
-                seq_item.setForeground(2, QBrush(QColor(30, 144, 255)))
-                seq_item.setData(0, Qt.UserRole, ("sequence", subdir_path, seq_key))
-                if seq.missing:
-                    seq_item.setToolTip(
-                        0,
-                        f"Missing frames: {', '.join(str(f) for f in seq.missing[:20])}"
-                        + (" …" if len(seq.missing) > 20 else ""),
-                    )
-                for fname in seq.files:
-                    fpath = Path(subdir_path) / fname
-                    try:
-                        from core.file_utils import format_file_size
-
-                        size_str = format_file_size(fpath.stat().st_size)
-                    except Exception:
-                        size_str = ""
-                    frame_item = QTreeWidgetItem([fname, size_str, ""])
-                    frame_item.setData(0, Qt.UserRole, ("file", subdir_path, seq_key, fpath))
-                    seq_item.addChild(frame_item)
-                subdir_item.addChild(seq_item)
-
-            # Add unsorted files section
-            unsorted = self.unsorted_files.get(subdir_path, [])
-            if unsorted:
-                unsorted_item = QTreeWidgetItem(["[UNSORTED]", f"{len(unsorted)} files", "Unsorted"])
-                unsorted_item.setForeground(0, QBrush(QColor(200, 100, 0)))
-                unsorted_item.setForeground(2, QBrush(QColor(200, 100, 0)))
-                unsorted_item.setFont(0, QFont("", -1, QFont.Bold))
-                unsorted_item.setData(0, Qt.UserRole, ("unsorted", subdir_path))
-
-                for file_path in sorted(unsorted, key=lambda f: f.name):
-                    from core.file_utils import format_file_size
-
-                    size = file_path.stat().st_size
-                    size_str = format_file_size(size)
-                    file_item = QTreeWidgetItem([file_path.name, size_str, ""])
-                    file_item.setData(0, Qt.UserRole, ("file", subdir_path, None, file_path))
-                    unsorted_item.addChild(file_item)
-
-                subdir_item.addChild(unsorted_item)
+            self._add_group_items(subdir_item, subdir_path)
+            self._add_sequence_items(subdir_item, subdir_path)
+            self._add_unsorted_items(subdir_item, subdir_path)
 
             self.tree_widget.addTopLevelItem(subdir_item)
 
         self._restore_expansion_state(expanded, first_populate)
+
+    def _add_group_items(self, parent: QTreeWidgetItem, subdir_path: str):
+        from core.file_utils import format_file_size
+
+        groups = self.file_groups.get(subdir_path, {})
+        for group_name, files in sorted(groups.items()):
+            group_item = QTreeWidgetItem([group_name, f"{len(files)} files", "Grouped"])
+            group_item.setForeground(2, QBrush(QColor(0, 150, 0)))
+            group_item.setData(0, Qt.UserRole, ("group", subdir_path, group_name))
+
+            for file_path in sorted(files, key=lambda f: f.name):
+                size_str = format_file_size(file_path.stat().st_size)
+                file_item = QTreeWidgetItem([file_path.name, size_str, ""])
+                file_item.setData(0, Qt.UserRole, ("file", subdir_path, group_name, file_path))
+                group_item.addChild(file_item)
+
+            parent.addChild(group_item)
+
+    def _add_sequence_items(self, parent: QTreeWidgetItem, subdir_path: str):
+        sequences = self.file_sequences.get(subdir_path, {})
+        for seq_key, seq in sorted(sequences.items()):
+            seq_item = QTreeWidgetItem([seq.label, f"{len(seq.files)} frames", "Sequence"])
+            seq_item.setForeground(0, QBrush(QColor(30, 144, 255)))
+            seq_item.setForeground(2, QBrush(QColor(30, 144, 255)))
+            seq_item.setData(0, Qt.UserRole, ("sequence", subdir_path, seq_key))
+            if seq.missing:
+                seq_item.setToolTip(
+                    0,
+                    f"Missing frames: {', '.join(str(f) for f in seq.missing[:20])}"
+                    + (" …" if len(seq.missing) > 20 else ""),
+                )
+            self._add_sequence_frame_items(seq_item, subdir_path, seq_key, seq)
+            parent.addChild(seq_item)
+
+    def _add_sequence_frame_items(self, parent: QTreeWidgetItem, subdir_path: str, seq_key: str, seq: SequenceGroup):
+        for fname in seq.files:
+            fpath = Path(subdir_path) / fname
+            try:
+                from core.file_utils import format_file_size
+
+                size_str = format_file_size(fpath.stat().st_size)
+            except Exception:
+                size_str = ""
+            frame_item = QTreeWidgetItem([fname, size_str, ""])
+            frame_item.setData(0, Qt.UserRole, ("file", subdir_path, seq_key, fpath))
+            parent.addChild(frame_item)
+
+    def _add_unsorted_items(self, parent: QTreeWidgetItem, subdir_path: str):
+        unsorted = self.unsorted_files.get(subdir_path, [])
+        if not unsorted:
+            return
+
+        from core.file_utils import format_file_size
+
+        unsorted_item = QTreeWidgetItem([_UNSORTED, f"{len(unsorted)} files", "Unsorted"])
+        unsorted_item.setForeground(0, QBrush(QColor(200, 100, 0)))
+        unsorted_item.setForeground(2, QBrush(QColor(200, 100, 0)))
+        unsorted_item.setFont(0, QFont("", -1, QFont.Bold))
+        unsorted_item.setData(0, Qt.UserRole, ("unsorted", subdir_path))
+
+        for file_path in sorted(unsorted, key=lambda f: f.name):
+            size_str = format_file_size(file_path.stat().st_size)
+            file_item = QTreeWidgetItem([file_path.name, size_str, ""])
+            file_item.setData(0, Qt.UserRole, ("file", subdir_path, None, file_path))
+            unsorted_item.addChild(file_item)
+
+        parent.addChild(unsorted_item)
 
     def show_context_menu(self, position):
         """Show context menu on right-click."""
@@ -596,75 +602,74 @@ class FileOrganizerTab(BaseTab):
         menu = QMenu()
 
         if data[0] == "group":
-            _, subdir_path, group_name = data
-
-            rename_action = menu.addAction("Rename Group")
-            rename_action.triggered.connect(
-                lambda checked=False, sp=subdir_path, gn=group_name: self.rename_group(sp, gn)
-            )
-
-            groups = [g for g in self.file_groups.get(subdir_path, {}).keys() if g != group_name]
-            if groups:
-                merge_menu = menu.addMenu("Merge with Group")
-                for other_group in sorted(groups):
-                    action = merge_menu.addAction(other_group)
-                    action.triggered.connect(
-                        lambda checked=False, sp=subdir_path, gn=group_name, og=other_group: self.merge_groups(
-                            sp, gn, og
-                        )
-                    )
-
-            delete_action = menu.addAction("Delete Group (move files to Unsorted)")
-            delete_action.triggered.connect(
-                lambda checked=False, sp=subdir_path, gn=group_name: self.delete_group(sp, gn)
-            )
-
+            self._build_group_context_menu(menu, data)
         elif data[0] == "file":
-            _, file_subdir, file_group, file_path = data
+            self._build_file_context_menu(menu, data)
 
-            # Only show move options for files in regular groups or in unsorted.
-            # Sequence frame items report a seq_key as file_group — skip those
-            # since sequences are managed as a unit.
-            in_group = file_group is not None and file_group in self.file_groups.get(file_subdir, {})
-            in_unsorted = file_group is None
-
-            if in_group:
-                to_unsorted = menu.addAction("Move to Unsorted")
-                to_unsorted.triggered.connect(
-                    lambda checked=False, fp=file_path, sd=file_subdir, fg=file_group: self._move_file_and_record(
-                        fp, sd, fg, None
-                    )
-                )
-
-                other_groups = sorted(g for g in self.file_groups.get(file_subdir, {}).keys() if g != file_group)
-                if other_groups:
-                    move_menu = menu.addMenu("Move to Group")
-                    for grp in other_groups:
-                        action = move_menu.addAction(grp)
-                        action.triggered.connect(
-                            lambda checked=False, fp=file_path, sd=file_subdir, fg=file_group, tg=grp: (
-                                self._move_file_and_record(fp, sd, fg, tg)
-                            )
-                        )
-
-            elif in_unsorted:
-                # File is in Unsorted — offer to move into a group
-                groups = sorted(self.file_groups.get(file_subdir, {}).keys())
-                if groups:
-                    move_menu = menu.addMenu("Move to Group")
-                    for grp in groups:
-                        action = move_menu.addAction(grp)
-                        action.triggered.connect(
-                            lambda checked=False, fp=file_path, sd=file_subdir, tg=grp: self._move_file_and_record(
-                                fp, sd, None, tg
-                            )
-                        )
-
-        # Don't show an empty menu
         if not menu.actions():
             return
 
         menu.exec(self.tree_widget.viewport().mapToGlobal(position))
+
+    def _build_group_context_menu(self, menu: QMenu, data: tuple):
+        _, subdir_path, group_name = data
+
+        rename_action = menu.addAction("Rename Group")
+        rename_action.triggered.connect(lambda checked=False, sp=subdir_path, gn=group_name: self.rename_group(sp, gn))
+
+        groups = [g for g in self.file_groups.get(subdir_path, {}).keys() if g != group_name]
+        if groups:
+            merge_menu = menu.addMenu("Merge with Group")
+            for other_group in sorted(groups):
+                action = merge_menu.addAction(other_group)
+                action.triggered.connect(
+                    lambda checked=False, sp=subdir_path, gn=group_name, og=other_group: self.merge_groups(sp, gn, og)
+                )
+
+        delete_action = menu.addAction("Delete Group (move files to Unsorted)")
+        delete_action.triggered.connect(lambda checked=False, sp=subdir_path, gn=group_name: self.delete_group(sp, gn))
+
+    def _build_file_context_menu(self, menu: QMenu, data: tuple):
+        _, file_subdir, file_group, file_path = data
+
+        in_group = file_group is not None and file_group in self.file_groups.get(file_subdir, {})
+        in_unsorted = file_group is None
+
+        if in_group:
+            self._build_grouped_file_menu(menu, file_path, file_subdir, file_group)
+        elif in_unsorted:
+            self._build_unsorted_file_menu(menu, file_path, file_subdir)
+
+    def _build_grouped_file_menu(self, menu: QMenu, file_path: Path, file_subdir: str, file_group: str):
+        to_unsorted = menu.addAction("Move to Unsorted")
+        to_unsorted.triggered.connect(
+            lambda checked=False, fp=file_path, sd=file_subdir, fg=file_group: self._move_file_and_record(
+                fp, sd, fg, None
+            )
+        )
+
+        other_groups = sorted(g for g in self.file_groups.get(file_subdir, {}).keys() if g != file_group)
+        if other_groups:
+            move_menu = menu.addMenu("Move to Group")
+            for grp in other_groups:
+                action = move_menu.addAction(grp)
+                action.triggered.connect(
+                    lambda checked=False, fp=file_path, sd=file_subdir, fg=file_group, tg=grp: (
+                        self._move_file_and_record(fp, sd, fg, tg)
+                    )
+                )
+
+    def _build_unsorted_file_menu(self, menu: QMenu, file_path: Path, file_subdir: str):
+        groups = sorted(self.file_groups.get(file_subdir, {}).keys())
+        if groups:
+            move_menu = menu.addMenu("Move to Group")
+            for grp in groups:
+                action = move_menu.addAction(grp)
+                action.triggered.connect(
+                    lambda checked=False, fp=file_path, sd=file_subdir, tg=grp: self._move_file_and_record(
+                        fp, sd, None, tg
+                    )
+                )
 
     def rename_group(self, subdir_path: str, old_name: str):
         """Rename a group."""
@@ -745,7 +750,7 @@ class FileOrganizerTab(BaseTab):
         """Move a single file and push a one-item batch to the undo stack."""
         self._move_file(file_path, subdir, source_group, target_group)
         self._push_undo_batch([(file_path, subdir, source_group, target_group)])
-        dest = target_group if target_group else "[UNSORTED]"
+        dest = target_group if target_group else _UNSORTED
         self.emit_status(f"Moved {file_path.name} \u2192 {dest}")
 
     def _push_undo_batch(self, records: list):
@@ -807,47 +812,19 @@ class FileOrganizerTab(BaseTab):
         if not target_data:
             return
 
-        if target_data[0] == "group":
-            _, target_subdir, target_group = target_data
-        elif target_data[0] == "unsorted":
-            _, target_subdir = target_data
-            target_group = None
-        else:
+        target_subdir, target_group = self._parse_drop_target(target_data)
+        if target_subdir is None:
             return
 
-        records = []  # (file_path, subdir, from_group, to_group) — for undo
-
+        records = []
         for file_path in dropped_files:
-            # Locate the file in the current data model
-            source_subdir = None
-            current_group = None
-            found = False
+            source_subdir, current_group = self._find_file_location(file_path)
 
-            for subdir_path, groups in self.file_groups.items():
-                for group_name, files in groups.items():
-                    if file_path in files:
-                        current_group = group_name
-                        source_subdir = subdir_path
-                        found = True
-                        break
-                if found:
-                    break
-
-            if not found:
-                for subdir_path, files in self.unsorted_files.items():
-                    if file_path in files:
-                        current_group = None
-                        source_subdir = subdir_path
-                        found = True
-                        break
-
-            if not found:
+            if source_subdir is None:
                 continue
-
             if source_subdir != target_subdir:
                 self.show_warning("Invalid Move", "Cannot move files between different subdirectories.")
                 continue
-
             if current_group == target_group:
                 continue
 
@@ -857,8 +834,32 @@ class FileOrganizerTab(BaseTab):
         if records:
             self.populate_tree()
             self._push_undo_batch(records)
-            dest = target_group if target_group else "[UNSORTED]"
+            dest = target_group if target_group else _UNSORTED
             self.emit_status(f"Moved {len(records)} file(s) \u2192 {dest}")
+
+    def _parse_drop_target(self, target_data: tuple) -> tuple:
+        """Return (target_subdir, target_group) or (None, None) if invalid."""
+        if target_data[0] == "group":
+            return target_data[1], target_data[2]
+        if target_data[0] == "unsorted":
+            return target_data[1], None
+        return None, None
+
+    def _find_file_location(self, file_path: Path) -> tuple:
+        """Return (subdir, group_name) for a file, or (None, None) if not found.
+
+        group_name is None when the file is in the unsorted bucket.
+        """
+        for subdir_path, groups in self.file_groups.items():
+            for group_name, files in groups.items():
+                if file_path in files:
+                    return subdir_path, group_name
+
+        for subdir_path, files in self.unsorted_files.items():
+            if file_path in files:
+                return subdir_path, None
+
+        return None, None
 
     def organize_files(self):
         """Start organizing files into folders."""

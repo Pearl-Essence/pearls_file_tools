@@ -62,6 +62,7 @@ from ui.widgets.tab_header import TabHeader
 
 _CFG_PROFILES = "naming.profiles"
 _CFG_ACTIVE_PROFILE = "naming.active_profile"
+_MSG_NO_DIR = "No Directory"
 
 
 def _make_section(eyebrow: str) -> Tuple[Panel, QVBoxLayout]:
@@ -905,37 +906,42 @@ class BulkRenamerTab(BaseTab):
         extensions = active_extensions if active_extensions else None
         recursive = self.recursive_check.isChecked()
 
-        # Primary directory
         all_dirs = [directory] + [d for d in self._queued_dirs if d != directory]
 
         if len(all_dirs) == 1:
             files = get_files_in_directory(directory, extensions, recursive)
             self.file_list.set_files(files, relative_to=directory if recursive else None)
         else:
-            # Multi-directory: load from each dir; display paths relative to
-            # the nearest common ancestor so the folder name acts as a prefix.
-            all_files: List[Path] = []
-            for d in all_dirs:
-                if d.exists():
-                    all_files.extend(get_files_in_directory(d, extensions, recursive))
-            try:
-                rel_root: Optional[Path] = all_dirs[0].parent
-                for d in all_dirs[1:]:
-                    while not str(d).startswith(str(rel_root)):
-                        rel_root = rel_root.parent
-            except Exception:
-                rel_root = None
-            self.file_list.set_files(all_files, relative_to=rel_root)
+            self._load_multi_directory(all_dirs, extensions, recursive)
 
         n = self.file_list.table.rowCount()
         dir_suffix = f" from {len(all_dirs)} directories" if len(all_dirs) > 1 else ""
         self.emit_status(f"Loaded {n} files{dir_suffix}")
 
+    def _load_multi_directory(self, all_dirs: List[Path], extensions, recursive: bool):
+        all_files: List[Path] = []
+        for d in all_dirs:
+            if d.exists():
+                all_files.extend(get_files_in_directory(d, extensions, recursive))
+        rel_root = self._find_common_ancestor(all_dirs)
+        self.file_list.set_files(all_files, relative_to=rel_root)
+
+    @staticmethod
+    def _find_common_ancestor(dirs: List[Path]) -> Optional[Path]:
+        try:
+            root: Optional[Path] = dirs[0].parent
+            for d in dirs[1:]:
+                while not str(d).startswith(str(root)):
+                    root = root.parent
+            return root
+        except Exception:
+            return None
+
     # ── multi-directory queue ─────────────────────────────────────────────
 
     def _add_dir_to_queue(self):
         if not self.current_directory:
-            self.show_warning("No Directory", "Select a directory first.")
+            self.show_warning(_MSG_NO_DIR, "Select a directory first.")
             return
         p = Path(self.current_directory)
         if p in self._queued_dirs:
@@ -990,19 +996,12 @@ class BulkRenamerTab(BaseTab):
             self.show_warning("No Root", "Select a root folder in Batch Mode.")
             return
 
-        checked_dirs = []
-        for i in range(self.batch_subdir_list.count()):
-            item = self.batch_subdir_list.item(i)
-            if item.checkState() == Qt.Checked:
-                checked_dirs.append(self._batch_root / item.text())
-
+        checked_dirs = self._get_checked_batch_dirs()
         if not checked_dirs:
             self.show_warning("None Selected", "Check at least one subdirectory.")
             return
 
         from PySide6.QtWidgets import QProgressDialog
-
-        from workers.rename_worker import RenameWorker
 
         active_extensions = self.get_active_extensions()
         extensions = active_extensions if active_extensions else None
@@ -1020,62 +1019,9 @@ class BulkRenamerTab(BaseTab):
             progress.setLabelText(f"Processing {subdir.name}…")
             progress.setValue(idx)
             QApplication.processEvents()
-
-            try:
-                files = get_files_in_directory(subdir, extensions, False)
-                if not files:
-                    continue
-
-                if mode == 1:
-                    base = self.seq_base_input.text().strip()
-                    if not base:
-                        errors.append(f"{subdir.name}: no base name set")
-                        continue
-                    pairs_seq = generate_sequential_filenames(
-                        [f.name for f in files],
-                        base_name=base,
-                        start=self.seq_start_spin.value(),
-                        padding=self.seq_padding_spin.value(),
-                        separator=self.seq_separator_input.text(),
-                    )
-                    direct = [(files[i], new) for i, (_, new) in enumerate(pairs_seq)]
-                elif mode == 2:
-                    composed = self._get_template_composed_name()
-                    if not composed:
-                        errors.append(f"{subdir.name}: template incomplete")
-                        continue
-                    sep = self._current_template.separator if self._current_template else "_"
-                    direct = [(f, f"{composed}{sep}{str(j + 1).zfill(3)}{f.suffix}") for j, f in enumerate(files)]
-                else:
-                    direct = None
-
-                if direct is not None:
-                    worker = RenameWorker(
-                        [],
-                        direct_renames=direct,
-                        rename_sidecars=self.rename_sidecars_chk.isChecked(),
-                        rename_captions=self.rename_captions_chk.isChecked(),
-                    )
-                else:
-                    worker = RenameWorker(
-                        files,
-                        prefix=self.prefix_input.text(),
-                        suffix=self.suffix_input.text(),
-                        rename_to=self.rename_input.text(),
-                        case_transform=self.get_case_transform(),
-                        find_prefix=self.replace_prefix_find.text(),
-                        replace_prefix_with=self.replace_prefix_with.text(),
-                        find_suffix=self.replace_suffix_find.text(),
-                        replace_suffix_with=self.replace_suffix_with.text(),
-                        rename_sidecars=self.rename_sidecars_chk.isChecked(),
-                        rename_captions=self.rename_captions_chk.isChecked(),
-                    )
-
-                # Run synchronously in the worker thread and wait
-                worker.run()
-
-            except Exception as exc:
-                errors.append(f"{subdir.name}: {exc}")
+            error = self._batch_rename_subdir(subdir, mode, extensions)
+            if error:
+                errors.append(error)
 
         progress.setValue(len(checked_dirs))
 
@@ -1085,6 +1031,87 @@ class BulkRenamerTab(BaseTab):
             self.show_info("Batch Complete", f"Processed {len(checked_dirs)} director(ies) successfully.")
 
         self.refresh_file_list()
+
+    def _get_checked_batch_dirs(self) -> List[Path]:
+        dirs = []
+        for i in range(self.batch_subdir_list.count()):
+            item = self.batch_subdir_list.item(i)
+            if item.checkState() == Qt.Checked:
+                dirs.append(self._batch_root / item.text())
+        return dirs
+
+    def _batch_rename_subdir(self, subdir: Path, mode: int, extensions) -> Optional[str]:
+        """Process one subdirectory for batch rename. Returns an error string or None."""
+        try:
+            files = get_files_in_directory(subdir, extensions, False)
+            if not files:
+                return None
+
+            worker = self._build_batch_worker(files, mode, subdir.name)
+            if isinstance(worker, str):
+                return worker
+            worker.run()
+            return None
+        except Exception as exc:
+            return f"{subdir.name}: {exc}"
+
+    def _build_batch_worker(self, files, mode: int, dir_name: str):
+        """Build a RenameWorker for one batch subdirectory.
+
+        Returns a RenameWorker on success or an error string on validation failure.
+        """
+        from workers.rename_worker import RenameWorker
+
+        direct = self._build_batch_direct_renames(files, mode, dir_name)
+        if isinstance(direct, str):
+            return direct
+
+        if direct is not None:
+            return RenameWorker(
+                [],
+                direct_renames=direct,
+                rename_sidecars=self.rename_sidecars_chk.isChecked(),
+                rename_captions=self.rename_captions_chk.isChecked(),
+            )
+        return RenameWorker(
+            files,
+            prefix=self.prefix_input.text(),
+            suffix=self.suffix_input.text(),
+            rename_to=self.rename_input.text(),
+            case_transform=self.get_case_transform(),
+            find_prefix=self.replace_prefix_find.text(),
+            replace_prefix_with=self.replace_prefix_with.text(),
+            find_suffix=self.replace_suffix_find.text(),
+            replace_suffix_with=self.replace_suffix_with.text(),
+            rename_sidecars=self.rename_sidecars_chk.isChecked(),
+            rename_captions=self.rename_captions_chk.isChecked(),
+        )
+
+    def _build_batch_direct_renames(self, files, mode: int, dir_name: str):
+        """Build direct-rename pairs for sequential/template modes.
+
+        Returns a list of (Path, str) pairs, None for standard mode,
+        or an error string on validation failure.
+        """
+        if mode == 1:
+            base = self.seq_base_input.text().strip()
+            if not base:
+                return f"{dir_name}: no base name set"
+            pairs_seq = generate_sequential_filenames(
+                [f.name for f in files],
+                base_name=base,
+                start=self.seq_start_spin.value(),
+                padding=self.seq_padding_spin.value(),
+                separator=self.seq_separator_input.text(),
+            )
+            return [(files[i], new) for i, (_, new) in enumerate(pairs_seq)]
+        if mode == 2:
+            composed = self._get_template_composed_name()
+            if not composed:
+                return f"{dir_name}: template incomplete"
+            sep = self._current_template.separator if self._current_template else "_"
+            return [(f, f"{composed}{sep}{str(j + 1).zfill(3)}{f.suffix}") for j, f in enumerate(files)]
+        return None
 
     # ── token detection (transposition) ──────────────────────────────────
 
@@ -1479,7 +1506,7 @@ class BulkRenamerTab(BaseTab):
         import sys
 
         if not self.current_directory:
-            self.show_warning("No Directory", "No directory selected.")
+            self.show_warning(_MSG_NO_DIR, "No directory selected.")
             return
         pattern = str(Path(self.current_directory) / "_pearls_rename_log_*.csv")
         matches = sorted(glob.glob(pattern))
@@ -1527,7 +1554,7 @@ class BulkRenamerTab(BaseTab):
     def lint_folder(self):
         """Lint filenames in the current directory and show a LintDialog."""
         if not self.current_directory:
-            self.show_warning("No Directory", "No directory selected.")
+            self.show_warning(_MSG_NO_DIR, "No directory selected.")
             return
         from core.linter import FilenameLint
         from ui.dialogs.lint_dialog import LintDialog
