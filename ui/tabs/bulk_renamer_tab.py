@@ -63,6 +63,8 @@ from ui.widgets.tab_header import TabHeader
 _CFG_PROFILES = "naming.profiles"
 _CFG_ACTIVE_PROFILE = "naming.active_profile"
 _MSG_NO_DIR = "No Directory"
+_LABEL_NONE = "(None)"
+_TITLE_NO_FILES = "No Files"
 
 
 def _make_section(eyebrow: str) -> Tuple[Panel, QVBoxLayout]:
@@ -361,7 +363,7 @@ class BulkRenamerTab(BaseTab):
         self.profile_combo.setToolTip(
             "The active profile drives the Template rename mode and the conformance check in Lint Folder."
         )
-        self.profile_combo.addItem("(None)")
+        self.profile_combo.addItem(_LABEL_NONE)
         self.profile_combo.currentTextChanged.connect(self._on_profile_changed)
         row.addWidget(self.profile_combo)
 
@@ -386,7 +388,7 @@ class BulkRenamerTab(BaseTab):
         self.profile_combo.blockSignals(True)
         current = self.profile_combo.currentText()
         self.profile_combo.clear()
-        self.profile_combo.addItem("(None)")
+        self.profile_combo.addItem(_LABEL_NONE)
         for d in self.config.get(_CFG_PROFILES, []):
             name = d.get("name", "")
             if name:
@@ -397,7 +399,7 @@ class BulkRenamerTab(BaseTab):
 
     def _get_active_profile(self) -> Optional[ProductionTemplate]:
         name = self.profile_combo.currentText()
-        if name == "(None)":
+        if name == _LABEL_NONE:
             return None
         for d in self.config.get(_CFG_PROFILES, []):
             if d.get("name") == name:
@@ -405,7 +407,7 @@ class BulkRenamerTab(BaseTab):
         return None
 
     def _on_profile_changed(self, name: str):
-        self.config.set(_CFG_ACTIVE_PROFILE, name if name != "(None)" else None)
+        self.config.set(_CFG_ACTIVE_PROFILE, name if name != _LABEL_NONE else None)
         self._rebuild_template_panel(self._get_active_profile())
 
     def _save_as_profile(self):
@@ -472,6 +474,20 @@ class BulkRenamerTab(BaseTab):
         self._rebuild_template_panel(None)
         return panel
 
+    @staticmethod
+    def _placeholder_for_token(template: ProductionTemplate, token: str) -> str:
+        if token == "VER":
+            try:
+                return f"e.g. {template.version_format.format(1)}"
+            except Exception:
+                return "e.g. v01"
+        if token in ("EP", "EPISODE"):
+            try:
+                return f"e.g. {template.episode_format.format(1)}"
+            except Exception:
+                return "e.g. EP01"
+        return f"\u2014 {token} \u2014"
+
     def _rebuild_template_panel(self, profile: Optional[ProductionTemplate] = None):
         """Rebuild token QLineEdits for *profile* (or DEFAULT_TEMPLATE)."""
         if not hasattr(self, "template_tokens_layout"):
@@ -487,19 +503,7 @@ class BulkRenamerTab(BaseTab):
 
         for token in template.tokens:
             edit = QLineEdit()
-            if token == "VER":
-                try:
-                    placeholder = f"e.g. {template.version_format.format(1)}"
-                except Exception:
-                    placeholder = "e.g. v01"
-            elif token in ("EP", "EPISODE"):
-                try:
-                    placeholder = f"e.g. {template.episode_format.format(1)}"
-                except Exception:
-                    placeholder = "e.g. EP01"
-            else:
-                placeholder = f"\u2014 {token} \u2014"
-            edit.setPlaceholderText(placeholder)
+            edit.setPlaceholderText(self._placeholder_for_token(template, token))
             edit.textChanged.connect(self._update_template_preview)
             self.template_tokens_layout.addRow(token + ":", edit)
             self.template_inputs[token] = edit
@@ -1060,7 +1064,7 @@ class BulkRenamerTab(BaseTab):
 
         Returns a RenameWorker on success or an error string on validation failure.
         """
-        from workers.rename_worker import RenameWorker
+        from workers.rename_worker import RenameConfig, RenameWorker
 
         direct = self._build_batch_direct_renames(files, mode, dir_name)
         if isinstance(direct, str):
@@ -1069,22 +1073,26 @@ class BulkRenamerTab(BaseTab):
         if direct is not None:
             return RenameWorker(
                 [],
-                direct_renames=direct,
-                rename_sidecars=self.rename_sidecars_chk.isChecked(),
-                rename_captions=self.rename_captions_chk.isChecked(),
+                RenameConfig(
+                    direct_renames=direct,
+                    rename_sidecars=self.rename_sidecars_chk.isChecked(),
+                    rename_captions=self.rename_captions_chk.isChecked(),
+                ),
             )
         return RenameWorker(
             files,
-            prefix=self.prefix_input.text(),
-            suffix=self.suffix_input.text(),
-            rename_to=self.rename_input.text(),
-            case_transform=self.get_case_transform(),
-            find_prefix=self.replace_prefix_find.text(),
-            replace_prefix_with=self.replace_prefix_with.text(),
-            find_suffix=self.replace_suffix_find.text(),
-            replace_suffix_with=self.replace_suffix_with.text(),
-            rename_sidecars=self.rename_sidecars_chk.isChecked(),
-            rename_captions=self.rename_captions_chk.isChecked(),
+            RenameConfig(
+                prefix=self.prefix_input.text(),
+                suffix=self.suffix_input.text(),
+                rename_to=self.rename_input.text(),
+                case_transform=self.get_case_transform(),
+                find_prefix=self.replace_prefix_find.text(),
+                replace_prefix_with=self.replace_prefix_with.text(),
+                find_suffix=self.replace_suffix_find.text(),
+                replace_suffix_with=self.replace_suffix_with.text(),
+                rename_sidecars=self.rename_sidecars_chk.isChecked(),
+                rename_captions=self.rename_captions_chk.isChecked(),
+            ),
         )
 
     def _build_batch_direct_renames(self, files, mode: int, dir_name: str):
@@ -1118,7 +1126,7 @@ class BulkRenamerTab(BaseTab):
     def detect_tokens(self):
         files = self.file_list.get_all_files()
         if not files:
-            self.show_warning("No Files", "No files loaded to analyze.")
+            self.show_warning(_TITLE_NO_FILES, "No files loaded to analyze.")
             return
         filenames = [f.name for f in files]
         is_prefix_mode = self.transpose_p2s_radio.isChecked()
@@ -1271,7 +1279,7 @@ class BulkRenamerTab(BaseTab):
         """
         selected_files = self.file_list.get_selected_files()
         if not selected_files:
-            self.show_warning("No Files", "No files selected for preview.")
+            self.show_warning(_TITLE_NO_FILES, "No files selected for preview.")
             return
 
         selected_files = self._filter_hidden_files(selected_files)
@@ -1318,7 +1326,7 @@ class BulkRenamerTab(BaseTab):
 
     def _apply_sequential(self, selected_files, copy_mode, copy_dest):
         """Build and confirm the sequential-numbering rename. Returns a RenameWorker or None."""
-        from workers.rename_worker import RenameWorker
+        from workers.rename_worker import RenameConfig, RenameWorker
 
         base = self.seq_base_input.text().strip()
         if not base:
@@ -1343,16 +1351,18 @@ class BulkRenamerTab(BaseTab):
             return None
         return RenameWorker(
             selected_files,
-            direct_renames=direct,
-            copy_mode=copy_mode,
-            copy_dest=copy_dest,
-            rename_sidecars=self.rename_sidecars_chk.isChecked(),
-            rename_captions=self.rename_captions_chk.isChecked(),
+            RenameConfig(
+                direct_renames=direct,
+                copy_mode=copy_mode,
+                copy_dest=copy_dest,
+                rename_sidecars=self.rename_sidecars_chk.isChecked(),
+                rename_captions=self.rename_captions_chk.isChecked(),
+            ),
         )
 
     def _apply_template(self, selected_files, copy_mode, copy_dest):
         """Build and confirm the template rename. Returns a RenameWorker or None."""
-        from workers.rename_worker import RenameWorker
+        from workers.rename_worker import RenameConfig, RenameWorker
 
         base = self._get_template_composed_name()
         if not base:
@@ -1374,16 +1384,18 @@ class BulkRenamerTab(BaseTab):
             return None
         return RenameWorker(
             selected_files,
-            direct_renames=direct,
-            copy_mode=copy_mode,
-            copy_dest=copy_dest,
-            rename_sidecars=self.rename_sidecars_chk.isChecked(),
-            rename_captions=self.rename_captions_chk.isChecked(),
+            RenameConfig(
+                direct_renames=direct,
+                copy_mode=copy_mode,
+                copy_dest=copy_dest,
+                rename_sidecars=self.rename_sidecars_chk.isChecked(),
+                rename_captions=self.rename_captions_chk.isChecked(),
+            ),
         )
 
     def _apply_standard(self, selected_files, copy_mode, copy_dest):
         """Build and confirm the standard rename. Returns a RenameWorker or None."""
-        from workers.rename_worker import RenameWorker
+        from workers.rename_worker import RenameConfig, RenameWorker
 
         tokens = self.get_selected_prefixes()
         is_p2s = self.transpose_p2s_radio.isChecked()
@@ -1397,28 +1409,30 @@ class BulkRenamerTab(BaseTab):
             return None
         return RenameWorker(
             selected_files,
-            prefix=self.prefix_input.text(),
-            suffix=self.suffix_input.text(),
-            rename_to=self.rename_input.text(),
-            case_transform=self.get_case_transform(),
-            prefix_to_suffix=prefix_to_suffix,
-            suffix_to_prefix=suffix_to_prefix,
-            find_prefix=self.replace_prefix_find.text(),
-            replace_prefix_with=self.replace_prefix_with.text(),
-            find_suffix=self.replace_suffix_find.text(),
-            replace_suffix_with=self.replace_suffix_with.text(),
-            copy_mode=copy_mode,
-            copy_dest=copy_dest,
-            include_hidden=self.include_hidden_chk.isChecked(),
-            rename_sidecars=self.rename_sidecars_chk.isChecked(),
-            rename_captions=self.rename_captions_chk.isChecked(),
+            RenameConfig(
+                prefix=self.prefix_input.text(),
+                suffix=self.suffix_input.text(),
+                rename_to=self.rename_input.text(),
+                case_transform=self.get_case_transform(),
+                prefix_to_suffix=prefix_to_suffix,
+                suffix_to_prefix=suffix_to_prefix,
+                find_prefix=self.replace_prefix_find.text(),
+                replace_prefix_with=self.replace_prefix_with.text(),
+                find_suffix=self.replace_suffix_find.text(),
+                replace_suffix_with=self.replace_suffix_with.text(),
+                copy_mode=copy_mode,
+                copy_dest=copy_dest,
+                include_hidden=self.include_hidden_chk.isChecked(),
+                rename_sidecars=self.rename_sidecars_chk.isChecked(),
+                rename_captions=self.rename_captions_chk.isChecked(),
+            ),
         )
 
     def apply_rename(self):
         """Apply rename — dispatches to standard, sequential, or template mode."""
         selected_files = self.file_list.get_selected_files()
         if not selected_files:
-            self.show_warning("No Files", "No files selected for renaming.")
+            self.show_warning(_TITLE_NO_FILES, "No files selected for renaming.")
             return
 
         result = self._validate_copy_dest()
@@ -1447,7 +1461,7 @@ class BulkRenamerTab(BaseTab):
         """Bump the _v## suffix on all selected files."""
         selected_files = self.file_list.get_selected_files()
         if not selected_files:
-            self.show_warning("No Files", "No files selected.")
+            self.show_warning(_TITLE_NO_FILES, "No files selected.")
             return
         direct = [(f, bump_version(f.name)) for f in selected_files]
         direct = [(path, new) for path, new in direct if new != path.name]
@@ -1463,9 +1477,9 @@ class BulkRenamerTab(BaseTab):
             f"Increment version suffix on {len(direct)} file(s)?\n\nThis can be undone using 'Undo Last Operation'.",
         ):
             return
-        from workers.rename_worker import RenameWorker
+        from workers.rename_worker import RenameConfig, RenameWorker
 
-        self.worker_thread = RenameWorker([], direct_renames=direct)
+        self.worker_thread = RenameWorker([], RenameConfig(direct_renames=direct))
         self.worker_thread.progress.connect(self.emit_status)
         self.worker_thread.finished.connect(self.on_rename_finished)
         self.worker_thread.start()
@@ -1572,7 +1586,7 @@ class BulkRenamerTab(BaseTab):
         selected = self.file_list.get_selected_files()
         files = selected if selected else self.file_list.get_all_files()
         if not files:
-            self.show_warning("No Files", "No files loaded.")
+            self.show_warning(_TITLE_NO_FILES, "No files loaded.")
             return
         from ui.dialogs.normalize_dialog import NormalizeDialog
 
@@ -1583,13 +1597,15 @@ class BulkRenamerTab(BaseTab):
         if not pairs:
             self.show_info("No Changes", "No files matched the current patterns.")
             return
-        from workers.rename_worker import RenameWorker
+        from workers.rename_worker import RenameConfig, RenameWorker
 
         self.worker_thread = RenameWorker(
             [],
-            direct_renames=pairs,
-            rename_sidecars=self.rename_sidecars_chk.isChecked(),
-            rename_captions=self.rename_captions_chk.isChecked(),
+            RenameConfig(
+                direct_renames=pairs,
+                rename_sidecars=self.rename_sidecars_chk.isChecked(),
+                rename_captions=self.rename_captions_chk.isChecked(),
+            ),
         )
         self.worker_thread.progress.connect(self.emit_status)
         self.worker_thread.finished.connect(self.on_rename_finished)

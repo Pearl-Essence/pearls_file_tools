@@ -13,7 +13,7 @@ find_python3() {
     for cmd in python3 python; do
         if command -v "$cmd" &>/dev/null; then
             major=$("$cmd" -c 'import sys; print(sys.version_info.major)' 2>/dev/null || echo 0)
-            if [ "$major" -ge 3 ]; then
+            if [[ "$major" -ge 3 ]]; then
                 echo "$cmd"
                 return
             fi
@@ -28,8 +28,9 @@ pip_install() {
 
 ask() {
     # ask <prompt> → returns 0 (yes) or 1 (no)
+    local prompt="$1"
     local yn
-    read -r -p "  $1 [y/N] " yn
+    read -r -p "  $prompt [y/N] " yn
     [[ "$yn" =~ ^[Yy]$ ]]
 }
 
@@ -44,8 +45,8 @@ run_setup() {
 
     # 1. Locate Python 3
     BASE_PYTHON=$(find_python3)
-    if [ -z "$BASE_PYTHON" ]; then
-        echo "ERROR: Python 3 not found on this system."
+    if [[ -z "$BASE_PYTHON" ]]; then
+        echo "ERROR: Python 3 not found on this system." >&2
         echo ""
         echo "Install it with one of these methods:"
         echo "  macOS  → brew install python"
@@ -59,7 +60,7 @@ run_setup() {
     echo ""
 
     # 2. Create virtual environment
-    if [ -d "$VENV_DIR" ]; then
+    if [[ -d "$VENV_DIR" ]]; then
         echo "Virtual environment already exists — skipping creation."
     else
         echo "Creating virtual environment in .venv/ ..."
@@ -73,8 +74,8 @@ run_setup() {
 
     # 4. Required dependency
     echo "Installing required dependency..."
-    pip_install "PyQt5>=5.15.0"
-    echo "  ✓  PyQt5"
+    pip_install "PySide6>=6.11.1"
+    echo "  ✓  PySide6"
     echo ""
 
     # 5. Optional dependencies
@@ -121,7 +122,7 @@ run_setup() {
 
 # ── entry point ───────────────────────────────────────────────────────────────
 
-if [ "${1:-}" = "--setup" ]; then
+if [[ "${1:-}" = "--setup" ]]; then
     run_setup
 fi
 
@@ -137,16 +138,16 @@ else
     fi
 fi
 
-# Check PyQt5 is present before trying to launch
-if ! "$PYTHON" -c "import PyQt5" 2>/dev/null; then
-    echo "ERROR: PyQt5 is not installed." >&2
+# Check PySide6 is present before trying to launch
+if ! "$PYTHON" -c "import PySide6" 2>/dev/null; then
+    echo "ERROR: PySide6 is not installed." >&2
     echo ""
     echo "Run setup to install everything automatically:"
     echo "  ./run.sh --setup"
     exit 1
 fi
 
-# macOS: required for Qt 5.15+ layer-backed views
+# macOS: required for Qt layer-backed views
 if [[ "$(uname)" = "Darwin" ]]; then
     export QT_MAC_WANTS_LAYER=1
 fi

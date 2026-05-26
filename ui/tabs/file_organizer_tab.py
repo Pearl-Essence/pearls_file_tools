@@ -466,23 +466,23 @@ class FileOrganizerTab(BaseTab):
         self.organize_btn.setEnabled(True)
         self.new_group_btn.setEnabled(True)
 
+    @staticmethod
+    def _expanded_keys(parent) -> set:
+        """Collect UserRole data keys from expanded children of *parent*."""
+        keys = set()
+        for i in range(parent.childCount()):
+            item = parent.child(i)
+            if not item.isExpanded():
+                continue
+            d = item.data(0, Qt.UserRole)
+            if d:
+                keys.add(d)
+            keys.update(FileOrganizerTab._expanded_keys(item))
+        return keys
+
     def _save_expansion_state(self) -> set:
         """Return the set of UserRole data tuples for every currently expanded item."""
-        expanded = set()
-        root = self.tree_widget.invisibleRootItem()
-        for i in range(root.childCount()):
-            top = root.child(i)
-            if top.isExpanded():
-                d = top.data(0, Qt.UserRole)
-                if d:
-                    expanded.add(d)
-                for j in range(top.childCount()):
-                    child = top.child(j)
-                    if child.isExpanded():
-                        d = child.data(0, Qt.UserRole)
-                        if d:
-                            expanded.add(d)
-        return expanded
+        return self._expanded_keys(self.tree_widget.invisibleRootItem())
 
     def _restore_expansion_state(self, expanded: set, first_populate: bool):
         """Expand items whose data key is in *expanded*; expand all top-level on first populate."""

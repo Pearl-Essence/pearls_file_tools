@@ -59,53 +59,10 @@ class RenameWorker(BaseWorker):
     def emit_finished(self, success: bool, message: str, record=None):
         self.finished.emit(success, message, record)
 
-    def __init__(
-        self,
-        files: List[Path],
-        config: Optional[RenameConfig] = None,
-        *,
-        prefix: str = "",
-        suffix: str = "",
-        rename_to: str = "",
-        case_transform: str = "none",
-        prefix_to_suffix: Optional[List[str]] = None,
-        suffix_to_prefix: Optional[List[str]] = None,
-        find_prefix: str = "",
-        replace_prefix_with: str = "",
-        find_suffix: str = "",
-        replace_suffix_with: str = "",
-        direct_renames: Optional[List[Tuple[Path, str]]] = None,
-        copy_mode: bool = False,
-        copy_dest: Optional[Path] = None,
-        rename_sidecars: bool = True,
-        rename_captions: bool = True,
-        write_manifest: bool = True,
-        include_hidden: bool = False,
-    ):
+    def __init__(self, files: List[Path], config: Optional[RenameConfig] = None):
         super().__init__()
         self.files = files
-        if config is not None:
-            self.config = config
-        else:
-            self.config = RenameConfig(
-                prefix=prefix,
-                suffix=suffix,
-                rename_to=rename_to,
-                case_transform=case_transform,
-                prefix_to_suffix=prefix_to_suffix,
-                suffix_to_prefix=suffix_to_prefix,
-                find_prefix=find_prefix,
-                replace_prefix_with=replace_prefix_with,
-                find_suffix=find_suffix,
-                replace_suffix_with=replace_suffix_with,
-                direct_renames=direct_renames,
-                copy_mode=copy_mode,
-                copy_dest=copy_dest,
-                rename_sidecars=rename_sidecars,
-                rename_captions=rename_captions,
-                write_manifest=write_manifest,
-                include_hidden=include_hidden,
-            )
+        self.config = config if config is not None else RenameConfig()
 
     # ── helpers ──────────────────────────────────────────────────────────────
 

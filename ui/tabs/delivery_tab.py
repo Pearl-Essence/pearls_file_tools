@@ -55,6 +55,7 @@ _GREY = QColor("#888888")
 
 _STYLE_BTN = "padding: 8px 20px;"
 _STYLE_SUMMARY = "font-weight: bold; padding: 2px 0;"
+_LABEL_FOLDER = "Folder:"
 _MSG_NO_FOLDER = "No Folder"
 _MSG_SELECT_FOLDER = "Please select a valid folder."
 
@@ -250,7 +251,7 @@ class _ValidatorPane(QWidget):
         layout.setSpacing(6)
 
         # ── Top pinned: directory ─────────────────────────────────────────────
-        self.dir_selector = DirectorySelectorWidget(label_text="Folder:")
+        self.dir_selector = DirectorySelectorWidget(label_text=_LABEL_FOLDER)
         layout.addWidget(self.dir_selector)
 
         # ── Scrollable options ────────────────────────────────────────────────
@@ -502,7 +503,7 @@ class _DuplicatesPane(QWidget):
         layout.setSpacing(6)
 
         # ── Top pinned: directory ─────────────────────────────────────────────
-        self.dir_selector = DirectorySelectorWidget(label_text="Folder:")
+        self.dir_selector = DirectorySelectorWidget(label_text=_LABEL_FOLDER)
         layout.addWidget(self.dir_selector)
 
         # ── Results tree (fills remaining space) ──────────────────────────────
@@ -648,7 +649,7 @@ class _HandoffPane(QWidget):
         layout.setSpacing(6)
 
         # ── Top pinned: directory ─────────────────────────────────────────────
-        self.dir_selector = DirectorySelectorWidget(label_text="Folder:")
+        self.dir_selector = DirectorySelectorWidget(label_text=_LABEL_FOLDER)
         layout.addWidget(self.dir_selector)
 
         # ── Scrollable options: rule description note ─────────────────────────
@@ -739,7 +740,7 @@ class _ExportPane(QWidget):
         layout.setSpacing(6)
 
         # ── Top pinned: directory, project name, format toggle ────────────────
-        self.dir_selector = DirectorySelectorWidget(label_text="Folder:")
+        self.dir_selector = DirectorySelectorWidget(label_text=_LABEL_FOLDER)
         layout.addWidget(self.dir_selector)
 
         name_row = QHBoxLayout()

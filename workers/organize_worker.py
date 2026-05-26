@@ -33,6 +33,22 @@ class OrganizeWorker(BaseWorker):
         self.pending_response: Optional[str] = None
         self.apply_to_all: Optional[str] = None
 
+    def _process_group(self, subdir, group_name, files, processed, total_files):
+        """Process a single group — returns updated count, or ``None`` on cancel."""
+        if not files:
+            return processed
+
+        target_folder = subdir / group_name
+        action = self._resolve_folder_action(group_name, subdir, files, target_folder)
+        if action is None:
+            return None
+
+        if action == "skip":
+            self.progress.emit(f"Skipped {group_name} (folder exists)", processed, total_files)
+            return processed + len(files)
+
+        return self._move_group_files(files, target_folder, group_name, processed, total_files)
+
     def run(self):
         """Execute the file organization."""
         try:
@@ -47,30 +63,12 @@ class OrganizeWorker(BaseWorker):
                     return
 
                 subdir = Path(subdir_path)
-
                 for group_name, files in groups.items():
                     if self.is_cancelled:
                         self.finished.emit(False, _MSG_CANCELLED)
                         return
-
-                    if not files:
-                        continue
-
-                    target_folder = subdir / group_name
-
-                    action = self._resolve_folder_action(group_name, subdir, files, target_folder)
-                    if action is None:
-                        # Cancelled
-                        return
-
-                    if action == "skip":
-                        self.progress.emit(f"Skipped {group_name} (folder exists)", processed, total_files)
-                        processed += len(files)
-                        continue
-
-                    processed = self._move_group_files(files, target_folder, group_name, processed, total_files)
+                    processed = self._process_group(subdir, group_name, files, processed, total_files)
                     if processed is None:
-                        # Cancelled
                         return
 
             self.finished.emit(True, f"Successfully organized {processed} files!")
